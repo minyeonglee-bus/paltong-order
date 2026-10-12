@@ -1,0 +1,611 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="robots" content="noindex">
+<meta name="theme-color" content="#d33d2a">
+<title>기사 상세 · 빨통</title>
+<link rel="icon" type="image/png" href="rider-icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Black+Han+Sans&family=Noto+Sans+KR:wght@400;500;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<link rel="stylesheet" href="style.css">
+<style>
+  body{max-width:1180px;}
+  .topbar{top:0;}
+  .top-actions{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end;}
+  .sm-btn{border:1px solid var(--line);background:var(--surface);color:var(--ink);border-radius:10px;padding:8px 11px;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap;text-decoration:none;}
+  .chip{border:1px solid var(--line);background:var(--surface-2);color:var(--ink);border-radius:8px;padding:6px 9px;font-size:12px;font-weight:700;cursor:pointer;text-decoration:none;white-space:nowrap;}
+  .chip.sel{background:var(--ink);color:var(--bg);border-color:var(--ink);}
+  .chip.red{background:var(--red);border-color:var(--red);color:#fff;}
+  .chip.green{background:var(--green);border-color:var(--green);color:#fff;}
+  .chip.blue{background:#2a6fd3;border-color:#2a6fd3;color:#fff;}
+  .chip:disabled{opacity:.5;cursor:default;}
+  .chips{display:flex;gap:6px;flex-wrap:wrap;margin:8px 0 0;}
+  .wrap{display:grid;grid-template-columns:minmax(0,1fr) 440px;gap:14px;padding:14px 0 70px;align-items:start;}
+  @media (max-width:900px){ .wrap{grid-template-columns:minmax(0,1fr);} }
+  .map-col{position:sticky;top:72px;}
+  @media (max-width:900px){ .map-col{position:static;} }
+  #map{height:min(70vh,660px);border-radius:16px;border:1px solid var(--line);background:var(--surface-2);z-index:1;}
+  @media (max-width:900px){ #map{height:46vh;} }
+  .box{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:14px;margin-bottom:12px;}
+  .box h2{display:flex;align-items:center;gap:8px;margin:0 0 10px;font:400 19px 'Black Han Sans','Noto Sans KR',sans-serif;}
+  .box h2 .n{font:800 12px 'Noto Sans KR',sans-serif;background:var(--red);color:#fff;border-radius:999px;padding:2px 8px;}
+  .box h2 .grow{flex:1;}
+  .who{display:flex;align-items:center;gap:12px;}
+  .who .dot{width:14px;height:14px;border-radius:50%;background:#b8a898;flex-shrink:0;}
+  .who .dot.on{background:var(--green);box-shadow:0 0 0 5px rgba(47,143,78,.18);}
+  .who .dot.stale{background:var(--mustard);box-shadow:0 0 0 5px rgba(229,167,49,.2);}
+  .who b{font-size:22px;line-height:1.1;display:block;}
+  .who .meta{font-size:12.5px;color:var(--muted);margin-top:3px;}
+  .stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:12px;}
+  .stat{background:var(--surface-2);border-radius:12px;padding:9px 10px;text-align:center;}
+  .stat b{display:block;font-size:19px;font-weight:800;}
+  .stat span{font-size:11.5px;color:var(--muted);}
+  .daybar{display:flex;gap:6px;align-items:center;flex-wrap:wrap;}
+  .daybar input[type=date]{border:1px solid var(--line);background:var(--surface);color:var(--ink);padding:7px 10px;border-radius:999px;font:inherit;font-size:13px;font-weight:700;}
+  .er{border:1px solid var(--line);border-radius:14px;padding:11px 12px;margin-top:8px;background:var(--surface);}
+  .er.going{border:2px solid #2a6fd3;}
+  .er.assigned{border:2px solid var(--mustard);}
+  .er.sel{box-shadow:0 0 0 4px rgba(211,61,42,.25);}
+  .er.closed{background:var(--surface-2);}
+  .er-top{display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
+  .er-top .no{display:inline-flex;align-items:center;justify-content:center;min-width:24px;height:24px;border-radius:50%;background:#e07b1a;color:#fff;font-size:12px;font-weight:800;}
+  .er-top b{font-size:15.5px;}
+  .er-top .t{margin-left:auto;font-size:12px;color:var(--muted);}
+  .pill{display:inline-block;color:#fff;border-radius:999px;padding:3px 9px;font-size:11.5px;font-weight:800;}
+  .er p{margin:5px 0 0;font-size:13px;line-height:1.5;}
+  .er .money{display:flex;gap:10px;flex-wrap:wrap;margin-top:6px;font-size:12.5px;font-weight:700;}
+  .er .money span{background:var(--surface-2);border-radius:8px;padding:3px 8px;}
+  .er.closed .money span{background:var(--surface);}
+  .er .note{color:var(--red-deep);font-weight:700;}
+  .ord{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:9px 0;border-top:1px solid var(--line);font-size:13px;}
+  .ord:first-of-type{border-top:0;}
+  .ord .no{font:400 20px/1 'Black Han Sans',sans-serif;color:var(--red);}
+  .ord .t{margin-left:auto;font-size:12px;color:var(--muted);}
+  .ord .addr{flex-basis:100%;color:var(--ink-soft);font-size:12.5px;}
+  .empty{color:var(--muted);font-size:13px;text-align:center;padding:16px 0;}
+  .notice{background:#fff1c9;color:#6b4e00;border:1px solid #f0d27a;border-radius:12px;padding:12px 14px;font-size:13.5px;margin-top:14px;line-height:1.55;}
+  @media (prefers-color-scheme: dark){ :root:not([data-theme="light"]) .notice{background:#3a2f12;color:#f3d98a;border-color:#6b5520;} }
+  .rd-pin{display:flex;align-items:center;justify-content:center;border-radius:50%;border:3px solid #fff;box-shadow:0 3px 10px rgba(0,0,0,.35);font-size:16px;line-height:1;width:38px;height:38px;background:var(--red);color:#fff;font-weight:800;}
+  .rd-pin.home{background:#2a6fd3;width:32px;height:32px;font-size:11px;}
+  .rd-pin.store{background:#fff;width:32px;height:32px;font-size:16px;}
+  .rd-pin.errand{background:#e07b1a;width:32px;height:32px;font-size:12px;}
+  .rd-pin.errand.sel{background:var(--red);width:38px;height:38px;}
+  .rd-pin.dot{width:16px;height:16px;border-width:2px;background:var(--green);}
+  .rd-rider{position:relative;width:52px;height:57px;}
+  .rd-rider img{position:relative;z-index:1;width:100%;height:100%;object-fit:contain;filter:drop-shadow(0 2px 3px rgba(0,0,0,.35));}
+  .rd-rider::before{content:"";position:absolute;left:50%;bottom:-2px;width:36px;height:11px;margin-left:-18px;border-radius:50%;background:rgba(211,61,42,.35);}
+  .rd-rider.stale img{filter:grayscale(1) opacity(.65) drop-shadow(0 2px 3px rgba(0,0,0,.35));}
+  #pickMap{height:220px;border-radius:12px;border:1px solid var(--line);margin-top:6px;z-index:1;}
+  .viewer{position:fixed;inset:0;background:rgba(0,0,0,.9);z-index:300;display:flex;align-items:center;justify-content:center;cursor:zoom-out;}
+  .viewer img{max-width:96vw;max-height:96vh;}
+  .trail-note{font-size:12px;color:var(--muted);margin:8px 2px 0;}
+  .quick{display:flex;gap:6px;flex-wrap:wrap;margin:-4px 0 12px;}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="brand"><h1 id="hName">🛵 기사 상세</h1><p id="hSub">빨통 관리자 · Rider</p></div>
+  <div class="top-actions">
+    <a class="sm-btn" href="/admin" id="backBtn">← 관리자</a>
+    <button class="sm-btn" id="langBtn" data-raw>🌐 English</button>
+  </div>
+</div>
+
+<div id="gate" hidden></div>
+
+<div id="appView" hidden>
+  <div class="wrap">
+    <div class="map-col">
+      <div id="map"></div>
+      <div class="chips" id="mapChips"></div>
+      <p class="trail-note" id="mapNote"></p>
+    </div>
+    <div>
+      <div class="box" id="whoBox"></div>
+      <div class="box">
+        <div class="daybar" id="dayBar"></div>
+        <div class="stats" id="stats"></div>
+      </div>
+      <div class="box" id="errBox"></div>
+      <div class="box" id="ordBox"></div>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="config.js"></script>
+<script src="menu.js"></script>
+<script src="common.js"></script>
+<script src="admin-i18n.js"></script>
+<script>
+/* =====================================================================
+   빨통 — 기사 한 명 상세 화면 (38단계)
+   관리자 🛵 기사 화면에서 기사를 누르면 새 창으로 열립니다:  /rider-detail?id=<기사 id>
+   · 실시간 위치 · 배터리 · 지금 맡은 배달 · 그날 배달 기록 · 기사가 받은 현금
+   · 🧾 심부름: 맡기기 → 기사 앱에서 출발/완료 → 시간·이동 경로·쓴 돈·영수증 사진
+   관리자와 같은 로그인을 씁니다 (관리자 화면에 로그인돼 있으면 바로 열림)
+   ===================================================================== */
+const { CFG, esc, peso, api, toast, STATUS } = PT;
+const $ = id => document.getElementById(id);
+const L = PTI18N.L;
+const RID = new URLSearchParams(location.search).get("id");
+const RIDER_IMG = "data:image/webp;base64,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";
+const STALE = 120;
+
+let D = null, day = new URLSearchParams(location.search).get("day") || null, today = null;
+let map = null, layer = null, fitted = false, selErrand = null, trail = [], loading = false;
+
+const ES = {   // 심부름 상태
+  assigned:  ["출발 전", "Not started", "#e5a731"],
+  going:     ["진행 중", "In progress", "#2a6fd3"],
+  done:      ["완료", "Done", "#2f8f4e"],
+  cancelled: ["취소", "Cancelled", "#9c8a7a"],
+};
+const QUICK = [["🧊 얼음", "🧊 Ice"], ["🛒 장보기", "🛒 Groceries"], ["🏦 은행", "🏦 Bank"], ["📦 물건 전달", "📦 Drop-off"], ["💱 잔돈 바꾸기", "💱 Get change"], ["⛽ 가스·연료", "⛽ Gas / fuel"]];
+
+/* ---------------- 작은 도우미 ---------------- */
+const ageSec = t => t ? Math.max(0, Math.round((Date.now() - new Date(t)) / 1000)) : null;
+const ageText = s => s == null ? L("위치 없음", "no location") : s < 60 ? L(`${s}초 전`, `${s}s ago`) : s < 3600 ? L(`${Math.floor(s/60)}분 전`, `${Math.floor(s/60)} min ago`) : s < 86400 ? L(`${Math.floor(s/3600)}시간 전`, `${Math.floor(s/3600)} h ago`) : L(`${Math.floor(s/86400)}일 전`, `${Math.floor(s/86400)} d ago`);
+const durText = (a, b) => { if(!a) return ""; const m = Math.max(0, Math.round(((b ? new Date(b) : new Date()) - new Date(a)) / 60000));
+  return m < 60 ? L(`${m}분`, `${m} min`) : L(`${Math.floor(m/60)}시간 ${m%60}분`, `${Math.floor(m/60)} h ${m%60} min`); };
+const tm = d => d ? new Date(d).toLocaleTimeString(PTI18N.lang === "en" ? "en-US" : "ko-KR", { hour:"numeric", minute:"2-digit" }) : "";
+const won = n => n == null || n === "" ? "—" : peso(n);
+const telOf = p => String(p || "").replace(/[^\d+]/g, "");
+const sum = (a, f) => a.reduce((s, x) => s + (+f(x) || 0), 0);
+function addDays(d, n){ const t = new Date(d + "T12:00:00Z"); t.setUTCDate(t.getUTCDate() + n); return t.toISOString().slice(0, 10); }
+function debounce(f, ms){ let h; return () => { clearTimeout(h); h = setTimeout(f, ms); }; }
+
+/* ---------------- 언어 ---------------- */
+function paintLang(){ $("langBtn").textContent = PTI18N.lang === "en" ? "🌐 한국어" : "🌐 English"; $("backBtn").textContent = L("← 관리자", "← Admin"); }
+$("langBtn").onclick = () => PTI18N.toggle();
+PTI18N.onChange(() => { paintLang(); if(D) renderAll(); });
+
+/* ---------------- 시작 ---------------- */
+function gate(html){ $("gate").hidden = false; $("appView").hidden = true; $("gate").innerHTML = `<div class="notice">${html}</div>`; }
+async function boot(){
+  PTI18N.start(); paintLang();
+  if(PT.DEMO) return gate(L("데모 모드에서는 기사 화면을 쓸 수 없어요. config.js 에 Supabase 정보를 넣어주세요.", "Rider pages need a real Supabase connection (config.js)."));
+  if(!RID) return gate(L("기사가 지정되지 않았어요. 관리자 화면 🛵 기사에서 기사를 눌러 열어주세요.", "No rider selected. Open this from Admin → 🛵 Riders."));
+  if(!(await api.hasSession().catch(() => false))) return gate(L(`관리자 로그인이 필요해요. <a href="/admin">관리자 화면</a>에서 로그인한 뒤 이 창을 새로고침하세요.`, `Please sign in on the <a href="/admin">admin page</a> first, then reload this tab.`));
+  $("gate").hidden = true; $("appView").hidden = false;
+  api.getSettings().then(st => { gGeoKey = (st && st.google_maps_key) || null; }).catch(() => {});   // 설정의 Google 지도 키 (주소 찾기 정확도↑)
+  await load();
+  initMap();
+  try{ api.onRiderDetailChange(RID, debounce(load, 500)); }catch(e){}
+  setInterval(load, 20000);
+  setInterval(() => { if(D){ renderWho(); renderErrands(); } }, 10000);   // '몇 분 전' 갱신
+  document.addEventListener("visibilitychange", () => { if(!document.hidden) load(); });
+}
+
+async function load(){
+  if(loading) return; loading = true;
+  try{
+    D = await api.riderDetail(RID, day);
+    if(!today) today = D.day;
+    if(!day) day = D.day;
+    if(selErrand && !(D.errands || []).some(e => e.id === selErrand)) { selErrand = null; trail = []; }
+    if(selErrand){ const e = D.errands.find(x => x.id === selErrand); if(e && e.status === "going") trail = await api.errandTrail(selErrand).catch(() => trail); }
+    renderAll();
+  }catch(e){
+    if(!D) gate(esc(PT.errMsg(e)) + "<br>" + L("관리자 계정으로 로그인했는지, sql/38-rider-errands.sql 을 실행했는지 확인하세요.", "Check that you're signed in as admin and ran sql/38-rider-errands.sql."));
+    else console.warn(e);
+  }
+  loading = false;
+}
+function renderAll(){
+  const r = D.rider;
+  document.title = `${r.name} · ${L("기사 상세", "Rider")} · PAL TONG`;
+  $("hName").innerHTML = `🛵 <span data-raw>${esc(r.name)}</span>`;
+  $("hSub").textContent = L("기사 상세 · 심부름", "Rider detail · Errands");
+  renderWho(); renderDay(); renderErrands(); renderOrders(); drawMap();
+}
+
+/* ---------------- 기사 상태 ---------------- */
+function renderWho(){
+  const r = D.rider, l = D.loc, s = l ? ageSec(l.at) : null, fresh = r.on_duty && s != null && s <= STALE;
+  const st = !r.active ? L("사용 중지된 기사", "Deactivated") : !r.on_duty ? L("쉬는 중", "Off duty") : fresh ? L("근무 중", "On duty") : L("근무 중 · 신호 약함 (2분 넘게 위치 없음)", "On duty · weak signal");
+  const speed = l && l.speed != null && fresh ? ` · ${Math.round(l.speed * 3.6)}km/h` : "";
+  $("whoBox").innerHTML = `<div class="who"><span class="dot ${fresh ? "on" : r.on_duty ? "stale" : ""}"></span>
+      <div style="flex:1;min-width:0"><b data-raw>${esc(r.name)}</b><div class="meta">${st}</div>
+      <div class="meta">${l ? `${L("마지막 위치", "Last location")} ${ageText(s)}${l.accuracy != null ? ` · ±${Math.round(l.accuracy)}m` : ""}${speed}${l.battery != null ? ` · 🔋 ${Math.round(l.battery * 100)}%` : ""}` : L("아직 위치 기록이 없어요", "No location yet")}</div></div></div>
+    <div class="chips">
+      ${r.phone ? `<a class="chip" href="tel:${esc(telOf(r.phone))}">📞 <span data-raw>${esc(PT.phoneFmt ? PT.phoneFmt(r.phone) : r.phone)}</span></a><a class="chip" href="sms:${esc(telOf(r.phone))}">💬 SMS</a>` : ""}
+      ${l ? `<button class="chip" id="toRider">🎯 ${L("기사 위치로", "Center on rider")}</button><a class="chip" target="_blank" rel="noopener" href="https://www.google.com/maps?q=${l.lat},${l.lng}">🗺 Google</a>` : ""}
+    </div>`;
+  const b = $("toRider"); if(b) b.onclick = () => { if(map && D.loc){ map.setView([D.loc.lat, D.loc.lng], 16); fitted = true; } };
+}
+
+/* ---------------- 날짜 · 요약 ---------------- */
+function renderDay(){
+  const isToday = day === today;
+  $("dayBar").innerHTML = `<b style="font-size:15px">📅</b><button class="chip" id="dPrev">◀</button><input type="date" id="dPick" value="${esc(day)}" max="${esc(today)}">
+    <button class="chip" id="dNext" ${isToday ? "disabled" : ""}>▶</button>${isToday ? `<span class="hint" style="margin:0">${L("오늘 (오전 8시 기준)", "Today (from 8 AM)")}</span>` : `<button class="chip" id="dToday">${L("오늘", "Today")}</button>`}`;
+  const go = d => { if(!d || d > today) return; day = d; selErrand = null; trail = []; fitted = false; load(); };
+  $("dPrev").onclick = () => go(addDays(day, -1)); $("dNext").onclick = () => go(addDays(day, 1));
+  $("dPick").onchange = e => go(e.target.value); const t = $("dToday"); if(t) t.onclick = () => go(today);
+
+  const dl = (D.deliveries || []).filter(o => o.status === "done");
+  const cash = sum(dl.filter(o => o.payment === "cash"), o => o.total);
+  const ed = (D.errands || []).filter(e => e.status === "done" && e.biz_date === day);
+  const open = (D.errands || []).filter(e => ["assigned","going"].includes(e.status));
+  const given = sum(ed, e => e.cash_given), spent = sum(ed, e => e.spent);
+  $("stats").innerHTML = `
+    <div class="stat"><b>${dl.length}</b><span>${L("배달 완료", "Deliveries")}</span></div>
+    <div class="stat"><b>${ed.length}${open.length ? `<small style="font-size:12px;color:#2a6fd3"> +${open.length}</small>` : ""}</b><span>${L("심부름 완료", "Errands done")}${open.length ? L(" (+진행 중)", " (+open)") : ""}</span></div>
+    <div class="stat"><b>${peso(cash)}</b><span>${L("받은 현금 (배달)", "Cash collected")}</span></div>
+    <div class="stat"><b>${peso(given)}</b><span>${L("심부름 준 돈", "Errand cash given")}</span></div>
+    <div class="stat"><b>${peso(spent)}</b><span>${L("심부름 쓴 돈", "Errand spent")}</span></div>
+    <div class="stat"><b style="color:${given - spent < 0 ? "var(--red-deep)" : "var(--green)"}">${peso(given - spent)}</b><span>${L("돌려받을 돈", "Change to return")}</span></div>`;
+}
+
+/* ---------------- 🧾 심부름 ---------------- */
+function errandNo(e){ const open = (D.errands || []).filter(x => ["assigned","going"].includes(x.status)); const i = open.findIndex(x => x.id === e.id); return i >= 0 ? i + 1 : null; }
+function errandHTML(e){
+  const s = ES[e.status] || [e.status, e.status, "#888"], closed = ["done","cancelled"].includes(e.status), n = errandNo(e);
+  let when;
+  if(e.status === "assigned") when = L(`맡긴 지 ${durText(e.created_at)}`, `assigned ${durText(e.created_at)} ago`);
+  else if(e.status === "going") when = L(`${tm(e.started_at)} 출발 · ${durText(e.started_at)} 째`, `left ${tm(e.started_at)} · ${durText(e.started_at)}`);
+  else if(e.status === "done") when = `${e.started_at ? tm(e.started_at) + " → " : ""}${tm(e.done_at)}${e.started_at ? ` (${durText(e.started_at, e.done_at)})` : ""}`;
+  else when = tm(e.done_at || e.updated_at);
+  const change = e.cash_given != null && e.spent != null ? e.cash_given - e.spent : null;
+  const money = (e.cash_given != null || e.spent != null) ? `<div class="money">
+      <span>💵 ${L("준 돈", "Given")} ${won(e.cash_given)}</span>
+      ${e.status === "done" || e.spent != null ? `<span>🧾 ${L("쓴 돈", "Spent")} ${won(e.spent)}</span>` : ""}
+      ${change != null ? `<span style="color:${change < 0 ? "var(--red-deep)" : "var(--green)"}">↩ ${L("거스름", "Change")} ${peso(change)}</span>` : ""}</div>` : "";
+  const btns = [];
+  if(e.lat != null || selErrand === e.id || e.started_at) btns.push(`<button class="chip ${selErrand === e.id ? "sel" : ""}" data-route="${e.id}">🗺 ${selErrand === e.id ? L("경로 끄기", "Hide route") : L("지도·경로", "Map · route")}</button>`);
+  if(e.status !== "cancelled") btns.push(`<button class="chip" data-share="${e.id}">🔗 ${L("공유", "Share")}</button>`);
+  if(e.photo_path) btns.push(`<button class="chip" data-photo="${e.id}">📷 ${L("사진", "Photo")}</button>`);
+  if(!closed){
+    btns.push(`<button class="chip" data-edit="${e.id}">✏️ ${L("수정", "Edit")}</button>`);
+    if(e.status === "assigned") btns.push(`<button class="chip blue" data-go="${e.id}">▶ ${L("출발 처리", "Mark started")}</button>`);
+    btns.push(`<button class="chip green" data-done="${e.id}">✅ ${L("완료 처리", "Mark done")}</button>`);
+    btns.push(`<button class="chip" data-cancel="${e.id}">✕ ${L("취소", "Cancel")}</button>`);
+  } else {
+    btns.push(`<button class="chip" data-edit="${e.id}">✏️ ${L("금액 수정", "Edit amounts")}</button>`);
+    btns.push(`<button class="chip" data-reopen="${e.id}">↺ ${L("되돌리기", "Reopen")}</button>`);
+    btns.push(`<button class="chip" data-del="${e.id}">🗑</button>`);
+  }
+  return `<div class="er ${e.status} ${closed ? "closed" : ""} ${selErrand === e.id ? "sel" : ""}">
+    <div class="er-top">${n ? `<span class="no">${n}</span>` : ""}<b data-raw>${esc(e.title)}</b><span class="pill" style="background:${s[2]}">${L(s[0], s[1])}</span><span class="t">${when}</span></div>
+    ${e.place ? `<p>📍 <span data-raw>${esc(e.place)}</span>${e.lat != null ? "" : ` <span class="hint">(${L("지도 핀 없음", "no pin")})</span>`}</p>` : e.lat != null ? `<p>📍 ${L("지도 핀", "Map pin")}</p>` : ""}
+    ${e.memo ? `<p>📝 <span data-raw>${esc(e.memo)}</span></p>` : ""}
+    ${e.contact_phone ? `<p>👤 ${L("받는 분", "Contact")} <a href="tel:${esc(telOf(e.contact_phone))}" data-raw>${esc(e.contact_phone)}</a></p>` : ""}
+    ${money}
+    ${e.rider_note ? `<p class="note">🛵 <span data-raw>${esc(e.rider_note)}</span></p>` : ""}
+    <div class="chips">${btns.join("")}</div></div>`;
+}
+function renderErrands(){
+  const all = D.errands || [], open = all.filter(e => ["assigned","going"].includes(e.status)), closed = all.filter(e => !["assigned","going"].includes(e.status));
+  $("errBox").innerHTML = `<h2>🧾 ${L("심부름", "Errands")} ${open.length ? `<span class="n">${open.length}</span>` : ""}<span class="grow"></span>
+      <button class="chip red" id="addErr" ${D.rider.active ? "" : "disabled"}>➕ ${L("심부름 맡기기", "New errand")}</button></h2>
+    ${open.length ? open.map(errandHTML).join("") : `<div class="empty">${L("진행 중인 심부름이 없어요. ➕ 심부름 맡기기를 누르면 기사 앱에 바로 떠요.", "No open errands. Tap ➕ New errand — it pops up in the rider app.")}</div>`}
+    ${closed.length ? `<p class="hint" style="margin:14px 2px 0;font-weight:700">${day === today ? L("오늘 끝난 심부름", "Finished today") : L(`${day} 끝난 심부름`, `Finished on ${day}`)} · ${closed.length}</p>${closed.map(errandHTML).join("")}` : ""}`;
+  $("addErr").onclick = () => errandModal();
+  const find = id => all.find(e => e.id === id);
+  const act = async (fn, okMsg) => { try{ await fn(); if(okMsg) toast(okMsg); await load(); }catch(err){ toast(PT.errMsg(err), 4500); } };
+  $("errBox").querySelectorAll("[data-edit]").forEach(b => b.onclick = () => errandModal(find(b.dataset.edit)));
+  $("errBox").querySelectorAll("[data-go]").forEach(b => b.onclick = () => act(() => api.errandStatus(b.dataset.go, "going"), L("출발로 표시했어요", "Marked as started")));
+  $("errBox").querySelectorAll("[data-done]").forEach(b => b.onclick = () => doneModal(find(b.dataset.done)));
+  $("errBox").querySelectorAll("[data-cancel]").forEach(b => b.onclick = () => { if(confirm(L("이 심부름을 취소할까요? 기사 앱에서도 사라져요.", "Cancel this errand?"))) act(() => api.errandStatus(b.dataset.cancel, "cancelled"), L("취소했어요", "Cancelled")); });
+  $("errBox").querySelectorAll("[data-reopen]").forEach(b => b.onclick = () => { const e = find(b.dataset.reopen);
+    if(confirm(L("이 심부름을 다시 진행 중으로 돌릴까요?", "Reopen this errand?"))) act(() => api.errandStatus(e.id, e.started_at ? "going" : "assigned")); });
+  $("errBox").querySelectorAll("[data-del]").forEach(b => b.onclick = () => { if(confirm(L("이 심부름 기록을 완전히 지울까요? (경로·금액 기록도 사라져요)", "Delete this errand record permanently?"))) act(() => api.deleteErrand(b.dataset.del), L("지웠어요", "Deleted")); });
+  $("errBox").querySelectorAll("[data-route]").forEach(b => b.onclick = async () => {
+    const id = b.dataset.route;
+    if(selErrand === id){ selErrand = null; trail = []; fitted = false; renderErrands(); drawMap(); return; }
+    selErrand = id; trail = await api.errandTrail(id).catch(() => []); fitted = false; renderErrands(); drawMap();
+    if(innerWidth <= 900) $("map").scrollIntoView({ behavior:"smooth", block:"center" });
+  });
+  $("errBox").querySelectorAll("[data-share]").forEach(b => b.onclick = () => shareErrand(find(b.dataset.share)));
+  $("errBox").querySelectorAll("[data-photo]").forEach(b => b.onclick = async () => {
+    try{ const u = await api.receiptUrl(find(b.dataset.photo).photo_path); const v = document.createElement("div"); v.className = "viewer"; v.innerHTML = `<img src="${esc(u)}" alt="">`; v.onclick = () => v.remove(); document.body.append(v); }
+    catch(e){ toast(PT.errMsg(e), 4000); }
+  });
+}
+
+/* ---- 모달 ---- */
+function modal(title, bodyHTML, onOk, okLabel){
+  const ov = document.createElement("div"); ov.className = "overlay";
+  ov.innerHTML = `<div class="sheet" style="max-width:520px"><div class="sheet-head"><h3>${title}</h3><button class="close-x">✕</button></div>${bodyHTML}
+    <button class="primary-btn" data-ok>${okLabel || L("저장", "Save")}</button></div>`;
+  document.body.appendChild(ov);
+  const close = () => ov.remove();
+  ov.querySelector(".close-x").onclick = close; ov.onclick = e => { if(e.target === ov) close(); };
+  const ok = ov.querySelector("[data-ok]");
+  ok.onclick = async () => { ok.disabled = true; try{ if(await onOk(ov) !== false) close(); }catch(e){ toast(PT.errMsg(e), 4500); } ok.disabled = false; };
+  return ov;
+}
+const readFields = root => { const o = {}; root.querySelectorAll("[data-f]").forEach(i => { o[i.dataset.f] = i.value.trim(); }); return o; };
+const intOrBlank = v => v === "" || v == null ? "" : String(Math.max(0, Math.round(+String(v).replace(/[^\d.]/g, "")) || 0));
+
+/* ---- 주소 → 지도 위치 (관리자 외부 주문 화면과 같은 방식: Google 키 있으면 Google → Photon → OpenStreetMap) ---- */
+let gGeoKey = null, gLoadP = null;
+/* Google 지도 JS (설정의 Google Maps 키) — 손님 주문 화면과 같은 'Places API (New)' 사용 */
+function loadGoogleAdmin(){
+  if(!gGeoKey) return Promise.reject(new Error("no key"));
+  if(window.google && google.maps && google.maps.importLibrary) return Promise.resolve();
+  return gLoadP = gLoadP || new Promise((res, rej) => { const sc = document.createElement("script");
+    sc.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(gGeoKey)}&v=weekly&loading=async&language=en&region=PH&callback=__gadm`;
+    window.__gadm = res; sc.onerror = () => { gLoadP = null; rej(new Error("google load")); }; document.head.append(sc); });
+}
+async function googleFind(q, c){
+  await loadGoogleAdmin();
+  const P = await google.maps.importLibrary("places");
+  try{
+    const { places } = await P.Place.searchByText({ textQuery: q, fields: ["location", "displayName", "formattedAddress"], region: "ph", language: "en",
+      locationBias: { center: c, radius: 30000 }, maxResultCount: 1 });
+    const pl = places && places[0];
+    if(pl && pl.location) return { lat: pl.location.lat(), lng: pl.location.lng(), label: [pl.displayName, pl.formattedAddress].filter(Boolean).join(", ") };
+  }catch(e){ console.warn("google text search", e); }
+  const { suggestions } = await P.AutocompleteSuggestion.fetchAutocompleteSuggestions({ input: q, includedRegionCodes: ["ph"], language: "en", locationBias: { center: c, radius: 30000 }, origin: c });
+  const pred = suggestions && suggestions.map(s => s.placePrediction).find(Boolean);
+  if(!pred) return null;
+  const place = pred.toPlace(); await place.fetchFields({ fields: ["displayName", "formattedAddress", "location"] });
+  return place.location ? { lat: place.location.lat(), lng: place.location.lng(), label: [place.displayName, place.formattedAddress].filter(Boolean).join(", ") } : null;
+}
+async function photonFind(q, c){
+  const r = await fetch(`https://photon.komoot.io/api/?q=${encodeURIComponent(q)}&lat=${c.lat}&lon=${c.lng}&limit=1&lang=en&bbox=116.9,4.5,126.7,21.2`);
+  const f = ((await r.json()).features || [])[0]; if(!f) return null;
+  const pr = f.properties || {};
+  return { lat: f.geometry.coordinates[1], lng: f.geometry.coordinates[0], label: [pr.name, pr.street, pr.district || pr.locality, pr.city].filter(Boolean).join(", ") };
+}
+async function nominatimFind(q, c){
+  const r = await fetch(`https://nominatim.openstreetmap.org/search?format=jsonv2&limit=1&countrycodes=ph&viewbox=${c.lng - .3},${c.lat + .3},${c.lng + .3},${c.lat - .3}&q=${encodeURIComponent(q)}`, { headers: { "Accept-Language": "en" } });
+  const j = (await r.json())[0]; return j ? { lat: +j.lat, lng: +j.lon, label: j.display_name } : null;
+}
+/* 주소 → 좌표: Google(키 있으면) → Photon → Nominatim, 주소를 여러 모양으로 바꿔가며 시도 */
+async function geocodeAddr(text){
+  const q = String(text || "").replace(/\s+/g, " ").trim();
+  if(q.length < 3) return null;
+  const c = (D && D.store && D.store.lat ? D.store : null) || CFG.STORE_LOCATION || { lat: 14.5695, lng: 120.989 };
+  const pc = plusCode(q, c); if(pc) return { ...pc, label: "Plus code" };
+  // 호수·층·방 번호는 지도 검색에 방해 → 뺀 버전도 시도
+  const clean = q.replace(/\b(unit|rm|room|flr|floor|apt|suite|ste|no\.?|#)\s*[\w-]+/gi, "").replace(/\b\d+(st|nd|rd|th)?\s*(f|flr|floor)\b/gi, "").replace(/#\s*\d+\w*/g, "")
+    .replace(/(\d+\s*호|\d+\s*층)/g, "").replace(/\s*,\s*,+/g, ",").replace(/^[\s,]+|[\s,]+$/g, "").trim();
+  const parts = clean.split(",").map(s => s.trim()).filter(Boolean);
+  const city = /manila|makati|pasay|taguig|pasig|quezon|mandaluyong|paranaque|parañaque|pateros|marikina|san juan|caloocan|malabon|navotas|valenzuela|las pi[nñ]as|muntinlupa|metro/i.test(q) ? "" : ", Manila";
+  const tries = [q, clean + city, parts.slice(0, 2).join(", ") + city, parts.slice(-3).join(", ") + city]
+    .map(s => s.replace(/^[\s,]+/, "").trim()).filter((x, i, a) => x.length > 2 && a.indexOf(x) === i);
+  const near = p => p && Math.abs(p.lat - c.lat) < 1 && Math.abs(p.lng - c.lng) < 1;   // 가게에서 너무 먼 엉뚱한 결과는 버림
+  const engines = [gGeoKey ? googleFind : null, photonFind, nominatimFind].filter(Boolean);
+  for(const fn of engines) for(const t of tries){
+    try{ const p = await fn(t, c); if(near(p)) return { ...p, approx: true }; }catch(e){ console.warn("geocode", fn.name, e); if(fn === googleFind) break; }
+  }
+  return null;
+}
+/* 구글 플러스코드 (HXCQ+X5 Manila / 7Q63HXCQ+X5) → 좌표 — Open Location Code 규격 */
+function plusCode(text, ref){
+  const m = String(text).toUpperCase().match(/(?:^|[^A-Z0-9])([23456789CFGHJMPQRVWX]{2,8}\+[23456789CFGHJMPQRVWX]{2,3})(?![A-Z0-9])/);
+  if(!m) return null;
+  const A = "23456789CFGHJMPQRVWX", PR = [20, 1, .05, .0025, .000125], sep = m[1].indexOf("+");
+  if(sep % 2) return null;
+  const digits = m[1].replace("+", "");
+  const decode = d => { let lat = -90, lng = -180, n = Math.min(10, d.length - d.length % 2);
+    for(let i = 0; i < n; i += 2){ lat += A.indexOf(d[i]) * PR[i / 2]; lng += A.indexOf(d[i + 1]) * PR[i / 2]; }
+    const r = PR[n / 2 - 1]; return { lat: lat + r / 2, lng: lng + r / 2 }; };
+  if(sep === 8) return decode(digits);
+  if(!ref) return null;
+  const pad = 8 - sep, res = Math.pow(20, 2 - pad / 2);
+  let pre = "", la = ref.lat + 90, ln = ref.lng + 180;
+  for(let i = 0; i < pad / 2; i++){ const a = Math.floor(la / PR[i]), b = Math.floor(ln / PR[i]); pre += A[a] + A[b]; la -= a * PR[i]; ln -= b * PR[i]; }
+  const p = decode(pre + digits), h = res / 2;
+  if(ref.lat + h < p.lat && p.lat - res >= -90) p.lat -= res; else if(ref.lat - h > p.lat && p.lat + res <= 90) p.lat += res;
+  if(ref.lng + h < p.lng) p.lng -= res; else if(ref.lng - h > p.lng) p.lng += res;
+  return p;
+}
+
+/* 붙여넣은 구글 지도 링크·좌표 → 위치 */
+function parseLatLng(t){
+  const s = decodeURIComponent(String(t || "")), ok = (a, b) => Math.abs(a) <= 90 && Math.abs(b) <= 180 && (a || b) ? { lat: a, lng: b } : null;
+  let m = s.match(/!3d(-?\d+\.\d+)!4d(-?\d+\.\d+)/); if(m) return ok(+m[1], +m[2]);
+  m = s.match(/[?&](?:q|query|ll|destination|daddr|center)=(-?\d+\.\d+)\s*,\s*(-?\d+\.\d+)/i); if(m) return ok(+m[1], +m[2]);
+  m = s.match(/@(-?\d+\.\d+),(-?\d+\.\d+)/); if(m) return ok(+m[1], +m[2]);
+  m = s.match(/(-?\d{1,2}\.\d{3,})\s*[,\s]\s*(-?\d{1,3}\.\d{3,})/); return m ? ok(+m[1], +m[2]) : null;
+}
+/* 구글 지도 링크에서 장소 이름·주소 꺼내기 (/maps/search/주소, /maps/place/이름, ?q=주소) */
+function linkText(url){
+  try{
+    const u = new URL(url);
+    const q = u.searchParams.get("q") || u.searchParams.get("query") || u.searchParams.get("destination") || u.searchParams.get("daddr") || u.searchParams.get("address");
+    if(q && !/^-?\d+\.\d+\s*,/.test(q)) return q.replace(/\+/g, " ");
+    const m = u.pathname.match(/\/(?:search|place|dir\/[^/]*)\/([^/@]+)/);
+    if(m) return decodeURIComponent(m[1].replace(/\+/g, " "));
+  }catch(e){}
+  return null;
+}
+/* 붙여넣은 것 → 위치. 링크(좌표 → 링크 속 주소 → 짧은 링크 풀기) 또는 그냥 주소 글자 */
+async function resolveMapLink(t){
+  t = String(t || "").trim();
+  const p = parseLatLng(t); if(p) return p;
+  const url = (t.match(/https?:\/\/\S+/) || [])[0];
+  if(!url) return await geocodeAddr(t);
+  const inLink = linkText(url);
+  if(inLink){ const g = await geocodeAddr(inLink); if(g) return { ...g, text: inLink }; }
+  try{
+    const r = await fetch("/api/maplink?u=" + encodeURIComponent(url)), j = await r.json();
+    if(j.lat != null) return { lat: +j.lat, lng: +j.lng, text: j.q || inLink };
+    if(j.q){ const g = await geocodeAddr(j.q); if(g) return { ...g, text: j.q }; }
+  }catch(e){}
+  return null;
+}
+
+function errandModal(e){
+  const edit = !!e, closed = e && ["done","cancelled"].includes(e.status);
+  let pin = e && e.lat != null ? { lat: e.lat, lng: e.lng } : null;
+  const ov = modal(edit ? `✏️ ${L("심부름 수정", "Edit errand")}` : `🧾 ${L("심부름 맡기기", "New errand")} — <span data-raw>${esc(D.rider.name)}</span>`, `
+    <div class="field"><label>${L("무엇을 (기사 앱에 크게 보여요)", "What (shown big in the rider app)")}</label><input data-f="title" maxlength="200" value="${esc(e ? e.title : "")}" placeholder="${L("예: 얼음 3봉지 사오기", "e.g. Buy 3 bags of ice")}"></div>
+    ${edit ? "" : `<div class="quick">${QUICK.map(q => `<button type="button" class="chip" data-q="${esc(L(q[0], q[1]))}">${L(q[0], q[1])}</button>`).join("")}</div>`}
+    <div class="field"><label>${L("어디서 (가게·장소 이름, 주소)", "Where (shop / place / address)")}</label>
+      <div style="display:flex;gap:6px"><input data-f="place" value="${esc(e && e.place || "")}" placeholder="${L("예: 27 M. Lozada St, Pateros", "e.g. 27 M. Lozada St, Pateros")}" style="flex:1;min-width:0">
+      <button type="button" class="chip" id="placeFind" style="flex-shrink:0">🔍 ${L("지도에서 찾기", "Find on map")}</button></div></div>
+    <div class="field"><label>${L("지도 위치 (선택) — 구글 지도 링크·좌표·주소를 붙여넣거나 아래 지도를 누르세요", "Map location (optional) — paste a Google Maps link, coordinates or address, or tap the map")}</label>
+      <input data-x="link" placeholder="https://maps.app.goo.gl/…  ${L("또는", "or")}  14.5695, 120.9890">
+      <div id="pickMap"></div><div class="chips"><span class="hint" id="pinTxt" style="margin:0"></span><button type="button" class="chip" id="pinClear" style="margin-left:auto">${L("핀 지우기", "Clear pin")}</button></div></div>
+    <div class="field"><label>👤 ${L("받는 분 연락처 (선택 — 공유 링크 문자 보내기, 기사님 전화용)", "Recipient phone (optional — for texting the link, rider can call)")}</label><input data-f="contact_phone" type="tel" inputmode="tel" value="${esc(e && e.contact_phone || "")}" placeholder="09xx xxx xxxx"></div>
+    <div class="field"><label>💵 ${L("기사에게 준 돈 (₱, 선택)", "Cash given to rider (₱, optional)")}</label><input data-f="cash_given" inputmode="numeric" value="${esc(e && e.cash_given != null ? e.cash_given : "")}" placeholder="0"></div>
+    ${edit && (e.status === "done" || e.spent != null) ? `<div class="field"><label>🧾 ${L("실제 쓴 돈 (₱)", "Actually spent (₱)")}</label><input data-f="spent" inputmode="numeric" value="${esc(e.spent != null ? e.spent : "")}"></div>` : ""}
+    <div class="field"><label>📝 ${L("기사에게 전할 말 (선택)", "Note for the rider (optional)")}</label><textarea data-f="memo" rows="2">${esc(e && e.memo || "")}</textarea></div>`,
+    async ov => {
+      const f = readFields(ov);
+      if(!f.title){ toast(L("무엇을 할지 적어주세요", "Write what the errand is")); return false; }
+      const p = { rider_id: RID, title: f.title, place: f.place, memo: f.memo, cash_given: intOrBlank(f.cash_given), lat: pin ? String(pin.lat) : "", lng: pin ? String(pin.lng) : "" };
+      if("contact_phone" in f) p.contact_phone = f.contact_phone;
+      if(edit){ p.id = e.id; if("spent" in f) p.spent = intOrBlank(f.spent); }
+      const id = await api.saveErrand(p);
+      toast(edit ? L("저장했어요", "Saved") : L(`${D.rider.name} 기사 앱에 심부름이 떴어요`, `Sent to ${D.rider.name}'s app`), 3500);
+      await load();
+      if(!edit && f.contact_phone){ const ne = (D.errands || []).find(x => x.id === id); if(ne) setTimeout(() => shareErrand(ne, true), 300); }   // 연락처를 넣었으면 바로 공유 창
+    }, edit ? L("저장", "Save") : L("맡기기", "Send to rider"));
+  if(closed) ov.querySelectorAll("[data-f=title],[data-f=place],[data-f=memo],[data-f=contact_phone],[data-x=link]").forEach(i => i.disabled = true);
+  ov.querySelectorAll("[data-q]").forEach(b => b.onclick = () => { const t = ov.querySelector("[data-f=title]"); t.value = b.dataset.q + " "; t.focus(); });
+  // 위치 고르기 지도
+  const c = pin || (D.store && D.store.lat ? D.store : null) || CFG.STORE_LOCATION || { lat: 14.5695, lng: 120.989 };
+  const pm = window.L.map(ov.querySelector("#pickMap")).setView([c.lat, c.lng], pin ? 16 : 14);
+  window.L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom:19, attribution:"© OpenStreetMap" }).addTo(pm);
+  if(D.store && D.store.lat) window.L.marker([D.store.lat, D.store.lng], { icon: pinIcon("store", "🌶", 28) }).addTo(pm);
+  let mk = null;
+  const setPin = (p, pan) => { pin = p; if(mk){ mk.remove(); mk = null; }
+    if(p){ mk = window.L.marker([p.lat, p.lng], { icon: pinIcon("errand sel", "🧾", 34), draggable: !closed }).addTo(pm); mk.on("dragend", () => { const ll = mk.getLatLng(); pin = { lat: +ll.lat.toFixed(6), lng: +ll.lng.toFixed(6) }; paintPin(); }); if(pan) pm.setView([p.lat, p.lng], 16); }
+    paintPin(); };
+  const paintPin = () => { ov.querySelector("#pinTxt").textContent = pin ? `📍 ${pin.lat.toFixed(5)}, ${pin.lng.toFixed(5)}` : L("핀 없음 — 장소 이름만으로도 돼요", "No pin — the place name is enough too"); };
+  if(!closed) pm.on("click", ev => setPin({ lat: +ev.latlng.lat.toFixed(6), lng: +ev.latlng.lng.toFixed(6) }));
+  ov.querySelector("#pinClear").onclick = () => setPin(null);
+  if(closed) ov.querySelector("#pinClear").hidden = true;
+  setPin(pin);
+  setTimeout(() => pm.invalidateSize(), 250);
+  const link = ov.querySelector("[data-x=link]"), placeIn = ov.querySelector("[data-f=place]"), findBtn = ov.querySelector("#placeFind");
+  const found = (p, how) => { setPin({ lat: +(+p.lat).toFixed(6), lng: +(+p.lng).toFixed(6) }, true);
+    toast(p.approx ? L("주소로 대략 위치를 찍었어요 — 핀이 맞는지 보고, 다르면 지도를 눌러 옮기세요", "Pinned from the address (approximate) — check it, tap the map to move it") : L("지도에 위치를 찍었어요", "Pinned on the map"), 4500); };
+  link.addEventListener("change", async () => { if(!link.value.trim()) return;
+    link.disabled = true; const p = await resolveMapLink(link.value).catch(() => null); link.disabled = false;
+    if(p){ if(p.text && !placeIn.value.trim()) placeIn.value = p.text; found(p); }
+    else toast(L("링크에서 위치를 못 찾았어요 — 주소를 '어디서'에 쓰고 🔍 를 누르거나, 지도를 직접 눌러주세요", "Couldn't find it — type the address and tap 🔍, or tap the map"), 4500); });
+  const findPlace = async quiet => {
+    const t = placeIn.value.trim(); if(t.length < 3){ if(!quiet) toast(L("주소나 장소 이름을 먼저 적어주세요", "Type an address or place first")); return; }
+    findBtn.disabled = true; findBtn.textContent = L("찾는 중…", "Searching…");
+    const p = await resolveMapLink(t).catch(() => null);
+    findBtn.disabled = false; findBtn.textContent = "🔍 " + L("지도에서 찾기", "Find on map");
+    if(p) found(p); else if(!quiet) toast(L("이 주소는 지도에서 못 찾았어요 — 동네·거리까지만 쓰거나(예: M. Lozada St, Pateros), 아래 지도를 직접 눌러주세요", "Couldn't find it — try just the street and city, or tap the map"), 5000);
+  };
+  findBtn.onclick = () => findPlace(false);
+  placeIn.addEventListener("keydown", ev => { if(ev.key === "Enter"){ ev.preventDefault(); findPlace(false); } });
+  placeIn.addEventListener("change", () => { if(!pin) findPlace(true); });   // 핀이 없으면 주소로 자동으로 찾아봄
+  if(closed) findBtn.hidden = true;
+  link.addEventListener("paste", () => setTimeout(() => link.dispatchEvent(new Event("change")), 50));
+  if(!edit) setTimeout(() => ov.querySelector("[data-f=title]").focus(), 100);
+}
+/* 🔗 심부름 공유 — 받는 사람이 기사 위치를 실시간 지도로 봄 (/track?e=…, 39단계 SQL) */
+const errandLink = e => `${location.origin}/track?e=${e.id}`;
+function shareErrand(e, fresh){
+  if(!e) return;
+  const url = errandLink(e), ph = telOf(e.contact_phone);
+  const msg = `🛵 빨통 심부름 — ${e.title}\n${L("기사님 위치를 실시간으로 볼 수 있어요", "Track the rider live")} / Track the rider live:\n${url}`;
+  const ov = modal(`🔗 ${L("심부름 공유", "Share errand")} — <span data-raw>${esc(e.title)}</span>`, `
+    ${fresh ? `<p class="hint" style="margin-top:0">✅ ${L("심부름을 맡겼어요. 받는 분께 아래 링크를 보내면 기사님이 출발한 뒤부터 위치가 보여요.", "Errand sent. Send this link — they'll see the rider once it starts.")}</p>`
+      : `<p class="hint" style="margin-top:0">${L("이 링크를 받은 사람은 기사님 위치·도착 예상 시간을 지도로 봐요. (돈·메모·사진은 안 보여요. 기사 위치는 '진행 중'일 때만 보여요)", "Anyone with this link sees the rider's live location and ETA while it's in progress — not money, notes or photos.")}</p>`}
+    <div class="box" data-raw style="word-break:break-all;font-size:13px;padding:10px 12px;margin:0 0 10px">${esc(url)}</div>
+    <div class="chips" style="margin:0 0 6px">
+      <button class="chip" id="shCopy" style="flex:1;padding:11px">📋 ${L("링크 복사", "Copy link")}</button>
+      ${navigator.share ? `<button class="chip" id="shShare" style="flex:1;padding:11px">📤 ${L("공유 (카톡 등)", "Share")}</button>` : ""}
+      ${ph ? `<a class="chip" style="flex:1;padding:11px;text-align:center" href="sms:${esc(ph)}?body=${encodeURIComponent(msg)}">💬 ${L("문자", "SMS")} <span data-raw>${esc(e.contact_phone)}</span></a>` : ""}
+      <a class="chip" style="flex:1;padding:11px;text-align:center" href="${esc(url)}" target="_blank" rel="noopener">👀 ${L("받는 사람 화면", "Their view")}</a>
+    </div>`, async () => {}, L("닫기", "Close"));
+  ov.querySelector("#shCopy").onclick = async () => { try{ await navigator.clipboard.writeText(msg); toast(L("복사했어요 — 카톡·메신저에 붙여넣으세요", "Copied — paste it in chat")); }catch(err){ prompt("", msg); } };
+  const sh = ov.querySelector("#shShare"); if(sh) sh.onclick = () => navigator.share({ title: "PAL TONG", text: msg }).catch(() => {});
+}
+function doneModal(e){
+  modal(`✅ ${L("완료 처리", "Mark done")} — <span data-raw>${esc(e.title)}</span>`, `
+    <p class="hint" style="margin-top:0">${L("보통은 기사님이 앱에서 '완료'를 누르면 자동으로 끝나요. 기사님 대신 처리할 때만 쓰세요.", "Usually the rider taps 'Done' in the app. Use this only to finish it for them.")}</p>
+    <div class="field"><label>💵 ${L("준 돈 (₱)", "Cash given (₱)")}</label><input data-f="cash_given" inputmode="numeric" value="${esc(e.cash_given ?? "")}"></div>
+    <div class="field"><label>🧾 ${L("실제 쓴 돈 (₱)", "Actually spent (₱)")}</label><input data-f="spent" inputmode="numeric" value="${esc(e.spent ?? "")}"></div>`,
+    async ov => {
+      const f = readFields(ov);
+      await api.saveErrand({ id: e.id, rider_id: RID, title: e.title, place: e.place || "", memo: e.memo || "", lat: e.lat != null ? String(e.lat) : "", lng: e.lng != null ? String(e.lng) : "", contact_phone: e.contact_phone || "",
+        cash_given: intOrBlank(f.cash_given), spent: intOrBlank(f.spent) });
+      await api.errandStatus(e.id, "done"); toast(L("완료 처리했어요", "Marked as done")); await load();
+    }, L("완료", "Done"));
+}
+
+/* ---------------- 🛵 배달 ---------------- */
+function renderOrders(){
+  const cur = D.orders || [], past = D.deliveries || [];
+  const pill = s => { const x = STATUS[s] || {}; return `<span class="pill" style="background:${x.color || "#888"}">${L(x.ko || s, x.en || s)}</span>`; };
+  const pay = o => o.payment === "cash" ? `💵 ${peso(o.total)}` : `✅ ${peso(o.total)}`;
+  $("ordBox").innerHTML = `<h2>🛵 ${L("배달", "Deliveries")} ${cur.length ? `<span class="n">${cur.length}</span>` : ""}</h2>
+    ${cur.length ? cur.map(o => `<div class="ord"><span class="no">#${esc(o.order_no)}</span>${pill(o.status)}<b data-raw>${esc(o.cust_name)}</b><span class="hint" style="margin:0">${pay(o)}</span>
+        <span class="t">${o.picked_up_at ? L(`${tm(o.picked_up_at)} 출발 · ${durText(o.picked_up_at)} 째`, `left ${tm(o.picked_up_at)} · ${durText(o.picked_up_at)}`) : L(`배정 ${tm(o.rider_assigned_at || o.created_at)}`, `assigned ${tm(o.rider_assigned_at || o.created_at)}`)}</span>
+        <span class="addr" data-raw>📍 ${esc(o.cust_addr || "")}</span></div>`).join("")
+      : `<div class="empty">${L("지금 맡은 배달이 없어요 (관리자 주문 카드에서 배정)", "No active deliveries (assign from an order card)")}</div>`}
+    <p class="hint" style="margin:14px 2px 4px;font-weight:700">${day === today ? L("오늘 끝난 배달", "Finished today") : L(`${day} 끝난 배달`, `Finished on ${day}`)} · ${past.length}</p>
+    ${past.length ? past.map(o => `<div class="ord" style="opacity:${o.status === "cancelled" ? .55 : 1}"><span class="no" style="font-size:17px">#${esc(o.order_no)}</span><span data-raw>${esc(o.cust_name)}</span><span class="hint" style="margin:0">${o.status === "cancelled" ? L("취소", "Cancelled") : pay(o)}</span>
+        <span class="t">${o.status === "done" ? `${o.picked_up_at ? tm(o.picked_up_at) + " → " : ""}${tm(o.delivered_at)}${o.picked_up_at && o.delivered_at ? ` (${durText(o.picked_up_at, o.delivered_at)})` : ""}` : ""}</span></div>`).join("")
+      : `<div class="empty">${L("기록 없음", "None")}</div>`}`;
+}
+
+/* ---------------- 지도 ---------------- */
+const pinIcon = (cls, html, size) => window.L.divIcon({ className:"", html:`<div class="rd-pin ${cls}">${html}</div>`, iconSize:[size, size], iconAnchor:[size/2, size/2] });
+function initMap(){
+  if(!window.L || !window.L.map){ $("map").innerHTML = `<div class="empty">${L("지도를 불러오지 못했어요 — 인터넷 확인", "Couldn't load the map")}</div>`; return; }
+  const c = (D && D.loc) || (D && D.store && D.store.lat ? D.store : null) || CFG.STORE_LOCATION || { lat: 14.5695, lng: 120.989 };
+  map = window.L.map("map").setView([c.lat, c.lng], 14);
+  window.L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom:19, attribution:"© OpenStreetMap" }).addTo(map);
+  layer = window.L.layerGroup().addTo(map);
+  map.on("dragstart zoomstart", e => { if(e.type === "dragstart") fitted = true; });
+  drawMap();
+}
+function drawMap(){
+  if(!map || !layer || !D) return;
+  const Lf = window.L; layer.clearLayers();
+  const pts = [], focus = [];
+  if(D.store && D.store.lat){ Lf.marker([D.store.lat, D.store.lng], { icon: pinIcon("store", "🌶", 32) }).addTo(layer).bindTooltip(L("가게", "Store")); pts.push([D.store.lat, D.store.lng]); }
+  (D.orders || []).filter(o => o.lat != null).forEach(o => {
+    Lf.marker([o.lat, o.lng], { icon: pinIcon("home", "#" + o.order_no, 32) }).addTo(layer).bindTooltip(`#${esc(o.order_no)} ${esc(o.cust_name)}`); pts.push([o.lat, o.lng]);
+    if(D.loc && o.status === "delivering") Lf.polyline([[D.loc.lat, D.loc.lng], [o.lat, o.lng]], { color:"#2a6fd3", weight:2, dashArray:"6 6", opacity:.7 }).addTo(layer);
+  });
+  (D.errands || []).forEach(e => {
+    const open = ["assigned","going"].includes(e.status), sel = selErrand === e.id;
+    if(e.lat == null || (!open && !sel)) return;
+    Lf.marker([e.lat, e.lng], { icon: pinIcon("errand" + (sel ? " sel" : ""), sel ? "🧾" : String(errandNo(e) || "🧾"), sel ? 38 : 32), zIndexOffset: sel ? 900 : 0 }).addTo(layer)
+      .bindTooltip(`🧾 ${esc(e.title)}${e.place ? " · " + esc(e.place) : ""}`, sel ? { permanent:true, direction:"top", offset:[0, -20] } : {});
+    pts.push([e.lat, e.lng]); if(sel) focus.push([e.lat, e.lng]);
+    if(D.loc && e.status === "going") Lf.polyline([[D.loc.lat, D.loc.lng], [e.lat, e.lng]], { color:"#e07b1a", weight:2, dashArray:"6 6", opacity:.8 }).addTo(layer);
+  });
+  // 선택한 심부름의 지나온 길
+  let note = "";
+  if(selErrand){
+    const e = (D.errands || []).find(x => x.id === selErrand);
+    if(trail.length > 1){
+      Lf.polyline(trail, { color:"#d33d2a", weight:5, opacity:.85 }).addTo(layer);
+      Lf.marker(trail[0], { icon: pinIcon("dot", "", 16) }).addTo(layer).bindTooltip(L("출발", "Start"));
+      trail.forEach(p => focus.push(p));
+      note = L(`🧾 '${e ? e.title : ""}' 이동 경로 · 점 ${trail.length}개${e && e.started_at ? ` · ${tm(e.started_at)}${e.done_at ? " → " + tm(e.done_at) : " ~ 지금"}` : ""}`, `🧾 Route for '${e ? e.title : ""}' · ${trail.length} points`);
+    } else note = L("🧾 이 심부름은 아직 이동 기록이 없어요 (기사가 '출발'을 누른 뒤부터 근무 중 위치가 기록돼요)", "🧾 No route yet — it's recorded after the rider taps 'Start' (while on duty)");
+  }
+  if(D.loc){
+    const s = ageSec(D.loc.at), stale = !D.rider.on_duty || s == null || s > STALE;
+    Lf.marker([D.loc.lat, D.loc.lng], { icon: Lf.divIcon({ className:"", html:`<div class="rd-rider ${stale ? "stale" : ""}"><img src="${RIDER_IMG}" alt="🛵"></div>`, iconSize:[52, 57], iconAnchor:[26, 54] }), zIndexOffset: 1000 })
+      .addTo(layer).bindTooltip(`<b>${esc(D.rider.name)}</b> · ${ageText(s)}`, { permanent:true, direction:"top", offset:[0, -56], opacity:.95 });
+    if(D.loc.accuracy > 30) Lf.circle([D.loc.lat, D.loc.lng], { radius: D.loc.accuracy, color:"#d33d2a", weight:1, fillOpacity:.06 }).addTo(layer);
+    pts.push([D.loc.lat, D.loc.lng]);
+  }
+  $("mapNote").textContent = note || L("🛵 기사 · 🌶 가게 · 🔵#번호 배달지 · 🟠번호 심부름 장소 (심부름 '🗺 지도·경로'를 누르면 지나온 길이 보여요)", "🛵 rider · 🌶 store · 🔵# drop-off · 🟠 errand place (tap '🗺 Map · route' on an errand to see its path)");
+  $("mapChips").innerHTML = selErrand ? `<button class="chip" id="clrRoute">✕ ${L("경로 끄기", "Hide route")}</button>` : "";
+  if($("clrRoute")) $("clrRoute").onclick = () => { selErrand = null; trail = []; fitted = false; renderErrands(); drawMap(); };
+  if(!fitted){
+    const f = focus.length ? focus : pts;
+    if(f.length > 1) map.fitBounds(f, { padding:[40, 40], maxZoom:16 }); else if(f.length) map.setView(f[0], 15);
+    fitted = true;
+  }
+}
+
+boot();
+</script>
+</body>
+</html>
