@@ -267,7 +267,7 @@ async function loadOrders(){
     if(prevLoaded && fresh.length) alertNew(fresh, prev);
     autoTranslate();
     prevLoaded = true;
-    if(viewDay && viewDay !== today()) dayOrders = await api.listOrdersByDay(viewDay).catch(() => dayOrders);
+    if(viewDay && !inCache(viewDay)) dayOrders = await api.listOrdersByDay(viewDay).catch(() => dayOrders);
     renderOrders();
     if(!$("diningView").hidden) renderDining();
   }catch(e){ console.error(e); toast("주문 불러오기 실패 — 인터넷 연결 확인", 3000); }
@@ -463,7 +463,7 @@ function schedText(d){
   return `${dl} ${hm}`;
 }
 
-/* ---- 날짜별 보기: 최근(오늘·어제) / 날짜 고르기 ---- */
+/* ---- 날짜별 보기: 오늘 / 어제 (영업일 기준) / 날짜 고르기 — viewDay null = 오늘(실시간) ---- */
 const today = () => PT.bizDay(new Date());   // 영업일 (오전 8:00 ~ 다음날 7:59)
 const shiftDay = (d, n) => PT.manilaDay(new Date(d + "T12:00:00+08:00").getTime() + n * 864e5);
 function dayLabel(d){
@@ -471,23 +471,27 @@ function dayLabel(d){
   const base = x.toLocaleDateString(EN() ? "en-US" : "ko-KR", { timeZone:"Asia/Manila", month:"long", day:"numeric", weekday:"short" });
   return d === t ? `${L("오늘", "Today")} · ${base}` : d === shiftDay(t, -1) ? `${L("어제", "Yesterday")} · ${base}` : x.toLocaleDateString(EN() ? "en-US" : "ko-KR", { timeZone:"Asia/Manila", year:"numeric", month:"long", day:"numeric", weekday:"short" });
 }
-function srcOrdersAll(){ return !viewDay ? orders : viewDay === today() ? orders.filter(o => PT.orderDay(o) === viewDay) : dayOrders; }
-function srcOrders(){ return srcOrdersAll().filter(o => !PT.isDine(o) || ["done", "cancelled"].includes(o.status)); }   // 진행 중인 다이닝(T)은 🍽 Dining 창에서, 결제 끝난 다이닝은 여기 목록에도 (R17)
+const inCache = d => d >= shiftDay(today(), -1);   // 오늘·어제는 이미 불러온 orders 안에 있어요
+function srcOrdersAll(fk = filter){
+  if(!viewDay) return fk === "action" || fk === "waiting" ? orders : orders.filter(o => PT.orderDay(o) === today());   // 처리 필요는 어제 못 끝낸 주문도 같이
+  return inCache(viewDay) ? orders.filter(o => PT.orderDay(o) === viewDay) : dayOrders;
+}
+function srcOrders(fk){ return srcOrdersAll(fk).filter(o => !PT.isDine(o) || ["done", "cancelled"].includes(o.status)); }   // 진행 중인 다이닝(T)은 🍽 Dining 창에서, 결제 끝난 다이닝은 여기 목록에도 (R17)
 let sortDesc = ls.get("paltong_sort_desc", true);   // 주문번호 정렬 (true = 큰 번호 위)
 async function setViewDay(d){
   viewDay = d || null;
-  if(viewDay && viewDay > today()) viewDay = today();
-  if(viewDay && viewDay !== today()){ try{ dayOrders = await api.listOrdersByDay(viewDay); }catch(e){ dayOrders = []; toast(PT.errMsg(e), 3000); } }
+  if(viewDay && viewDay >= today()) viewDay = null;
+  if(viewDay && !inCache(viewDay)){ try{ dayOrders = await api.listOrdersByDay(viewDay); }catch(e){ dayOrders = []; toast(PT.errMsg(e), 3000); } }
   if(viewDay && filter === "action") filter = "all";
   renderOrders();
 }
 function renderDaybar(){
-  const t = today(), d = viewDay;
-  $("daybar").innerHTML = `<button class="pill ${!d ? "sel" : ""}" data-day="">🕒 ${L("최근 (오늘·어제)", "Recent")}</button>
-    <button class="pill ${d === t ? "sel" : ""}" data-day="${t}">${L("오늘", "Today")}</button>
+  const t = today(), y = shiftDay(t, -1), d = viewDay;
+  $("daybar").innerHTML = `<button class="pill ${d === y ? "sel" : ""}" data-day="${y}">${L("어제", "Yesterday")}</button>
+    <button class="pill ${!d ? "sel" : ""}" data-day="">${L("오늘", "Today")}</button>
     <button class="pill" data-dstep="-1" title="${L("전날", "Previous day")}">◀</button>
-    <input type="date" id="dayPick" value="${d || ""}" max="${t}">
-    <button class="pill" data-dstep="1" ${!d || d >= t ? "disabled" : ""} title="${L("다음날", "Next day")}">▶</button>
+    <input type="date" id="dayPick" value="${d || t}" max="${t}" title="${L("다른 날짜 보기", "Pick another day")}">
+    <button class="pill" data-dstep="1" ${!d ? "disabled" : ""} title="${L("다음날", "Next day")}">▶</button>
     <button class="pill" id="cbBtn" style="margin-left:auto;background:#0E6B57;border-color:#0E6B57;color:#fff" title="${L("이 날 완료된 주문을 Paltong Cash Book 매출로 보내기", "Send this day's completed orders to the Paltong Cash Book")}">📒 ${L("캐시북으로", "To Cash Book")}</button>
     <button class="pill" id="extBtn" style="background:var(--red);border-color:var(--red);color:#fff">➕ ${L("외부 주문 (전화·카톡)", "Outside order")}</button>`;
   $("extBtn").onclick = () => extOrderModal();
@@ -731,7 +735,7 @@ function renderOrders(){
   renderDaybar();
   const SRC = srcOrders(), SRC_ALL = srcOrdersAll();
   $("filters").innerHTML = FILTERS.map(f => {
-    const n = SRC.filter(f.match).length;
+    const n = srcOrders(f.key).filter(f.match).length;
     return `<button class="pill ${filter===f.key?'sel':''}" data-f="${f.key}">${f.label}${n && f.key !== "all" && f.key !== "closed" ? `<span class="n">${n}</span>` : ` <span class="en">${n}</span>`}</button>`;
   }).join("");
   $("filters").insertAdjacentHTML("beforeend", filter === "action" || filter === "waiting" ? "" : `<button class="pill" id="sortBtn" title="${L("주문번호 정렬", "Sort by number")}">${sortDesc ? L("번호 ↓ 최신 위", "No. ↓ newest first") : L("번호 ↑ 1번부터", "No. ↑ from #1")}</button>`);
@@ -749,7 +753,7 @@ function renderOrders(){
   // 날짜별로 묶기 (최근 날짜 먼저) — 날짜마다 주문번호는 #1부터
   const days = [...new Set(list.map(PT.orderDay))].sort().reverse();
   $("orders").innerHTML = list.length ? days.map(d => dayHead(d, SRC_ALL) + list.filter(o => PT.orderDay(o) === d).map(cardHTML).join("")).join("")
-    : (viewDay ? dayHead(viewDay, SRC_ALL) : "") + `<div class="empty-box" style="grid-column:1/-1">해당하는 주문이 없습니다</div>`;
+    : dayHead(viewDay || today(), SRC_ALL) + `<div class="empty-box" style="grid-column:1/-1">해당하는 주문이 없습니다</div>`;
   list.forEach(bindCard);
   if(focused){ const el = document.querySelector(`[data-draft="${focused}"]`); if(el){ el.focus(); const v = el.value; el.value = ""; el.value = v; } }
 }
@@ -760,10 +764,10 @@ function cardHTML(o){
   const st = dine && o.status === "done" ? { ...STATUS.done, ko:"결제 완료", en:"Paid" } : pick && o.status === "delivering" ? { ...STATUS.delivering, ko:"픽업 대기", en:"Waiting for pickup" } : STATUS[o.status], p = payInfo(o.payment), d = drafts[o.id] || {};
   const warns = dine ? [] : priceWarnings(o);
   const svcOk = !["done","cancelled"].includes(o.status);
-  const itemsHTML = (o.items||[]).map((l, li) => `<div class="sum-row"${PT.isSvc(l) ? ' style="background:#fde8e4;border-radius:6px"' : l.added ? ' style="background:#fff1c9;border-radius:6px"' : ""}><span>${PT.isSvc(l) ? '<b style="color:var(--red-deep)">🎁서비스</b> ' : l.added ? '<b style="color:var(--red-deep)">➕추가</b> ' : ""}<span data-raw>${EN()
+  const itemsHTML = (o.items||[]).map((l, li) => `<div class="sum-row"${PT.isSvc(l) ? ' style="background:#fde8e4;border-radius:6px"' : l.added ? ' style="background:#fff1c9;border-radius:6px"' : ""}><span>${PT.isSvc(l) ? (l.couponFree ? '<b style="color:var(--green)">🎟쿠폰 무료</b> ' : '<b style="color:var(--red-deep)">🎁서비스</b> ') : l.added ? '<b style="color:var(--red-deep)">➕추가</b> ' : ""}<span data-raw>${EN()
       ? `<b>${esc(l.en || l.name)}</b>${l.opts&&l.opts.length ? ` <span class="en">· ${esc(l.opts.map(x => x.en || x.ko).join(", "))}</span>` : ""}`
       : `<b>${esc(l.name)}</b> <span class="en">${esc(l.en||"")}${l.opts&&l.opts.length ? " · " + esc(l.opts.map(x=>x.ko).join(", ")) : ""}</span>`}</span> ×${l.qty}</span><span style="white-space:nowrap">${PT.isSvc(l) ? `${l.origUnit ? `<s class="hint">${peso(l.origUnit*l.qty)}</s> ` : ""}<b style="color:var(--red-deep)">${L("무료", "FREE")}</b>` : `${l.priceOrig != null ? `<s class="hint">${peso(l.priceOrig*l.qty)}</s> ` : ""}${peso(l.unitPrice*l.qty)}`}${svcOk && !l.ext
-      ? (PT.isSvc(l) ? ` <button class="chip" data-unsvc="${li}" title="${L("서비스 취소", "Undo service")}">↩</button>` : ` <button class="chip" data-lprice="${li}" title="${L("가격 수정", "Edit price")}">✏️</button> <button class="chip" data-svc="${li}" title="${L("서비스로 처리", "Make it free")}">🎁</button>${l.byAdmin ? ` <button class="chip" data-rmadm="${li}" title="${L("관리자가 추가한 메뉴 빼기", "Remove (added by admin)")}">✕</button>` : ""}`) : ""}</span></div>`).join("")
+      ? (PT.isSvc(l) ? (l.couponFree ? "" : ` <button class="chip" data-unsvc="${li}" title="${L("서비스 취소", "Undo service")}">↩</button>`) : ` <button class="chip" data-lprice="${li}" title="${L("가격 수정", "Edit price")}">✏️</button> <button class="chip" data-svc="${li}" title="${L("서비스로 처리", "Make it free")}">🎁</button>${l.byAdmin ? ` <button class="chip" data-rmadm="${li}" title="${L("관리자가 추가한 메뉴 빼기", "Remove (added by admin)")}">✕</button>` : ""}`) : ""}</span></div>`).join("")
     + (PT.svcValue(o) ? `<div class="sum-row" style="color:var(--red-deep);font-weight:800"><span>🎁 ${L("서비스", "Service")}</span><span>${peso(PT.svcValue(o))} ${L("상당 · 무료", "value · free")}</span></div>` : "")
     + (svcOk ? `<div class="btn-row" style="margin:4px 0"><button class="ghost-btn sm" data-itemadd>➕ ${L("메뉴 추가", "Add item")}</button><button class="ghost-btn sm" data-svcadd>🎁 ${L("서비스 추가", "Add free item")}</button><button class="ghost-btn sm" data-totaledit>✏️ ${L("최종 금액", "Final amount")}</button></div>` : "");
   let action = "";
@@ -2091,7 +2095,8 @@ $("staffBtn").onclick = () => staffModal();
 /* ---------------- 회원 · 쿠폰 관리 ---------------- */
 let mvSettings = null, mvCodes = [], mvMembers = [], mvQuery = "";
 const dstr = d => d ? new Date(d).toLocaleDateString(EN() ? "en-US" : "ko-KR", { month:"numeric", day:"numeric" }) : "";
-const cval = c => c.discount_type === "percent" ? `${c.amount}%${c.max_discount ? L(` (최대 ${peso(c.max_discount)})`, ` (max ${peso(c.max_discount)})`) : ""}` : peso(c.amount);
+const cval = c => c.discount_type === "item" ? L(`🎁 ${c.item_name || ""} 무료 (${peso(c.item_price || c.amount)})`, `🎁 Free ${c.item_en || c.item_name || ""} (${peso(c.item_price || c.amount)})`) + (c.stackable ? " · 중복 가능" : "")
+  : (c.stackable ? L("[중복 가능] ", "[stackable] ") : "") + (c.discount_type === "percent" ? `${c.amount}%${c.max_discount ? L(` (최대 ${peso(c.max_discount)})`, ` (max ${peso(c.max_discount)})`) : ""}` : peso(c.amount));
 function modal(title, bodyHTML, onOk, okLabel = "저장"){
   const ov = document.createElement("div"); ov.className = "overlay";
   ov.innerHTML = `<div class="sheet" style="max-width:520px"><div class="sheet-head"><h3>${title}</h3><button class="close-x">✕</button></div>${bodyHTML}
@@ -2104,10 +2109,35 @@ function modal(title, bodyHTML, onOk, okLabel = "저장"){
 }
 const couponFields = (pre = {}) => `
   <div class="field"><label>쿠폰 이름 (손님에게 보임)</label><input data-f="title" value="${esc(pre.title || "")}" placeholder="예: 단골 감사 쿠폰 Thank you"></div>
-  <div class="fee-row" style="margin:0 0 12px"><select data-f="discount_type" class="note-in" style="width:auto;margin:0"><option value="amount">₱ 금액 할인</option><option value="percent">% 할인</option></select>
-    <input data-f="amount" type="number" min="1" placeholder="할인 금액/퍼센트" value="${esc(pre.amount || "")}" style="font-size:16px"></div>
-  <div class="field"><label>최대 할인 금액 (% 쿠폰일 때, 비우면 제한 없음)</label><input data-f="max_discount" type="number" min="1"></div>
-  <div class="field"><label>최소 주문 금액 (음식값 기준)</label><input data-f="min_order" type="number" min="0" value="${esc(pre.min_order ?? 0)}"></div>`;
+  <div class="fee-row" style="margin:0 0 12px"><select data-f="discount_type" class="note-in" style="width:auto;margin:0" data-cptype><option value="amount">₱ 금액 할인</option><option value="percent">% 할인</option><option value="item">🎁 메뉴 무료</option></select>
+    <input data-f="amount" type="number" min="1" placeholder="할인 금액/퍼센트" value="${esc(pre.amount || "")}" style="font-size:16px" data-cpamt></div>
+  <div class="field" data-cpitem hidden><label>🎁 무료로 줄 메뉴 — 손님이 쿠폰을 고르면 이 메뉴가 ₱0 로 주문·영수증에 자동으로 들어가요</label>
+    <select data-f="item_id" class="note-in" style="margin:0"><option value="">메뉴 고르기</option>${MENU.map(c => `<optgroup label="${esc(c.cat)}">${c.items.map(it => `<option value="${esc(it.id)}">${esc(it.name)} · ${esc(it.en || "")} (${peso(it.price)})</option>`).join("")}</optgroup>`).join("")}</select></div>
+  <div class="field" data-cpmax><label>최대 할인 금액 (% 쿠폰일 때, 비우면 제한 없음)</label><input data-f="max_discount" type="number" min="1"></div>
+  <div class="field"><label>최소 주문 금액 (음식값 기준)</label><input data-f="min_order" type="number" min="0" value="${esc(pre.min_order ?? 0)}"></div>
+  <label class="cp-row" style="margin:0 0 10px"><input type="checkbox" data-f="stackable" ${pre.stackable ? "checked" : ""}><span><b>중복 가능 쿠폰</b> — 다른 쿠폰과 같이 쓸 수 있어요 (🎟 쿠폰 중복 사용의 '중복 가능' 규칙)</span></label>
+  <p class="hint" style="margin:0 0 10px">손님은 쿠폰 금액(무료 메뉴 값 포함) 합계가 음식값보다 적을 때만 쓸 수 있어요.</p>`;
+/* 쿠폰 창: '메뉴 무료'면 메뉴 고르기를 보이고 금액 칸 숨김 */
+function bindCouponFields(ov){
+  const t = ov.querySelector("[data-cptype]"); if(!t) return;
+  const paint = () => { const item = t.value === "item";
+    ov.querySelector("[data-cpitem]").hidden = !item; ov.querySelector("[data-cpamt]").hidden = item; ov.querySelector("[data-cpmax]").hidden = t.value !== "percent"; };
+  t.onchange = paint; paint();
+}
+/* 입력값 → 쿠폰 정보 (메뉴 무료면 메뉴 이름·가격 채움). 잘못되면 null */
+function couponFromFields(f){
+  const o = { title: f.title, discount_type: f.discount_type, stackable: !!f.stackable, min_order: Math.round(+f.min_order || 0), max_discount: numOrNull(f.max_discount) };
+  if(f.discount_type === "item"){
+    const it = ITEM_BY_ID[f.item_id]; if(!it){ toast("무료로 줄 메뉴를 골라주세요"); return null; }
+    Object.assign(o, { item_id: it.id, item_name: it.name, item_en: it.en || it.name, item_price: it.price, amount: it.price, max_discount: null });
+    if(!o.title) o.title = `🎁 ${it.name} 무료 Free ${it.en || ""}`.trim();
+  } else {
+    if(!(+f.amount > 0)){ toast("할인 값을 입력하세요"); return null; }
+    if(f.discount_type === "percent" && +f.amount > 100){ toast("% 할인은 100 이하"); return null; }
+    Object.assign(o, { amount: Math.round(+f.amount), item_id: null, item_name: null, item_en: null, item_price: null });
+  }
+  return o;
+}
 const readFields = (root) => { const o = {}; root.querySelectorAll("[data-f]").forEach(i => { o[i.dataset.f] = i.type === "checkbox" ? i.checked : i.value.trim(); }); return o; };
 const numOrNull = v => v === "" || v == null ? null : Math.round(+v);
 
@@ -2220,19 +2250,23 @@ function renderMembersView(){
       const f = readFields(ov);
       const code = f.code.toUpperCase().replace(/\s/g, "");
       if(!/^[A-Z0-9_-]{3,30}$/.test(code)) { toast("코드는 영문/숫자 3~30자"); return false; }
-      if(!f.title || !(+f.amount > 0)) { toast("쿠폰 이름과 할인 값을 입력하세요"); return false; }
-      if(f.discount_type === "percent" && +f.amount > 100) { toast("% 할인은 100 이하"); return false; }
-      await api.saveCode({ code, title: f.title, discount_type: f.discount_type, amount: Math.round(+f.amount), max_discount: numOrNull(f.max_discount),
-        min_order: Math.round(+f.min_order || 0), valid_days: numOrNull(f.valid_days), ends_at: f.ends_at ? new Date(f.ends_at + "T23:59:59").toISOString() : null,
-        per_member_limit: 1, total_limit: numOrNull(f.total_limit), active: true });
+      const cp = couponFromFields(f); if(!cp) return false;
+      if(!cp.title) { toast("쿠폰 이름을 입력하세요"); return false; }
+      try{ await api.saveCode({ code, ...cp, valid_days: numOrNull(f.valid_days), ends_at: f.ends_at ? new Date(f.ends_at + "T23:59:59").toISOString() : null,
+        per_member_limit: 1, total_limit: numOrNull(f.total_limit), active: true }); }
+      catch(e){ toast(/stackable|item_|discount_type/.test(String(e.message || e)) ? "47단계 SQL(sql/47-coupon-upgrade.sql)을 먼저 실행해 주세요" : PT.errMsg(e), 5000); return false; }
       toast(L(`코드 ${code} 를 만들었습니다`, `Code ${code} created`)); loadMembersView();
     }, "코드 만들기");
+  { const ov = document.querySelector(".overlay:last-of-type"); if(ov) bindCouponFields(ov); }
   V.querySelectorAll("[data-act-code]").forEach(b => b.onclick = async () => { const k = mvCodes.find(x => x.code === b.dataset.actCode); await api.saveCode({ ...k, active: !k.active }); loadMembersView(); });
   V.querySelectorAll("[data-del-code]").forEach(b => b.onclick = async () => { if(!confirm(L(`${b.dataset.delCode} 코드를 삭제할까요? (이미 받은 쿠폰은 남아 있습니다)`, `Delete code ${b.dataset.delCode}? (Coupons already claimed stay)`))) return; await api.deleteCode(b.dataset.delCode); loadMembersView(); });
   V.querySelectorAll("[data-grant]").forEach(b => b.onclick = () => { const m = find(b.dataset.grant); modal(L(`${esc(m.name || PT.prettyPhone(m.phone))} 님에게 쿠폰 지급`, `Give a coupon to ${esc(m.name || PT.prettyPhone(m.phone))}`),
       couponFields({ title:"매장 선물 쿠폰 Gift" }) + `<div class="field"><label>유효기간(일) — 비우면 무제한</label><input data-f="days" type="number" min="1" value="30"></div>`,
-      async ov => { const f = readFields(ov); if(!(+f.amount > 0)) { toast("할인 값을 입력하세요"); return false; }
-        await api.grantCoupon(m.user_id, f); toast("쿠폰을 지급했습니다"); mvMembers = await api.listMembers(mvQuery); renderMembersView(); }, "지급하기"); });
+      async ov => { const f = readFields(ov); const cp = couponFromFields(f); if(!cp) return false;
+        try{ await api.grantCoupon(m.user_id, { ...cp, days: f.days }); }
+        catch(e){ toast(/stackable|item_|discount_type/.test(String(e.message || e)) ? "47단계 SQL(sql/47-coupon-upgrade.sql)을 먼저 실행해 주세요" : PT.errMsg(e), 5000); return false; }
+        toast("쿠폰을 지급했습니다"); mvMembers = await api.listMembers(mvQuery); renderMembersView(); }, "지급하기");
+      bindCouponFields(document.querySelector(".overlay:last-of-type")); });
   V.querySelectorAll("[data-cps]").forEach(b => b.onclick = async () => { const m = find(b.dataset.cps); const list = await api.memberCoupons(m.user_id);
       const ov = modal(L(`${esc(m.name || "")} 쿠폰함`, `${esc(m.name || "")} — coupons`), list.length ? list.map(c => `<div class="so-item" style="margin-bottom:6px;${c.used_at ? "opacity:.55" : ""}"><span><b>${esc(cval(c))}</b> <span data-raw>${esc(c.title)}</span><br>
         <span class="hint">${c.used_at ? L(`사용함 ${dstr(c.used_at)}`, `used ${dstr(c.used_at)}`) : c.expires_at && new Date(c.expires_at) < new Date() ? L("기간 만료", "expired") : L(`사용 가능${c.expires_at ? " · " + dstr(c.expires_at) + "까지" : ""}`, `available${c.expires_at ? " · until " + dstr(c.expires_at) : ""}`)} · ${L("최소", "min")} ${peso(c.min_order)} · ${esc(c.source)}</span></span>

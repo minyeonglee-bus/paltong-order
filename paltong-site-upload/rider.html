@@ -120,7 +120,7 @@
   <div class="appdl">
     <img src="rider-icon-192.png" alt="">
     <div class="tx"><b>Paltong riders 앱</b>기사용 앱 · Rider app</div>
-    <a class="get" href="/paltong-rider.apk" download="paltong-rider.apk">다운로드</a>
+    <a class="get" href="https://paltong-order.vercel.app/paltong-rider.apk" download="paltong-rider.apk">다운로드</a>
     <button class="x" id="appDlX" aria-label="닫기">✕</button>
   </div>
   <p class="appdl-help">① 예전 <b>빨통 기사</b> 앱이 있으면 먼저 삭제 → ② 다운로드 → ③ 알림이나 <b>내 파일 › 다운로드</b>에서 파일 눌러 설치 ('출처를 알 수 없는 앱' 허용) → ④ 로그인 후 위치 <b>'항상 허용'</b>.<br>Delete the old app → download → install → log in → location "Allow all the time".</p>
@@ -154,6 +154,11 @@
     <button class="btn red" id="lBtn" data-t="login"></button>
     <p class="err" id="lErr"></p>
     <p class="hint" data-t="login_hint"></p>
+  </div>
+  <!-- 어느 기기에서든 보이는 기사 앱 다운로드 (안드로이드 전용 앱) -->
+  <div class="card" style="text-align:center">
+    <a class="btn ghost" href="https://paltong-order.vercel.app/paltong-rider.apk" download="paltong-rider.apk" style="text-decoration:none">📲 기사 앱 다운로드 (안드로이드) · Rider app</a>
+    <p class="hint" style="margin:8px 0 0">안드로이드 폰에서 눌러 설치하세요. 아이폰은 앱 없이 이 화면에 로그인해서 쓰면 돼요.<br>Android only — on iPhone just log in here.</p>
   </div>
 </div>
 
@@ -218,7 +223,7 @@ async function boot(){
   const { data } = await sb.auth.getSession();
   if(data.session){ try{ me = unwrap(await sb.rpc("rider_me")); }catch(e){ me = null; } }
   if(me) return startApp();
-  if(data.session) await sb.auth.signOut();
+  if(data.session) await sb.auth.signOut({ scope: "local" });
   $("loginView").hidden = false; $("appView").hidden = true; $("outBtn").hidden = true;
   const last = store.get("paltong_rider_phone", ""); if(last) $("lPhone").value = last;
 }
@@ -230,7 +235,7 @@ $("lBtn").onclick = async () => {
   try{
     unwrap(await sb.auth.signInWithPassword({ email: `${ph}@rider.paltong.app`, password: pw }));
     me = unwrap(await sb.rpc("rider_me"));
-    if(!me){ await sb.auth.signOut(); throw new Error("not_rider"); }
+    if(!me){ await sb.auth.signOut({ scope: "local" }); throw new Error("not_rider"); }
     store.set("paltong_rider_phone", ph); startApp();
   }catch(e){ $("lErr").textContent = errText(e); }
   $("lBtn").disabled = false;
@@ -238,7 +243,7 @@ $("lBtn").onclick = async () => {
 $("lPw").addEventListener("keydown", e => { if(e.key === "Enter") $("lBtn").click(); });
 $("outBtn").onclick = async () => {
   if(onDuty && !confirm(T("근무를 끝내고 로그아웃할까요?", "End your shift and log out?"))) return;
-  await setDuty(false).catch(() => {}); await sb.auth.signOut(); location.reload();
+  await setDuty(false).catch(() => {}); await sb.auth.signOut({ scope: "local" }); location.reload();
 };
 
 function startApp(){
@@ -338,7 +343,7 @@ async function loadOrders(){
     if(!firstLoad && freshE.length){ beep(); if(navigator.vibrate) navigator.vibrate([300, 150, 300, 150, 300]); toast(T(`🧾 새 심부름: ${freshE.map(e => e.title).join(", ")}`, `🧾 New errand: ${freshE.map(e => e.title).join(", ")}`), 6000); freshE.forEach(e => e._new = true); }
     firstLoad = false;
     renderList();
-  }catch(e){ if(/not_rider/.test(String(e.message))){ await sb.auth.signOut(); location.reload(); return; } console.warn(e); }
+  }catch(e){ if(/not_rider/.test(String(e.message))){ await sb.auth.signOut({ scope: "local" }); location.reload(); return; } console.warn(e); }
 }
 function beep(){ try{ const c = new (window.AudioContext || window.webkitAudioContext)(); [0, .25].forEach(t => { const o = c.createOscillator(), g = c.createGain(); o.frequency.value = 880; o.connect(g); g.connect(c.destination); g.gain.setValueAtTime(.25, c.currentTime + t); g.gain.exponentialRampToValueAtTime(.001, c.currentTime + t + .2); o.start(c.currentTime + t); o.stop(c.currentTime + t + .22); }); }catch(e){} }
 /* 길안내: 누르면 바로 음성 안내 시작 (구글 지도는 오토바이 경로, Waze 도 가능) */

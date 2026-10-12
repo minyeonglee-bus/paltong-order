@@ -1,4 +1,4 @@
 User-agent: *
 Allow: /
 Disallow: /admin
-Sitemap: https://paltong-order.vercel.app/sitemap.xml
+Sitemap: https://paltong-order.com/sitemap.xml

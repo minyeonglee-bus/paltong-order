@@ -265,16 +265,27 @@ const prettyPhone = ph => { const d = normPhone(ph); return d.startsWith("63") &
 /* 회원 아이디 형식: 09 로 시작하는 숫자 11자리만 허용 */
 const isMemberPhone = v => /^09\d{9}$/.test(String(v || ""));
 function couponDiscount(c, subtotal){
-  if(!c) return 0;
+  if(!c || c.discount_type === "item") return 0;            // 🎁 메뉴 무료 쿠폰은 할인 대신 ₱0 메뉴 줄 (47단계)
   const raw = c.discount_type === "percent" ? Math.min(c.max_discount ?? Infinity, Math.floor(subtotal * c.amount / 100)) : c.amount;
   return Math.max(0, Math.min(subtotal, raw));
 }
 function couponValue(c){
+  if(c.discount_type === "item") return T(`🎁 ${c.item_name || ""} 무료`, `🎁 Free ${c.item_en || c.item_name || ""}`);
   return c.discount_type === "percent" ? `${c.amount}%` : peso(c.amount);
 }
+/* 쿠폰 '값' (금액 제한 확인용): 금액 = 금액, % = 계산된 할인, 메뉴 무료 = 그 메뉴 값 */
+function couponFace(c, subtotal){
+  if(!c) return 0;
+  if(c.discount_type === "item") return c.item_price || c.amount || 0;
+  if(c.discount_type === "percent") return Math.min(c.max_discount ?? Infinity, Math.floor(subtotal * c.amount / 100));
+  return c.amount || 0;
+}
+const couponsFace = (list, subtotal) => (list || []).reduce((s, c) => s + couponFace(c, subtotal), 0);
 function couponCond(c){
   const parts = [];
   if(c.discount_type === "percent" && c.max_discount) parts.push(T(`최대 ${peso(c.max_discount)} 할인`, `max ${peso(c.max_discount)} off`));
+  if(c.discount_type === "item") parts.push(T(`${peso(c.item_price || c.amount)} 상당`, `worth ${peso(c.item_price || c.amount)}`));
+  if(c.stackable) parts.push(T("다른 쿠폰과 같이 사용 가능", "stackable"));
   parts.push(c.min_order ? T(`${peso(c.min_order)} 이상 주문`, `min. order ${peso(c.min_order)}`) : T("최소금액 없음", "no minimum"));
   if(c.expires_at){ const x = new Date(c.expires_at); parts.push(T(`${x.getMonth()+1}/${x.getDate()}까지`, `until ${x.getMonth()+1}/${x.getDate()}`)); }
   return parts.join(" · ");
@@ -307,18 +318,19 @@ function stampText(st){
 function couponUsable(c, subtotal){
   if(c.used_at) return false;
   if(c.expires_at && new Date(c.expires_at) < new Date()) return false;
-  return subtotal >= (c.min_order || 0);
+  return subtotal >= (c.min_order || 0) && couponFace(c, subtotal) < subtotal;   // 쿠폰 값은 음식값보다 작아야 (47단계)
 }
 /* ---------- 쿠폰 중복 사용 (sql/30-coupon-stack.sql 과 같은 규칙) ----------
    종류: welcome 가입 · stamp 스탬프 · birthday 생일 · code 코드 · admin 매장선물
    settings.coupon_stack = ["birthday+code", "code+code", ...]  (알파벳 순 짝)
    settings.coupon_stack_max = 한 주문 최대 장수 */
-const COUPON_KINDS = [["welcome","가입 축하","Welcome"], ["stamp","스탬프","Stamp"], ["birthday","생일","Birthday"], ["code","쿠폰 코드","Code"], ["admin","매장 선물","Gift"]];
-const couponKind = c => ["welcome","stamp","birthday","code"].includes(c && c.source) ? c.source : "admin";
+const COUPON_KINDS = [["welcome","가입 축하","Welcome"], ["stamp","스탬프","Stamp"], ["birthday","생일","Birthday"], ["code","쿠폰 코드","Code"], ["admin","매장 선물","Gift"], ["stack","중복 가능","Stackable"]];
+const couponKind = c => c && c.stackable ? "stack" : ["welcome","stamp","birthday","code"].includes(c && c.source) ? c.source : "admin";
 const stackKey = (a, b) => a < b ? `${a}+${b}` : `${b}+${a}`;
 function stackMax(st){ return Math.max(1, Math.round(+((st || {}).coupon_stack_max ?? 1)) || 1); }
 /* 이 쿠폰들을 한 주문에 같이 쓸 수 있는지 */
-function couponStackOk(list, st){
+function couponStackOk(list, st, subtotal){
+  if(subtotal != null && list.length && couponsFace(list, subtotal) >= subtotal) return false;   // 쿠폰 합계는 음식값보다 작게
   if(list.length <= 1) return true;
   if(list.length > stackMax(st)) return false;
   const allow = new Set((st || {}).coupon_stack || []);
@@ -330,17 +342,17 @@ function couponStackOk(list, st){
 function couponsDiscount(list, subtotal){
   return Math.min(subtotal, (list || []).reduce((s, c) => s + couponDiscount(c, subtotal), 0));
 }
-/* 할인이 가장 큰 조합 고르기 (같은 할인이면 장수가 적은 쪽) */
+/* 혜택이 가장 큰 조합 고르기 (할인 + 무료 메뉴 값, 같으면 장수가 적은 쪽) — 쿠폰 합계는 음식값보다 작게 */
 function bestCoupons(coupons, subtotal, st){
   const ok = (coupons || []).filter(c => couponUsable(c, subtotal))
-    .sort((x, y) => couponDiscount(y, subtotal) - couponDiscount(x, subtotal)).slice(0, 15);
+    .sort((x, y) => couponFace(y, subtotal) - couponFace(x, subtotal)).slice(0, 15);
   const max = Math.min(stackMax(st), ok.length);
   let best = [], bestD = 0;
   (function walk(start, pick){
-    const d = couponsDiscount(pick, subtotal);
+    const d = couponsFace(pick, subtotal);
     if(d > bestD || (d === bestD && pick.length < best.length)){ best = pick; bestD = d; }
-    if(pick.length >= max || bestD >= subtotal) return;
-    for(let i = start; i < ok.length; i++){ const next = pick.concat(ok[i]); if(couponStackOk(next, st)) walk(i + 1, next); }
+    if(pick.length >= max) return;
+    for(let i = start; i < ok.length; i++){ const next = pick.concat(ok[i]); if(couponStackOk(next, st, subtotal)) walk(i + 1, next); }
   })(0, []);
   return best;
 }
@@ -444,6 +456,8 @@ function errMsg(e){
     [/coupon_invalid/, ["이미 사용했거나 사용할 수 없는 쿠폰입니다", "Coupon is not available"]],
     [/coupon_stack_max:(\d+)/, m2 => [`쿠폰은 한 주문에 ${m2[1]}장까지 쓸 수 있습니다`, `Up to ${m2[1]} coupons per order`]],
     [/coupon_stack_not_allowed/, ["함께 쓸 수 없는 쿠폰이 섞여 있습니다", "These coupons can't be used together"]],
+    [/coupon_over_total:(\d+)/, m2 => [`쿠폰 금액(무료 메뉴 포함)은 음식값 ${peso(m2[1])}보다 적어야 해요`, `Coupons (incl. free items) must be less than the food total ${peso(m2[1])}`]],
+    [/item_required/, ["무료로 줄 메뉴를 골라주세요", "Choose the free menu item"]],
     [/coupon_login_required|login_required/, ["로그인이 필요합니다", "Please log in"]],
     [/code_invalid/, ["없는 쿠폰 코드입니다", "Invalid coupon code"]],
     [/code_expired/, ["등록 기간이 끝난 코드입니다", "This code has expired"]],
@@ -1346,6 +1360,6 @@ function toast(msg, ms = 2200){
   clearTimeout(t._h); t._h = setTimeout(() => t.classList.remove("show"), ms);
 }
 
-window.PT = { PRINT_SETS, printKinds, manilaDay, bizDay, bizStart, DAY_START_HOUR, orderDay, get menuCfgActive(){ return menuCfgActive; }, loadMenuData, exportMenu, priceSig, politeKo, CATS, get menuOv(){ return menuOv; }, applyMenuOverrides, cleanForTranslate, setTranslateKey, googleTranslate, splitKoEn, msgText, schedLabel, menuToEnglish, matchZone, zoneFee, phoneMask, phoneValue, phoneOk, phoneDigits, phoneFmt, englishOnly, EN_NAME, EN_ADDR, hasHangul, stampRewards, stampText, isMemberPhone, normPhone, phoneEmail, prettyPhone, couponDiscount, couponValue, couponCond, couponUsable, COUPON_KINDS, couponKind, stackKey, stackMax, couponStackOk, couponsDiscount, bestCoupons, stackRulesText, repriceLine, errMsg, CFG, MENU, ITEM_BY_ID, esc, peso, ls, L, T, setLang, get LANG(){ return LANG; },
+window.PT = { PRINT_SETS, printKinds, manilaDay, bizDay, bizStart, DAY_START_HOUR, orderDay, get menuCfgActive(){ return menuCfgActive; }, loadMenuData, exportMenu, priceSig, politeKo, CATS, get menuOv(){ return menuOv; }, applyMenuOverrides, cleanForTranslate, setTranslateKey, googleTranslate, splitKoEn, msgText, schedLabel, menuToEnglish, matchZone, zoneFee, phoneMask, phoneValue, phoneOk, phoneDigits, phoneFmt, englishOnly, EN_NAME, EN_ADDR, hasHangul, stampRewards, stampText, isMemberPhone, normPhone, phoneEmail, prettyPhone, couponDiscount, couponValue, couponFace, couponsFace, couponCond, couponUsable, COUPON_KINDS, couponKind, stackKey, stackMax, couponStackOk, couponsDiscount, bestCoupons, stackRulesText, repriceLine, errMsg, CFG, MENU, ITEM_BY_ID, esc, peso, ls, L, T, setLang, get LANG(){ return LANG; },
   orderPrefix, orderCode, isDine, inClosingWindow, isSvc, svcValue, riderPhone, riderEmail, STATUS, payInfo, isOnlinePay, lineName, lineOpt, compressImage, api, DEMO, receiptDoc, printReceipt, toast };
 })();

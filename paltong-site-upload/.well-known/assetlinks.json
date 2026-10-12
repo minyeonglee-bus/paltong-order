@@ -1,0 +1,14 @@
+[
+  {
+    "relation": [
+      "delegate_permission/common.handle_all_urls"
+    ],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "app.vercel.paltong_order.rider",
+      "sha256_cert_fingerprints": [
+        "2B:B8:A3:A7:A6:DE:AC:63:50:11:D6:76:62:EE:C2:A1:7E:7A:DA:4D:EA:C2:2E:6B:EB:C1:79:26:70:17:AC:0C"
+      ]
+    }
+  }
+]
