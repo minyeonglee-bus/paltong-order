@@ -1,0 +1,33 @@
+{
+  "name": "빨통 PAL TONG",
+  "short_name": "빨통 PAL TONG",
+  "description": "빨통 PAL TONG 배달·픽업 주문 (Malate, Manila)",
+  "id": "/",
+  "start_url": "/?from=app",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#faf3ea",
+  "theme_color": "#d33d2a",
+  "lang": "ko",
+  "icons": [
+    {
+      "src": "/app-icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/app-icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/app-icon-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}

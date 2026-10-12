@@ -1302,7 +1302,7 @@ async function doPrint(o){
   let fresh = orders.find(x => x.id === o.id) || o;
   if(o._cashGot != null) fresh._cashGot = o._cashGot;
   fresh = await printEnglish(fresh);
-  try{ await PTPrinter.print(fresh); if(PTPrinter.getMode() !== "browser") toast(L(`#${fresh.order_no} 영수증 전송 완료`, `#${fresh.order_no} sent to printer`)); }
+  try{ await PTPrinter.print(fresh); if(!["browser", "share"].includes(PTPrinter.getMode())) toast(L(`#${fresh.order_no} 영수증 전송 완료`, `#${fresh.order_no} sent to printer`)); }
   catch(e){ toast(L("인쇄 실패: ", "Print failed: ") + (e.message || e) + L(" — 🖨 프린터 버튼에서 다시 연결하세요", " — reconnect from the 🖨 Printer button"), 5000); paintPrinterBtn(false); return; }
   printed[o.id] = Date.now(); ls.set("paltong_printed", printed);
   setTimeout(renderOrders, 500);
@@ -1335,6 +1335,7 @@ $("printerBtn").onclick = () => {
       <div class="opt-choices" id="pmodes">
         <button class="opt-choice" data-m="ble">블루투스 바로 연결 (아이폰은 Bluefy)</button>
         <button class="opt-choice" data-m="rawbt">RawBT 앱 (안드로이드)</button>
+        <button class="opt-choice" data-m="share">📤 아이패드·아이폰 (프린터 앱으로 공유)</button>
         <button class="opt-choice" data-m="browser">브라우저 인쇄창 (PC 드라이버)</button>
       </div></div>
     <div class="card" id="pdesc" style="font-size:13px;line-height:1.6"></div>
@@ -1358,6 +1359,12 @@ $("printerBtn").onclick = () => {
           앱에서 블루투스 프린터를 선택 → 테스트 인쇄가 되는지 먼저 확인하세요.<br>
           그다음 여기서 '테스트 인쇄'를 누르면 RawBT가 열리며 인쇄됩니다. 처음 한 번 "항상 허용"을 눌러두면 이후 자동으로 나갑니다.<br>
           • 거의 모든 58mm 블루투스 프린터(클래식 블루투스 포함)에서 작동합니다.`,
+    share: `<b>아이패드·아이폰용</b> — 영수증을 그림으로 만들어 <b>공유 창</b>으로 프린터 제조사 앱에 보내 인쇄해요. (와이파이·블루투스 프린터 모두)<br>
+          ① App Store에서 <b>프린터 설명서·상자에 적힌 앱</b>을 설치하고, 그 앱에서 프린터를 연결해 테스트 인쇄가 되는지 확인<br>
+          ② 여기서 '테스트 인쇄' → 공유 창에서 그 앱 선택 → 앱에서 인쇄<br>
+          ③ 처음 한 번: 공유 창 앱 목록 맨 끝 <b>'더 보기' → 편집</b>에서 그 앱을 <b>즐겨찾기</b>로 앞에 두면 다음부터 한 번에 눌러요<br>
+          • 주방용 + 손님용은 한 장으로 이어서 나오고 사이에 ✂ 선이 있어요 (손으로 뜯기)<br>
+          • 공유 창 목록에 프린터 앱이 없으면, 그 앱이 사진 받기를 지원하지 않는 거예요 → 앱 안의 '사진/이미지 인쇄'에서 저장한 영수증을 고르세요`,
     browser: `PC에 프린터 드라이버를 설치한 경우(USB/블루투스 COM 포트) 브라우저 인쇄창으로 출력합니다. 설치가이드 5단계 참고.`,
   };
   function paint(){
