@@ -1,0 +1,517 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="robots" content="noindex">
+<meta name="theme-color" content="#d33d2a">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="PALTONG Rider">
+<title>PAL TONG Rider</title>
+<link rel="manifest" href="rider.webmanifest">
+<link rel="icon" type="image/png" href="rider-icon-192.png">
+<link rel="apple-touch-icon" href="rider-apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Black+Han+Sans&family=Noto+Sans+KR:wght@400;500;700;800&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --ink:#241812; --ink-soft:#5c4a3e; --bg:#faf3ea; --surface:#ffffff; --surface-2:#fff8ef;
+    --line:#ecdfce; --red:#d33d2a; --red-deep:#a92a1b; --muted:#8a7868; --green:#2f8f4e; --blue:#2a6fd3; --mustard:#e5a731;
+    color-scheme:light;
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --ink:#f3e9dd; --ink-soft:#cbb9a8; --bg:#1c130f; --surface:#271b15; --surface-2:#2f2118;
+      --line:#3c2c22; --red:#ef5c46; --red-deep:#ff7a63; --muted:#9c8979; --green:#4fbf73; --blue:#5b95ef; --mustard:#f0b94a; color-scheme:dark;
+    }
+  }
+  :root[data-theme="dark"]{
+    --ink:#f3e9dd; --ink-soft:#cbb9a8; --bg:#1c130f; --surface:#271b15; --surface-2:#2f2118;
+    --line:#3c2c22; --red:#ef5c46; --red-deep:#ff7a63; --muted:#9c8979; --green:#4fbf73; --blue:#5b95ef; --mustard:#f0b94a; color-scheme:dark;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0 auto;max-width:560px;padding:0 16px 40px;background:var(--bg);color:var(--ink);font:15px/1.45 'Noto Sans KR',system-ui,-apple-system,sans-serif;font-variant-numeric:tabular-nums;-webkit-tap-highlight-color:transparent;}
+  button,input{font:inherit;color:inherit;}
+  [hidden]{display:none !important;}
+  .top{position:sticky;top:0;z-index:20;display:flex;align-items:center;gap:10px;padding:calc(10px + env(safe-area-inset-top)) 16px 10px;margin:0 -16px;background:var(--bg);border-bottom:1px solid var(--line);}
+  .top img{width:40px;height:40px;object-fit:contain;}
+  .top h1{flex:1;min-width:0;margin:0;font:400 20px/1 'Black Han Sans','Noto Sans KR',sans-serif;color:var(--red);}
+  .top h1 small{display:block;margin-top:3px;font:500 11px 'Noto Sans KR',sans-serif;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .chip{border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:7px 11px;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap;}
+  .card{background:var(--surface);border:1px solid var(--line);border-radius:18px;padding:16px;margin-top:12px;}
+  .field{margin:12px 0;} .field label{display:block;font-size:13px;font-weight:700;color:var(--ink-soft);margin-bottom:6px;}
+  .field input{width:100%;border:1px solid var(--line);background:var(--surface);border-radius:12px;padding:13px 14px;font-size:17px;}
+  .btn{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;border:0;border-radius:14px;padding:15px;font-size:16px;font-weight:800;cursor:pointer;text-decoration:none;}
+  .btn:disabled{opacity:.5;cursor:default;}
+  .btn.red{background:var(--red);color:#fff;} .btn.green{background:var(--green);color:#fff;} .btn.blue{background:var(--blue);color:#fff;}
+  .btn.ghost{background:var(--surface-2);border:1px solid var(--line);color:var(--ink);}
+  .hint{font-size:12.5px;color:var(--muted);margin:8px 0 0;}
+  .err{color:var(--red-deep);font-weight:700;font-size:13px;min-height:18px;margin:8px 0 0;}
+  /* 근무 상태 */
+  .duty{display:flex;align-items:center;gap:14px;}
+  .duty .dot{width:16px;height:16px;border-radius:50%;background:#b8a898;flex-shrink:0;}
+  .duty.on .dot{background:var(--green);box-shadow:0 0 0 6px rgba(47,143,78,.18);animation:pulse 1.6s infinite;}
+  .duty.warn .dot{background:var(--mustard);box-shadow:0 0 0 6px rgba(229,167,49,.2);}
+  @keyframes pulse{50%{box-shadow:0 0 0 10px rgba(47,143,78,.05);}}
+  .duty b{display:block;font-size:17px;} .duty small{color:var(--muted);font-size:12.5px;}
+  .duty .txt{flex:1;min-width:0;}
+  .switch{border:0;border-radius:999px;padding:12px 16px;font-weight:800;font-size:14px;cursor:pointer;white-space:nowrap;}
+  .switch.start{background:var(--green);color:#fff;} .switch.stop{background:var(--surface-2);border:1px solid var(--line);}
+  .banner{margin-top:10px;padding:10px 12px;border-radius:12px;font-size:12.5px;background:#fff1c9;color:#6b4e00;border:1px solid #f0d27a;}
+  @media (prefers-color-scheme: dark){ :root:not([data-theme="light"]) .banner{background:#3a2f12;color:#f3d98a;border-color:#6b5520;} }
+  /* 주문 */
+  h2{font:400 18px 'Black Han Sans','Noto Sans KR',sans-serif;margin:22px 2px 0;display:flex;align-items:center;gap:8px;}
+  h2 .n{font:800 12px 'Noto Sans KR',sans-serif;background:var(--red);color:#fff;border-radius:999px;padding:2px 8px;}
+  .ord{background:var(--surface);border:1px solid var(--line);border-radius:18px;padding:14px;margin-top:10px;}
+  .ord.live{border:2px solid var(--blue);}
+  .ord.new{animation:flash 1s ease-in-out 3;}
+  @keyframes flash{50%{box-shadow:0 0 0 6px rgba(211,61,42,.35);}}
+  .oh{display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
+  .oh .no{font:400 28px/1 'Black Han Sans',sans-serif;color:var(--red);}
+  .pill{display:inline-block;color:#fff;border-radius:999px;padding:4px 10px;font-size:12px;font-weight:800;}
+  .oh .t{margin-left:auto;font-size:12px;color:var(--muted);}
+  .cust{margin-top:10px;padding:10px 12px;border-radius:12px;background:var(--surface-2);font-size:14px;}
+  .cust b{font-size:16px;}
+  .memo{margin-top:6px;font-weight:700;color:var(--red-deep);}
+  .items{margin:10px 2px 0;font-size:13.5px;color:var(--ink-soft);}
+  .money{display:flex;justify-content:space-between;align-items:center;margin-top:10px;padding:10px 12px;border-radius:12px;font-weight:800;}
+  .money.cash{background:#fff1c9;color:#6b4e00;} .money.paid{background:rgba(47,143,78,.12);color:var(--green);}
+  @media (prefers-color-scheme: dark){ :root:not([data-theme="light"]) .money.cash{background:#3a2f12;color:#f3d98a;} }
+  .money big{font-size:20px;}
+  .row{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px;}
+  .wait{margin-top:10px;padding:10px 12px;border-radius:12px;background:var(--surface-2);color:var(--ink-soft);font-size:13px;text-align:center;}
+  .done-list .ord{opacity:.7;padding:10px 14px;}
+  .empty{text-align:center;color:var(--muted);padding:36px 10px;}
+  .empty div{font-size:42px;}
+  .toast{position:fixed;left:50%;bottom:calc(24px + env(safe-area-inset-bottom));transform:translateX(-50%) translateY(20px);background:var(--ink);color:var(--bg);padding:12px 18px;border-radius:12px;font-size:14px;font-weight:700;opacity:0;transition:.25s;z-index:100;max-width:90vw;text-align:center;pointer-events:none;}
+  .toast.show{opacity:1;transform:translateX(-50%);}
+  .appdl{display:flex;align-items:center;gap:10px;margin:10px 14px 0;padding:10px 12px;border-radius:14px;background:var(--red);color:#fff;box-shadow:0 4px 14px rgba(0,0,0,.18);}
+  .appdl img{width:44px;height:44px;border-radius:11px;flex-shrink:0;background:#fff;}
+  .appdl .tx{flex:1;min-width:0;font-size:13px;line-height:1.35;}
+  .appdl .tx b{display:block;font-size:15px;}
+  .appdl a.get{flex-shrink:0;background:#fff;color:var(--red-deep);font-weight:800;font-size:14px;padding:9px 12px;border-radius:10px;text-decoration:none;}
+  .appdl .x{flex-shrink:0;background:none;border:0;color:#fff;font-size:20px;line-height:1;padding:4px;opacity:.8;cursor:pointer;}
+  /* 🧾 심부름 (38단계) */
+  .ord.errand{border:2px solid #e07b1a;}
+  .ord.errand.going{border-color:var(--blue);}
+  .ord.errand .no{font-size:22px;color:#e07b1a;}
+  .etitle{margin-top:8px;font-size:18px;font-weight:800;line-height:1.35;}
+  .sheet-bg{position:fixed;inset:0;z-index:90;background:rgba(20,12,8,.55);display:flex;align-items:flex-end;justify-content:center;}
+  .sheet{width:100%;max-width:560px;max-height:92vh;overflow-y:auto;background:var(--bg);border-radius:20px 20px 0 0;padding:18px 16px calc(20px + env(safe-area-inset-bottom));}
+  .sheet h3{margin:0 0 6px;font:400 20px 'Black Han Sans','Noto Sans KR',sans-serif;}
+  .field textarea{width:100%;border:1px solid var(--line);background:var(--surface);border-radius:12px;padding:12px 14px;font:inherit;font-size:16px;resize:vertical;}
+  .photo-pick{display:flex;align-items:center;justify-content:center;gap:8px;border:2px dashed var(--line);border-radius:14px;padding:14px;font-weight:700;color:var(--ink-soft);cursor:pointer;}
+  .photo-pick img{max-height:140px;max-width:100%;border-radius:10px;}
+  .appdl-help{margin:6px 14px 0;font-size:12px;color:var(--muted);line-height:1.45;}
+</style>
+</head>
+<body>
+<div class="top">
+  <img src="images/logo.png" alt="">
+  <h1>빨통 기사 <small id="sub">PAL TONG Rider</small></h1>
+  <button class="chip" id="langBtn">EN</button>
+  <button class="chip" id="outBtn" hidden></button>
+</div>
+
+<!-- 안드로이드 브라우저로 들어오면 앱(APK) 다운로드 안내 -->
+<div id="appDl" hidden>
+  <div class="appdl">
+    <img src="rider-icon-192.png" alt="">
+    <div class="tx"><b>Paltong riders 앱</b>기사용 앱 · Rider app</div>
+    <a class="get" href="https://paltong-order.vercel.app/paltong-rider.apk" download="paltong-rider.apk">다운로드</a>
+    <button class="x" id="appDlX" aria-label="닫기">✕</button>
+  </div>
+  <p class="appdl-help">① 예전 <b>빨통 기사</b> 앱이 있으면 먼저 삭제 → ② 다운로드 → ③ 알림이나 <b>내 파일 › 다운로드</b>에서 파일 눌러 설치 ('출처를 알 수 없는 앱' 허용) → ④ 로그인 후 위치 <b>'항상 허용'</b>.<br>Delete the old app → download → install → log in → location "Allow all the time".</p>
+</div>
+<script>
+(function(){
+  var KEY = "paltong_rider_appdl_hide";
+  var get = function(k){ try{ return localStorage.getItem(k); }catch(e){ return null; } };
+  var set = function(k, v){ try{ localStorage.setItem(k, v); }catch(e){} };
+  try{ if(document.referrer.indexOf("android-app://") === 0) sessionStorage.setItem("paltong_in_app", "1"); }catch(e){}
+  var inApp = false;
+  try{ inApp = sessionStorage.getItem("paltong_in_app") === "1"; }catch(e){}
+  if(window.matchMedia && (matchMedia("(display-mode: standalone)").matches || matchMedia("(display-mode: fullscreen)").matches)) inApp = true;
+  var android = /Android/i.test(navigator.userAgent);
+  if(/; wv\)|ReactNative|Expo/i.test(navigator.userAgent)) inApp = true;   // 기사 앱(Expo) 안에서 열린 화면이면 숨김
+  var hideUntil = +(get(KEY) || 0);
+  if(android && !inApp && Date.now() > hideUntil) document.getElementById("appDl").hidden = false;
+  document.getElementById("appDlX").onclick = function(){
+    document.getElementById("appDl").hidden = true;
+    set(KEY, String(Date.now() + 3 * 864e5));   // 닫으면 3일 동안 안 보임
+  };
+})();
+</script>
+
+<!-- 로그인 -->
+<div id="loginView" hidden>
+  <div class="card">
+    <h2 style="margin-top:0" data-t="login_title"></h2>
+    <div class="field"><label data-t="phone"></label><input id="lPhone" type="tel" inputmode="numeric" autocomplete="username" placeholder="09xx xxx xxxx"></div>
+    <div class="field"><label data-t="password"></label><input id="lPw" type="password" autocomplete="current-password"></div>
+    <button class="btn red" id="lBtn" data-t="login"></button>
+    <p class="err" id="lErr"></p>
+    <p class="hint" data-t="login_hint"></p>
+  </div>
+</div>
+
+<!-- 메인 -->
+<div id="appView" hidden>
+  <div class="card">
+    <div class="duty" id="duty"><span class="dot"></span><div class="txt"><b id="dutyTitle"></b><small id="dutyInfo"></small></div><button class="switch" id="dutyBtn"></button></div>
+    <div class="banner" id="gpsBanner" hidden></div>
+  </div>
+  <div id="list"></div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="config.js"></script>
+<script>
+const CFG = window.PALTONG_CONFIG || {};
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const peso = n => "₱" + Number(n || 0).toLocaleString("en-PH");
+const store = { get(k, d){ try{ const v = localStorage.getItem(k); return v == null ? d : JSON.parse(v); }catch(e){ return d; } }, set(k, v){ try{ localStorage.setItem(k, JSON.stringify(v)); }catch(e){} } };
+
+/* ---------------- 언어 (기사님 대부분 영어 → 기본은 휴대폰 언어) ---------------- */
+let LANG = store.get("paltong_rider_lang", (navigator.language || "").startsWith("ko") ? "ko" : "en");
+const TX = {
+  login_title: ["기사 로그인", "Rider sign-in"], phone: ["휴대폰번호 (아이디)", "Mobile number (ID)"], password: ["비밀번호", "Password"],
+  login: ["로그인", "Sign in"], login_hint: ["아이디·비밀번호는 매장에서 받으세요.", "Get your ID and password from the store."],
+  logout: ["로그아웃", "Log out"],
+};
+const T = (ko, en) => LANG === "en" ? en : ko;
+function paintStatic(){
+  document.querySelectorAll("[data-t]").forEach(el => { const t = TX[el.dataset.t]; if(t) el.textContent = T(t[0], t[1]); });
+  $("langBtn").textContent = LANG === "en" ? "한국어" : "EN"; $("outBtn").textContent = T("로그아웃", "Log out"); document.documentElement.lang = LANG;
+}
+$("langBtn").onclick = () => { LANG = LANG === "en" ? "ko" : "en"; store.set("paltong_rider_lang", LANG); paintStatic(); paintDuty(); renderList(); };
+paintStatic();
+
+function toast(m, ms = 2600){ const t = $("toast"); t.textContent = m; t.classList.add("show"); clearTimeout(t._h); t._h = setTimeout(() => t.classList.remove("show"), ms); }
+function errText(e){
+  const m = String((e && (e.message || e.error_description)) || e || "");
+  if(/Invalid login credentials/i.test(m)) return T("휴대폰번호 또는 비밀번호가 맞지 않아요", "Wrong number or password");
+  if(/not_rider/.test(m)) return T("기사로 등록되지 않은 계정이에요. 매장에 문의하세요", "This account is not a rider. Please ask the store");
+  if(/not_ready/.test(m)) return T("아직 출발할 수 없어요 — 매장에서 결제 확인·조리 완료 후 눌러주세요", "Not ready yet — wait for the store to confirm payment");
+  if(/not_delivering/.test(m)) return T("먼저 '픽업·출발'을 눌러주세요", "Tap 'Picked up' first");
+  if(/not_your_errand/.test(m)) return T("다른 기사에게 맡긴 심부름이에요", "This errand belongs to another rider");
+  if(/errand_closed/.test(m)) return T("이미 끝났거나 취소된 심부름이에요", "This errand is already finished or cancelled");
+  if(/not_your_order/.test(m)) return T("다른 기사에게 배정된 주문이에요", "This order is assigned to another rider");
+  if(/rider_orders|rider_me|Could not find the function/.test(m)) return T("서버 설정이 아직 안 됐어요 (sql/28 실행 필요)", "Server not set up yet (run sql/28)");
+  if(/Failed to fetch|NetworkError|network/i.test(m)) return T("인터넷 연결을 확인해주세요", "Check your internet connection");
+  return T("오류가 발생했어요", "Something went wrong") + (m ? ` (${m.slice(0, 80)})` : "");
+}
+
+/* ---------------- Supabase ---------------- */
+const sb = supabase.createClient(CFG.SUPABASE_URL, CFG.SUPABASE_ANON_KEY, { auth:{ persistSession:true, storageKey:"paltong_rider_auth" } });
+const unwrap = ({ data, error }) => { if(error) throw error; return data; };
+const riderPhone = v => { let d = String(v || "").replace(/\D/g, ""); if(d.startsWith("63") && d.length === 12) d = "0" + d.slice(2); return d; };
+let me = null, orders = [], storeLoc = null, known = new Set(), firstLoad = true;
+let errands = [], errandsOn = true;   // 🧾 가게 심부름 (38단계 SQL 실행 전이면 꺼짐)
+
+async function boot(){
+  const { data } = await sb.auth.getSession();
+  if(data.session){ try{ me = unwrap(await sb.rpc("rider_me")); }catch(e){ me = null; } }
+  if(me) return startApp();
+  if(data.session) await sb.auth.signOut({ scope: "local" });
+  $("loginView").hidden = false; $("appView").hidden = true; $("outBtn").hidden = true;
+  const last = store.get("paltong_rider_phone", ""); if(last) $("lPhone").value = last;
+}
+$("lBtn").onclick = async () => {
+  const ph = riderPhone($("lPhone").value), pw = $("lPw").value;
+  $("lErr").textContent = "";
+  if(!/^09\d{9}$/.test(ph)){ $("lErr").textContent = T("09로 시작하는 11자리 번호를 입력하세요", "Enter your 11-digit number starting with 09"); return; }
+  $("lBtn").disabled = true;
+  try{
+    unwrap(await sb.auth.signInWithPassword({ email: `${ph}@rider.paltong.app`, password: pw }));
+    me = unwrap(await sb.rpc("rider_me"));
+    if(!me){ await sb.auth.signOut({ scope: "local" }); throw new Error("not_rider"); }
+    store.set("paltong_rider_phone", ph); startApp();
+  }catch(e){ $("lErr").textContent = errText(e); }
+  $("lBtn").disabled = false;
+};
+$("lPw").addEventListener("keydown", e => { if(e.key === "Enter") $("lBtn").click(); });
+$("outBtn").onclick = async () => {
+  if(onDuty && !confirm(T("근무를 끝내고 로그아웃할까요?", "End your shift and log out?"))) return;
+  await setDuty(false).catch(() => {}); await sb.auth.signOut({ scope: "local" }); location.reload();
+};
+
+function startApp(){
+  $("loginView").hidden = true; $("appView").hidden = false; $("outBtn").hidden = false;
+  $("sub").textContent = me.name + " · PAL TONG Rider";
+  onDuty = !!store.get("paltong_rider_duty", false);
+  if(onDuty) startGps();
+  paintDuty(); loadOrders();
+  setInterval(loadOrders, 10000);
+  setInterval(paintDuty, 5000);
+}
+
+/* ---------------- 근무 · 위치 전송 ----------------
+   웹 버전은 화면이 켜져 있을 때만 위치가 전송됩니다 (화면 꺼짐 방지를 켜둠).
+   화면이 꺼져도 계속 보내려면 설치형 앱(빨통 기사 앱)을 쓰세요. */
+let onDuty = false, watchId = null, lastFix = null, lastSent = null, lastSentAt = 0, sending = false, gpsErr = null, wake = null, battery = null;
+if(navigator.getBattery) navigator.getBattery().then(b => { battery = b; }).catch(() => {});
+function distM(a, b){ const R = 6371000, r = x => x * Math.PI / 180, dLat = r(b.lat - a.lat), dLng = r(b.lng - a.lng);
+  const h = Math.sin(dLat/2)**2 + Math.cos(r(a.lat)) * Math.cos(r(b.lat)) * Math.sin(dLng/2)**2; return 2 * R * Math.asin(Math.sqrt(h)); }
+const hasLive = () => orders.some(o => o.status === "delivering") || errands.some(e => e.status === "going");
+
+function startGps(){
+  if(!("geolocation" in navigator)){ gpsErr = "unsupported"; paintDuty(); return; }
+  if(watchId != null) return;
+  watchId = navigator.geolocation.watchPosition(p => {
+    gpsErr = null;
+    lastFix = { lat: p.coords.latitude, lng: p.coords.longitude, accuracy: p.coords.accuracy, heading: p.coords.heading, speed: p.coords.speed, at: Date.now() };
+    paintDuty(); maybeSend().then(paintDuty);
+  }, e => { gpsErr = e.code === 1 ? "denied" : "unavailable"; paintDuty(); }, { enableHighAccuracy:true, maximumAge:5000, timeout:20000 });
+  keepAwake();
+}
+function stopGps(){ if(watchId != null){ navigator.geolocation.clearWatch(watchId); watchId = null; } if(wake){ wake.release().catch(() => {}); wake = null; } }
+async function maybeSend(force){
+  if(!onDuty || !lastFix || sending) return;
+  const gap = hasLive() ? 5000 : 15000, moved = lastSent ? distM(lastSent, lastFix) : 1e9;
+  if(!force && Date.now() - lastSentAt < gap && moved < 40) return;
+  if(!force && Date.now() - lastSentAt < 3000) return;
+  sending = true;
+  try{
+    await sb.rpc("rider_ping", { p_lat: lastFix.lat, p_lng: lastFix.lng, p_accuracy: lastFix.accuracy ?? null, p_heading: Number.isFinite(lastFix.heading) ? lastFix.heading : null,
+      p_speed: Number.isFinite(lastFix.speed) ? lastFix.speed : null, p_battery: battery ? battery.level : null }).then(unwrap);
+    lastSent = lastFix; lastSentAt = Date.now();
+  }catch(e){ console.warn(e); }
+  sending = false;
+}
+setInterval(() => maybeSend(), 5000);
+async function keepAwake(){
+  try{ if(onDuty && !document.hidden && "wakeLock" in navigator && !wake){ wake = await navigator.wakeLock.request("screen"); wake.addEventListener("release", () => { wake = null; }); } }catch(e){}
+}
+document.addEventListener("visibilitychange", () => { if(!document.hidden){ keepAwake(); loadOrders(); maybeSend(true); } });
+
+async function setDuty(on){
+  await sb.rpc("rider_set_duty", { p_on: on }).then(unwrap);
+  onDuty = on; store.set("paltong_rider_duty", on);
+  if(on){ startGps(); } else { stopGps(); }
+  paintDuty();
+}
+$("dutyBtn").onclick = async () => {
+  if(onDuty && hasLive() && !confirm(T("배달 중인 주문이 있어요. 그래도 근무를 끝낼까요? (손님 지도에서 위치가 멈춥니다)", "You have an order on the way. End shift anyway? (the customer's map will stop)"))) return;
+  $("dutyBtn").disabled = true;
+  try{ await setDuty(!onDuty); toast(onDuty ? T("근무 시작 — 위치를 보내는 중", "Shift started — sharing location") : T("근무 종료", "Shift ended")); }catch(e){ toast(errText(e), 4000); }
+  $("dutyBtn").disabled = false;
+};
+function paintDuty(){
+  if(!me) return;
+  const d = $("duty"), b = $("dutyBtn"), age = lastSentAt ? Math.round((Date.now() - lastSentAt) / 1000) : null;
+  const warn = onDuty && (gpsErr || age == null || age > 60);
+  d.classList.toggle("on", onDuty && !warn); d.classList.toggle("warn", !!warn);
+  $("dutyTitle").textContent = onDuty ? T("근무 중", "On duty") : T("쉬는 중", "Off duty");
+  $("dutyInfo").textContent = !onDuty ? T("근무를 시작하면 매장·손님이 내 위치를 볼 수 있어요", "Start your shift so the store and customers can see you")
+    : gpsErr ? T("위치를 가져올 수 없어요", "Can't get your location")
+    : age == null ? T("위치 찾는 중…", "Finding your location…")
+    : T(`위치 전송 ${age < 10 ? "방금" : age + "초 전"}${lastFix ? ` · 정확도 ±${Math.round(lastFix.accuracy)}m` : ""}`, `Location sent ${age < 10 ? "just now" : age + "s ago"}${lastFix ? ` · ±${Math.round(lastFix.accuracy)}m` : ""}`);
+  b.textContent = onDuty ? T("근무 종료", "End shift") : T("▶ 근무 시작", "▶ Start shift");
+  b.className = "switch " + (onDuty ? "stop" : "start");
+  const bn = $("gpsBanner");
+  if(onDuty && gpsErr === "denied") bn.innerHTML = T("📍 위치 권한이 꺼져 있어요. 휴대폰 설정 → 브라우저(Chrome) → 위치 → <b>허용</b>으로 바꾼 뒤 새로고침하세요.", "📍 Location permission is off. Phone Settings → Chrome → Location → <b>Allow</b>, then reload.");
+  else if(onDuty && gpsErr) bn.innerHTML = T("📍 GPS 신호를 찾는 중이에요. 휴대폰의 위치(GPS)가 켜져 있는지 확인하세요.", "📍 Looking for GPS. Make sure Location is turned on.");
+  else if(onDuty) bn.innerHTML = T("📱 웹 버전은 <b>이 화면을 켜둔 채</b>로 있어야 위치가 전송돼요. 화면을 끄거나 다른 앱으로 가면 손님 지도에서 위치가 멈춰요.", "📱 Keep <b>this screen open</b> — if the screen turns off or you switch apps, your location stops updating.");
+  bn.hidden = !onDuty;
+}
+
+/* ---------------- 주문 ---------------- */
+const ST = {
+  accepted:["주문 접수", "Accepted", "#2a9d8f"], awaiting_payment:["조리 중·입금 대기", "Cooking · awaiting payment", "#d33d2a"], receipt_submitted:["결제 확인 중", "Checking payment", "#7a5cd3"],
+  confirmed:["준비 중 · 출발 대기", "Ready to pick up", "#2f8f4e"], delivering:["배달 중", "On the way", "#2a6fd3"], done:["배달 완료", "Delivered", "#6b6b6b"], cancelled:["취소됨", "Cancelled", "#9c8a7a"], new:["확인 중", "New", "#e5a731"],
+};
+async function loadOrders(){
+  try{
+    const [r, er] = await Promise.all([sb.rpc("rider_orders").then(unwrap), errandsOn ? sb.rpc("rider_errands").then(unwrap).catch(e => { if(/rider_errands|Could not find the function/.test(String(e.message))) errandsOn = false; return null; }) : null]);
+    storeLoc = r.store; orders = (r.orders || []).filter(o => !o.errand);   // 심부름은 아래 전용 카드로 (설치형 앱용으로 rider_orders 에 같이 옴)
+    if(er) errands = er;
+    const fresh = orders.filter(o => !["done","cancelled"].includes(o.status) && !known.has(o.id));
+    const freshE = errands.filter(e => ["assigned","going"].includes(e.status) && !known.has(e.id));
+    orders.forEach(o => known.add(o.id)); errands.forEach(e => known.add(e.id));
+    if(!firstLoad && fresh.length){ beep(); if(navigator.vibrate) navigator.vibrate([300, 150, 300]); toast(T(`🛵 새 배달 #${fresh.map(o => o.order_no).join(", #")}`, `🛵 New delivery #${fresh.map(o => o.order_no).join(", #")}`), 5000); fresh.forEach(o => o._new = true); }
+    if(!firstLoad && freshE.length){ beep(); if(navigator.vibrate) navigator.vibrate([300, 150, 300, 150, 300]); toast(T(`🧾 새 심부름: ${freshE.map(e => e.title).join(", ")}`, `🧾 New errand: ${freshE.map(e => e.title).join(", ")}`), 6000); freshE.forEach(e => e._new = true); }
+    firstLoad = false;
+    renderList();
+  }catch(e){ if(/not_rider/.test(String(e.message))){ await sb.auth.signOut({ scope: "local" }); location.reload(); return; } console.warn(e); }
+}
+function beep(){ try{ const c = new (window.AudioContext || window.webkitAudioContext)(); [0, .25].forEach(t => { const o = c.createOscillator(), g = c.createGain(); o.frequency.value = 880; o.connect(g); g.connect(c.destination); g.gain.setValueAtTime(.25, c.currentTime + t); g.gain.exponentialRampToValueAtTime(.001, c.currentTime + t + .2); o.start(c.currentTime + t); o.stop(c.currentTime + t + .22); }); }catch(e){} }
+/* 길안내: 누르면 바로 음성 안내 시작 (구글 지도는 오토바이 경로, Waze 도 가능) */
+const nav = (o, app) => {
+  const pin = o.lat != null && o.lng != null, q = encodeURIComponent(o.cust_addr || o.addr || "");
+  if(app === "waze") return pin ? `https://waze.com/ul?ll=${o.lat},${o.lng}&navigate=yes` : `https://waze.com/ul?q=${q}&navigate=yes`;
+  return `https://www.google.com/maps/dir/?api=1&destination=${pin ? `${o.lat},${o.lng}` : q}&travelmode=two-wheeler&dir_action=navigate`;
+};
+const tm = d => d ? new Date(d).toLocaleTimeString(LANG === "en" ? "en-US" : "ko-KR", { hour:"numeric", minute:"2-digit" }) : "";
+function moneyHTML(o){
+  if(o.payment === "cash") return `<div class="money cash"><span>💵 ${T("현금 받기", "Collect cash")}</span><big>${peso(o.total)}</big></div>`;
+  const due = o.paid_total != null && o.total > o.paid_total ? o.total - o.paid_total : 0;
+  return due ? `<div class="money cash"><span>⚠️ ${T("추가금 미결제 — 매장 확인", "Extra unpaid — ask store")}</span><big>${peso(due)}</big></div>`
+             : `<div class="money paid"><span>✅ ${T("결제 완료 — 돈 받지 마세요", "Paid — do not collect")}</span><big>${peso(o.total)}</big></div>`;
+}
+function orderHTML(o){
+  const s = ST[o.status] || [o.status, o.status, "#888"], live = o.status === "delivering";
+  const items = (o.items || []).map(i => `${i.svc ? "🎁" : ""}${esc(LANG === "en" ? (i.en || i.name) : i.name)} ×${i.qty}`).join(", ");
+  let act;
+  if(o.status === "confirmed") act = `<div class="row"><a class="btn ghost" href="${nav(storeLoc || {})}" target="_blank" rel="noopener" ${storeLoc ? "" : "hidden"}>🏪 ${T("가게", "Store")}</a><button class="btn red" data-pick="${o.id}" style="${storeLoc ? "" : "grid-column:1/-1"}">🛵 ${T("픽업·출발", "Picked up · Go")}</button></div>`;
+  else if(live) act = `<div class="row"><a class="btn blue" href="${nav(o)}" target="_blank" rel="noopener">🧭 ${T("구글 길안내", "Google Maps")}</a><a class="btn ghost" href="${nav(o, "waze")}" target="_blank" rel="noopener">🚙 Waze</a>
+      <button class="btn green" data-done="${o.id}" style="grid-column:1/-1">✅ ${T("배달 완료", "Delivered")}</button></div>
+      <p class="hint" style="margin:6px 2px 0;font-size:12px">${T("길안내를 켜도 이 앱을 화면 분할로 같이 띄워두면 위치가 계속 전송돼요. 도착하면 '배달 완료'를 눌러주세요.", "Keep this app open in split screen while navigating so your location keeps updating. Tap 'Delivered' when you arrive.")}</p>`;
+  else act = `<div class="wait">⏳ ${T("매장에서 조리·결제 확인 중이에요. 준비되면 '픽업·출발' 버튼이 켜져요.", "The store is still cooking / checking payment. The 'Picked up' button appears when it's ready.")}</div>`;
+  return `<div class="ord ${live ? "live" : ""} ${o._new ? "new" : ""}">
+    <div class="oh"><span class="no">#${esc(o.order_no)}</span><span class="pill" style="background:${s[2]}">${T(s[0], s[1])}</span>
+      ${o.scheduled_at ? `<span class="pill" style="background:#c2410c">⏰ ${tm(o.scheduled_at)}</span>` : ""}<span class="t">${live && o.picked_up_at ? T(`${tm(o.picked_up_at)} 출발`, `left ${tm(o.picked_up_at)}`) : tm(o.created_at)}</span></div>
+    <div class="cust"><b>${esc(o.cust_name)}</b><br>📍 ${esc(o.cust_addr)}${o.memo ? `<div class="memo">📝 ${esc(LANG === "en" && o.memo_en ? o.memo_en : o.memo)}</div>` : ""}</div>
+    <div class="items">🍽 ${items}</div>
+    ${moneyHTML(o)}
+    <div class="row"><a class="btn ghost" href="tel:${esc(String(o.cust_phone || "").replace(/[^\d+]/g, ""))}">📞 ${T("손님 전화", "Call")}</a><a class="btn ghost" href="sms:${esc(String(o.cust_phone || "").replace(/[^\d+]/g, ""))}">💬 SMS</a></div>
+    ${act}</div>`;
+}
+function renderList(){
+  if(!me) return;
+  const open = orders.filter(o => !["done","cancelled"].includes(o.status)), closed = orders.filter(o => ["done","cancelled"].includes(o.status));
+  const openE = errands.filter(e => ["assigned","going"].includes(e.status)), closedE = errands.filter(e => !["assigned","going"].includes(e.status));
+  $("list").innerHTML = (openE.length ? `<h2>🧾 ${T("가게 심부름", "Store errands")} <span class="n" style="background:#e07b1a">${openE.length}</span></h2>${openE.map(errandHTML).join("")}` : "")
+    + `<h2>${T("내 배달", "My deliveries")} ${open.length ? `<span class="n">${open.length}</span>` : ""}</h2>`
+    + (open.length ? open.map(orderHTML).join("") : `<div class="empty"><div>🛵</div>${onDuty ? T("배정된 주문이 없어요. 매장에서 배정하면 여기에 떠요.", "No deliveries yet. Orders appear here when the store assigns them.") : T("근무를 시작하고 배정을 기다리세요.", "Start your shift and wait for an order.")}</div>`)
+    + (closed.length || closedE.length ? `<h2>${T("오늘 완료", "Completed")} <span class="n" style="background:var(--muted)">${closed.length + closedE.length}</span></h2><div class="done-list">${closedE.map(e => `<div class="ord"><div class="oh"><span class="no" style="font-size:18px;color:#e07b1a">🧾</span><span>${esc(e.title)}</span><span class="t">${e.status === "done" ? "✅ " + tm(e.done_at) + (e.spent != null ? " · " + peso(e.spent) : "") : T("취소됨", "Cancelled")}</span></div></div>`).join("")}${closed.map(o => `<div class="ord"><div class="oh"><span class="no" style="font-size:20px">#${esc(o.order_no)}</span><span>${esc(o.cust_name)}</span><span class="t">${o.status === "done" ? "✅ " + tm(o.delivered_at) : T("취소", "Cancelled")}</span></div></div>`).join("")}</div>` : "");
+  orders.forEach(o => { delete o._new; }); errands.forEach(e => { delete e._new; });
+  $("list").querySelectorAll("[data-estart]").forEach(b => b.onclick = async () => {
+    b.disabled = true;
+    try{
+      if(!onDuty) await setDuty(true);
+      await sb.rpc("rider_errand_start", { p_id: b.dataset.estart }).then(unwrap);
+      await maybeSend(true); toast(T("심부름 출발! 매장에서 위치를 볼 수 있어요", "Errand started — the store can see your route"), 3500); await loadOrders();
+    }catch(e){ toast(errText(e), 4500); b.disabled = false; }
+  });
+  $("list").querySelectorAll("[data-edone]").forEach(b => b.onclick = () => errandDoneSheet(errands.find(x => x.id === b.dataset.edone)));
+  $("list").querySelectorAll("[data-pick]").forEach(b => b.onclick = async () => {
+    b.disabled = true;
+    try{
+      if(!onDuty) await setDuty(true);
+      await sb.rpc("rider_pickup", { p_order: b.dataset.pick }).then(unwrap);
+      await maybeSend(true); toast(T("출발! 손님에게 위치가 보여요", "On the way! The customer can see you now"), 3500); await loadOrders();
+    }catch(e){ toast(errText(e), 4500); b.disabled = false; }
+  });
+  $("list").querySelectorAll("[data-done]").forEach(b => b.onclick = async () => {
+    const o = orders.find(x => x.id === b.dataset.done);
+    if((o.payment || "cash") === "cash" && o.total != null) return cashDoneSheet(o);   // 💵 현금: 받은 돈 입력 창 (46단계)
+    if(!confirm(o.payment === "cash" ? T(`#${o.order_no} 배달 완료 — 현금 ${peso(o.total)} 받으셨나요?`, `#${o.order_no} delivered — did you collect ${peso(o.total)} cash?`) : T(`#${o.order_no} 배달 완료할까요?`, `Mark #${o.order_no} as delivered?`))) return;
+    b.disabled = true;
+    try{ await sb.rpc("rider_complete", { p_order: o.id }).then(unwrap); toast(T("수고하셨어요! 🙏", "Great job! 🙏")); await loadOrders(); }
+    catch(e){ toast(errText(e), 4500); b.disabled = false; }
+  });
+}
+/* ---------------- 💵 현금 배달 완료: 받은 돈 (46단계) ----------------
+   비우면 딱 맞게 받은 것 · 덜 받았으면 '왜 다른지' + '왜 미리 매장에 말 안 했는지' 필수 */
+function cashDoneSheet(o){
+  const due = o.total;
+  const bg = document.createElement("div"); bg.className = "sheet-bg";
+  bg.innerHTML = `<div class="sheet"><h3>✅ #${esc(o.order_no)} ${T("배달 완료 · 현금", "Delivered · cash")}</h3>
+    <div class="money cash" style="margin-top:6px"><span>💵 ${T("받을 돈", "To collect")}</span><big>${peso(due)}</big></div>
+    <div class="field"><label>${T("손님에게 받은 돈 (비우면 딱 맞게 받은 것)", "Cash received (blank = exact)")}</label>
+      <input id="cGot" type="number" inputmode="numeric" min="0" placeholder="${due}" style="font-size:22px;font-weight:800"></div>
+    <div class="row" style="margin:0 0 8px"><button class="btn ghost" id="cExact">${T("딱 맞게", "Exact")} ${peso(due)}</button></div>
+    <p class="hint" id="cInfo" style="margin:0 2px 8px;font-weight:800"></p>
+    <div id="cDiff" hidden style="border:2px solid #d33d2a;border-radius:14px;padding:10px;margin:0 0 10px">
+      <div class="field"><label>❓ ${T("왜 덜 받았나요? (꼭 입력)", "Why is it short? (required)")}</label><textarea id="cReason" rows="2" placeholder="${T("예: 손님이 잔돈이 없었음 / 가게에서 깎아주라고 함", "e.g. customer had no change / store said give a discount")}"></textarea></div>
+      <div class="field" style="margin:0"><label>📢 ${T("왜 미리 매장에 말하지 않았나요? (꼭 입력)", "Why didn't you tell the store first? (required)")}</label><textarea id="cUnrep" rows="2" placeholder="${T("예: 전화했는데 안 받음 / 급해서 못 했음", "e.g. called but no answer")}"></textarea></div></div>
+    <div class="row"><button class="btn ghost" id="cCancel">${T("닫기", "Close")}</button><button class="btn green" id="cOk">✅ ${T("배달 완료", "Delivered")}</button></div></div>`;
+  document.body.append(bg);
+  const q = x => bg.querySelector(x), inp = q("#cGot"), close = () => bg.remove();
+  bg.onclick = ev => { if(ev.target === bg) close(); };
+  q("#cCancel").onclick = close;
+  const val = () => inp.value === "" ? due : Math.round(+inp.value);
+  const paint = () => { const v = val(), info = q("#cInfo");
+    if(isNaN(v)){ info.textContent = ""; q("#cDiff").hidden = true; return; }
+    if(v < due){ info.textContent = T(`⚠️ ${peso(due - v)} 덜 받음`, `⚠️ ${peso(due - v)} short`); info.style.color = "#d33d2a"; q("#cDiff").hidden = false; }
+    else { info.textContent = v > due ? T(`↩ 거스름돈 ${peso(v - due)}`, `↩ Change ${peso(v - due)}`) : T("✔ 딱 맞게 받음", "✔ Exact"); info.style.color = "#2f8f4e"; q("#cDiff").hidden = true; } };
+  inp.oninput = paint; q("#cExact").onclick = () => { inp.value = due; paint(); }; paint();
+  setTimeout(() => inp.focus(), 60);
+  q("#cOk").onclick = async ev => {
+    const b = ev.currentTarget, v = val();
+    if(isNaN(v) || v < 0){ toast(T("받은 돈을 숫자로 넣어주세요", "Enter the cash received")); inp.focus(); return; }
+    const reason = q("#cReason").value.trim(), unrep = q("#cUnrep").value.trim();
+    if(v < due && reason.length < 2){ toast(T("왜 덜 받았는지 적어주세요", "Explain why it's short")); q("#cReason").focus(); return; }
+    if(v < due && unrep.length < 2){ toast(T("왜 미리 말하지 않았는지 적어주세요", "Explain why you didn't tell the store")); q("#cUnrep").focus(); return; }
+    b.disabled = true;
+    try{
+      const r = await sb.rpc("rider_complete_cash", { p_order: o.id, p_got: inp.value === "" ? null : v, p_reason: reason || null, p_unreported: unrep || null });
+      if(r.error && /rider_complete_cash|function|schema cache/i.test(r.error.message || "")){   // 46단계 SQL 전 → 예전처럼 완료만
+        await sb.rpc("rider_complete", { p_order: o.id }).then(unwrap);
+      } else unwrap(r);
+      close(); toast(v > due ? T(`수고하셨어요! 🙏 거스름돈 ${peso(v - due)}`, `Great job! 🙏 Change ${peso(v - due)}`) : T("수고하셨어요! 🙏", "Great job! 🙏")); await loadOrders();
+    }catch(e){ toast(/reason_required/.test(String(e.message || e)) ? T("덜 받은 이유 2개를 적어주세요", "Please fill in both reasons") : errText(e), 4500); b.disabled = false; }
+  };
+}
+/* ---------------- 🧾 가게 심부름 (38단계) ---------------- */
+function errandHTML(e){
+  const going = e.status === "going", pin = e.lat != null && e.lng != null;
+  const navBtns = pin || e.place ? `<div class="row"><a class="btn blue" href="${nav({ lat: e.lat, lng: e.lng, addr: e.place })}" target="_blank" rel="noopener">🧭 ${T("길안내", "Navigate")}</a><a class="btn ghost" href="${nav({ lat: e.lat, lng: e.lng, addr: e.place }, "waze")}" target="_blank" rel="noopener">🚙 Waze</a></div>` : "";
+  const act = going
+    ? `<div class="row"><button class="btn green" data-edone="${e.id}" style="grid-column:1/-1">✅ ${T("심부름 완료", "Errand done")}</button></div>`
+    : `<div class="row"><button class="btn red" data-estart="${e.id}" style="grid-column:1/-1">▶ ${T("출발", "Start")}</button></div>`;
+  return `<div class="ord errand ${going ? "going" : ""} ${e._new ? "new" : ""}">
+    <div class="oh"><span class="no">🧾</span><span class="pill" style="background:${going ? "#2a6fd3" : "#e5a731"}">${going ? T("진행 중", "In progress") : T("출발 전", "Not started")}</span>
+      <span class="t">${going && e.started_at ? T(`${tm(e.started_at)} 출발`, `left ${tm(e.started_at)}`) : tm(e.created_at)}</span></div>
+    <div class="etitle">${esc(e.title)}</div>
+    ${e.place || e.memo ? `<div class="cust">${e.place ? `📍 ${esc(e.place)}` : ""}${e.memo ? `<div class="memo">📝 ${esc(e.memo)}</div>` : ""}</div>` : ""}
+    ${e.cash_given != null ? `<div class="money cash"><span>💵 ${T("받은 돈 (매장에서)", "Cash from store")}</span><big>${peso(e.cash_given)}</big></div>` : ""}
+    ${e.contact_phone ? `<div class="row"><a class="btn ghost" href="tel:${esc(String(e.contact_phone).replace(/[^\d+]/g, ""))}">📞 ${T("받는 분 전화", "Call contact")}</a><a class="btn ghost" href="sms:${esc(String(e.contact_phone).replace(/[^\d+]/g, ""))}">💬 SMS</a></div>` : ""}
+    ${navBtns}${act}
+    ${going ? `<p class="hint" style="margin:6px 2px 0;font-size:12px">${T("근무 중에는 이동 경로가 매장에 기록돼요. 끝나면 '심부름 완료'를 누르고 쓴 돈·영수증 사진을 남겨주세요.", "Your route is recorded while on duty. When finished, tap 'Errand done' and add what you spent and a receipt photo.")}</p>` : ""}</div>`;
+}
+async function shrinkImage(file, maxSide = 1600, q = 0.8){
+  try{ const bmp = await createImageBitmap(file), k = Math.min(1, maxSide / Math.max(bmp.width, bmp.height)), c = document.createElement("canvas");
+    c.width = Math.round(bmp.width * k); c.height = Math.round(bmp.height * k); c.getContext("2d").drawImage(bmp, 0, 0, c.width, c.height);
+    return await new Promise(res => c.toBlob(b => res(b || file), "image/jpeg", q)); }catch(e){ return file; }
+}
+function errandDoneSheet(e){
+  if(!e) return;
+  let photo = null;
+  const bg = document.createElement("div"); bg.className = "sheet-bg";
+  bg.innerHTML = `<div class="sheet"><h3>✅ ${esc(e.title)}</h3>
+    <p class="hint" style="margin-top:0">${T("쓴 돈과 영수증 사진을 남기면 매장에서 바로 확인해요. (없으면 비워도 돼요)", "Add what you spent and a receipt photo so the store can check. (Optional)")}</p>
+    ${e.cash_given != null ? `<div class="money cash" style="margin-top:6px"><span>💵 ${T("받은 돈", "Cash from store")}</span><big>${peso(e.cash_given)}</big></div>` : ""}
+    <div class="field"><label>🧾 ${T("쓴 돈 (₱)", "Amount spent (₱)")}</label><input id="eSpent" type="number" inputmode="numeric" min="0" placeholder="0"></div>
+    <p class="hint" id="eChange" style="margin:-4px 2px 8px;font-weight:700"></p>
+    <div class="field"><label>📷 ${T("영수증·물건 사진", "Receipt / item photo")}</label>
+      <label class="photo-pick" id="ePick"><span id="ePickTx">📷 ${T("사진 찍기 / 고르기", "Take / choose photo")}</span><input id="ePhoto" type="file" accept="image/*" capture="environment" hidden></label></div>
+    <div class="field"><label>📝 ${T("매장에 남길 말 (선택)", "Note for the store (optional)")}</label><textarea id="eNote" rows="2"></textarea></div>
+    <div class="row"><button class="btn ghost" id="eCancel">${T("닫기", "Close")}</button><button class="btn green" id="eOk">✅ ${T("완료", "Done")}</button></div></div>`;
+  document.body.append(bg);
+  const close = () => bg.remove();
+  bg.onclick = ev => { if(ev.target === bg) close(); };
+  bg.querySelector("#eCancel").onclick = close;
+  const spent = bg.querySelector("#eSpent");
+  spent.oninput = () => { const v = spent.value === "" ? null : Math.round(+spent.value);
+    bg.querySelector("#eChange").textContent = v != null && e.cash_given != null ? (e.cash_given - v >= 0 ? T(`↩ 매장에 돌려줄 돈 ${peso(e.cash_given - v)}`, `↩ Return to store ${peso(e.cash_given - v)}`) : T(`⚠️ ${peso(v - e.cash_given)} 더 썼어요 — 매장에서 받아야 해요`, `⚠️ You paid ${peso(v - e.cash_given)} extra — ask the store`)) : ""; };
+  bg.querySelector("#ePhoto").onchange = async ev => {
+    const f = ev.target.files && ev.target.files[0]; if(!f) return;
+    photo = await shrinkImage(f);
+    bg.querySelector("#ePickTx").innerHTML = `<img src="${URL.createObjectURL(photo)}" alt="">`;
+  };
+  bg.querySelector("#eOk").onclick = async ev => {
+    const b = ev.currentTarget; b.disabled = true;
+    try{
+      let path = null;
+      if(photo){
+        path = `errand/${e.id}/${Date.now()}.jpg`;
+        const up = await sb.storage.from("receipts").upload(path, photo, { contentType: "image/jpeg", upsert: false });
+        if(up.error){ console.warn(up.error); path = null; toast(T("사진은 못 올렸어요 — 완료는 처리할게요", "Photo upload failed — finishing anyway"), 3000); }
+      }
+      const v = spent.value === "" ? null : Math.max(0, Math.round(+spent.value));
+      await sb.rpc("rider_errand_done", { p_id: e.id, p_spent: v, p_note: bg.querySelector("#eNote").value.trim() || null, p_photo: path }).then(unwrap);
+      close(); toast(T("수고하셨어요! 🙏", "Great job! 🙏")); await loadOrders();
+    }catch(err){ toast(errText(err), 4500); b.disabled = false; }
+  };
+}
+boot();
+</script>
+</body>
+</html>

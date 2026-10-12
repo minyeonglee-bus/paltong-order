@@ -561,13 +561,23 @@ function makeSupabaseApi(){
     async signIn(email, password){
       unwrap(await sb.auth.signInWithPassword({ email, password }));
       const isAdmin = unwrap(await sb.rpc("is_admin"));
-      if(!isAdmin){ await sb.auth.signOut(); throw new Error("관리자로 등록되지 않은 계정입니다 (admins 테이블 확인)"); }
+      if(!isAdmin){ await sb.auth.signOut({ scope: "local" }); throw new Error("관리자로 등록되지 않은 계정입니다 (admins 테이블 확인)"); }
     },
-    async signOut(){ await sb.auth.signOut(); },
+    async signOut(){ await sb.auth.signOut({ scope: "local" }); },
     async hasSession(){
-      const { data } = await sb.auth.getSession();
-      if(!data.session) return false;
-      try{ return !!unwrap(await sb.rpc("is_admin")); }catch(e){ return false; }
+      // 열 때 인터넷이 잠깐 불안정해도 로그인 화면으로 튕기지 않게 몇 번 다시 시도
+      for(let i = 0; i < 4; i++){
+        let sess = null;
+        try{ sess = (await sb.auth.getSession()).data.session; }catch(e){}
+        if(!sess){
+          let saved = null; try{ saved = localStorage.getItem(window.PT_AUTH_KEY || "paltong_admin_auth"); }catch(e){}
+          if(!saved) return false;                                   // 저장된 로그인 없음 = 진짜 로그아웃
+          await new Promise(r => setTimeout(r, 800 * (i + 1))); continue;   // 저장은 돼 있는데 갱신 실패 → 잠깐 뒤 다시
+        }
+        try{ return !!unwrap(await sb.rpc("is_admin")); }
+        catch(e){ if(/JWT|401|403|not authorized|permission/i.test(String(e.message || e))) return false; await new Promise(r => setTimeout(r, 800 * (i + 1))); }
+      }
+      return false;
     },
     async listOrders(sinceISO){
       return unwrap(await sb.from("orders").select("*").gte("created_at", sinceISO).order("created_at", { ascending:false }).limit(300));
@@ -596,7 +606,7 @@ function makeSupabaseApi(){
       if(!d.session){ throw new Error("confirm_required"); }
     },
     async memberSignIn(phone, password){ unwrap(await sb.auth.signInWithPassword({ email: phoneEmail(phone), password })); },
-    async memberSignOut(){ await sb.auth.signOut(); },
+    async memberSignOut(){ await sb.auth.signOut({ scope: "local" }); },
     async myAccount(){
       const { data } = await sb.auth.getSession(); if(!data.session) return null;
       return unwrap(await sb.rpc("my_account"));
