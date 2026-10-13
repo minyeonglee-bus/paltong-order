@@ -228,18 +228,27 @@ function rawbtIntent(bytes){
   return "intent:base64," + btoa(bin) + "#Intent;scheme=rawbt;package=ru.a402d.rawbtprinter;end;";
 }
 function rawbtSend(bytes){ location.href = rawbtIntent(bytes); }
-/* RawBT 웹소켓 (안드로이드 'Server for RawBT' 앱 · PC용 rawbt_ws_server) — 누르지 않아도 자동 인쇄
-   ws://127.0.0.1:40213 로 intent 문자열을 보내면 RawBT 서버가 프린터(와이파이 9100 등)로 출력 */
+/* RawBT 웹소켓 (안드로이드 'Server for RawBT' 앱, ws://localhost:40213) — 누르지 않아도 자동 인쇄
+   RawBT API 형식: JSON 작업 { idJob, commands:[{ command:"sendBytes", base64 }], printer:"current", template:"none" }
+   → 서버가 { responseType: "success" | "error" | "progress", jobId, errorMessage } 로 답함 */
 function rawbtWsSend(bytes, timeoutMs){
-  const msg = rawbtIntent(bytes);
+  let bin = ""; for(let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000));
+  const idJob = "pt" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+  const job = JSON.stringify({ idJob, commands: [{ command: "sendBytes", base64: btoa(bin) }], copies: 1, template: "none", printer: "current", premium: false });
   return new Promise((ok, fail) => {
     let ws, done = false;
     const end = (e) => { if(done) return; done = true; clearTimeout(t); try{ ws && ws.close(1000); }catch(_){} e ? fail(e) : ok(); };
-    const t = setTimeout(() => end(new Error("RawBT 서버 응답 없음 (Server for RawBT 앱이 켜져 있는지 확인)")), timeoutMs || 6000);
-    try{ ws = new WebSocket("ws://127.0.0.1:40213/"); }catch(e){ return end(new Error("RawBT 서버에 연결할 수 없어요: " + (e.message || e))); }
-    ws.binaryType = "arraybuffer";
+    const t = setTimeout(() => end(new Error("RawBT 서버가 인쇄 결과를 알려주지 않았어요 (Server for RawBT 앱 · 프린터 전원 확인)")), timeoutMs || 25000);
+    try{ ws = new WebSocket("ws://localhost:40213/"); }catch(e){ return end(new Error("RawBT 서버에 연결할 수 없어요: " + (e.message || e))); }
     ws.onerror = () => end(new Error("RawBT 서버에 연결할 수 없어요 (Server for RawBT 앱이 켜져 있는지 확인)"));
-    ws.onopen = () => { try{ ws.send(msg); setTimeout(() => end(), 600); }catch(e){ end(e); } };
+    ws.onclose = () => end(new Error("RawBT 서버 연결이 끊겼어요"));
+    ws.onopen = () => { try{ ws.send(job); }catch(e){ end(e); } };
+    ws.onmessage = ev => {
+      let r = null; try{ r = JSON.parse(ev.data); }catch(_){ return; }
+      if(!r || (r.jobId && r.jobId !== idJob)) return;
+      if(r.responseType === "success") end();
+      else if(r.responseType === "error" || r.responseType === "canceled") end(new Error("RawBT: " + (r.errorMessage || r.responseType)));
+    };
   });
 }
 /* 📡 인쇄 스테이션으로 보내기 — 주문마다 인쇄할 장(주방용·손님용…)을 이 기기 설정대로 정해서 보냄 */
