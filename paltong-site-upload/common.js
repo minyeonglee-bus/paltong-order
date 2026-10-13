@@ -617,6 +617,7 @@ function makeSupabaseApi(){
     /* ---- 📥 DK 자동 접수 (50단계) ---- */
     async dkInboxList(){ return unwrap(await sb.from("dk_inbox").select("*").eq("status", "new").order("created_at", { ascending:false }).limit(30)) || []; },
     async dkInboxSet(id, status, orderId){ unwrap(await sb.from("dk_inbox").update({ status, order_id: orderId || null, handled_at: new Date().toISOString() }).eq("id", id)); },
+    async dkInboxClaim(id){ const r = await sb.from("dk_inbox").update({ status: "done", handled_at: new Date().toISOString() }).eq("id", id).eq("status", "new").select("id"); if(r.error) throw r.error; return (r.data || []).length > 0; },   // 여러 기기 중 한 곳만 자동 등록
     async dkInboxKey(rotate){ return unwrap(await sb.rpc("admin_dk_inbox_key", { p_rotate: !!rotate })); },
     onDkInbox(cb){ sb.channel("dk_inbox").on("postgres_changes", { event:"INSERT", schema:"public", table:"dk_inbox" }, p => cb(p)).subscribe(); },
     /* ---- 📡 인쇄 스테이션 (49단계) ---- */
@@ -1111,7 +1112,7 @@ function makeDemoApi(){
       if(k.total_limit != null && k.claimed_count >= k.total_limit) throw new Error("code_sold_out");
       return { ...k, source:"code", min_order:k.min_order || 0 };
     },
-    async dkInboxList(){ return []; }, async dkInboxSet(){}, async dkInboxKey(){ return "demo-key"; }, onDkInbox(){},
+    async dkInboxList(){ return []; }, async dkInboxSet(){}, async dkInboxClaim(){ return false; }, async dkInboxKey(){ return "demo-key"; }, onDkInbox(){},
     async printJobAdd(order, copies, label){ const q = ls.get("paltong_demo_print_jobs", []); q.push({ id: "pj" + Date.now() + Math.random().toString(36).slice(2, 6), label, payload: order, copies: copies ?? "auto", created_at: new Date().toISOString(), printed_at: null, tries: 0 }); ls.set("paltong_demo_print_jobs", q.slice(-50)); },
     async printJobsPending(){ return ls.get("paltong_demo_print_jobs", []).filter(j => !j.printed_at); },
     async printJobsRecent(){ return ls.get("paltong_demo_print_jobs", []).slice(-15).reverse(); },
