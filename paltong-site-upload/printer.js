@@ -66,7 +66,7 @@ function drawReceipt(o, copyLabel, kitchen){
     text(fmt(o.created_at), { size:22, align:"center" });
     hr();
     (o.items || []).forEach(l => {
-      row(`${PT.isSvc(l) ? "[FREE] " : l.added ? "[ADD] " : ""}${nameEn(l)}`, `×${l.qty}`, { size:34, bold:true });
+      row(`${PT.isSvc(l) ? "[FREE] " : ""}${nameEn(l)}`, `×${l.qty}`, { size:34, bold:true });
       if(l.opts && l.opts.length) text("  - " + l.opts.map(optEn).join(", "), { size:26 });
       y += 4;
     });
@@ -86,7 +86,7 @@ function drawReceipt(o, copyLabel, kitchen){
   (o.items || []).forEach(l => {
     const it = ITEM_BY_ID[l.id] || {};
     const svc = PT.isSvc(l);
-    row(`${svc ? B("[서비스]", "[FREE]") + " " : l.added ? B("[추가]", "[ADD]") + " " : ""}${en ? nameEn(l) : (l.name || it.name)} x${l.qty}`, svc ? "FREE" : peso(l.unitPrice * l.qty), { size:24, bold:true });
+    row(`${svc ? B("[서비스]", "[FREE]") + " " : ""}${en ? nameEn(l) : (l.name || it.name)} x${l.qty}`, svc ? "FREE" : peso(l.unitPrice * l.qty), { size:24, bold:true });
     const sub = en
       ? [...(l.opts || []).map(optEn), svc && l.origUnit ? `(${peso(l.origUnit * l.qty)})` : ""].filter(Boolean).join(" · ")
       : [l.en || it.en || "", ...(l.opts || []).map(x => x.ko === x.en ? x.ko : `${x.ko}/${x.en}`), svc && l.origUnit ? `(${peso(l.origUnit * l.qty)})` : ""].filter(Boolean).join(" · ");

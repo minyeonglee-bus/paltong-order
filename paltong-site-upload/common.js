@@ -1270,7 +1270,7 @@ function kitchenHTML(o){
     ${o.scheduled_at ? `<div class="c b lg" style="border:2px dashed #000;margin:1mm 0">⏰ SCHEDULED ${esc(schedLabel(o.scheduled_at, "en"))}</div>` : ""}
     <div class="c">${esc(fmt(o.created_at))}</div>
     <div class="hr"></div>
-    ${(o.items || []).map(l => `<div class="row xl b"><span>${isSvc(l) ? "[FREE] " : l.added ? "[ADD] " : ""}${esc(nameEnOf(l))}</span><span>×${l.qty}</span></div>
+    ${(o.items || []).map(l => `<div class="row xl b"><span>${isSvc(l) ? "[FREE] " : ""}${esc(nameEnOf(l))}</span><span>×${l.qty}</span></div>
       ${l.opts && l.opts.length ? `<div class="lg" style="margin:0 0 1.2mm 2mm">- ${esc(l.opts.map(x => x.en || x.ko).join(", "))}</div>` : ""}`).join("")}
     <div class="hr"></div>
     ${o.memo ? `<div class="memo lg"><span class="b">Note:</span> ${esc(o.memo_en || o.memo)}</div>` : ""}
@@ -1287,7 +1287,7 @@ function hallHTML(o, copyLabel, p){
     <div class="c b xxl">${esc(orderCode(o))}</div>
     <div class="c">${esc(fmt(o.created_at))}</div>
     <div class="hr"></div>
-    ${(o.items || []).map(l => `<div class="row"><span class="b">${isSvc(l) ? "[FREE] " : l.added ? "[ADD] " : ""}${esc(nameEnOf(l))} x${l.qty}</span><span${isSvc(l) ? ' class="b"' : ""}>${isSvc(l) ? "FREE" : peso(l.unitPrice * l.qty)}</span></div>
+    ${(o.items || []).map(l => `<div class="row"><span class="b">${isSvc(l) ? "[FREE] " : ""}${esc(nameEnOf(l))} x${l.qty}</span><span${isSvc(l) ? ' class="b"' : ""}>${isSvc(l) ? "FREE" : peso(l.unitPrice * l.qty)}</span></div>
       ${l.opts && l.opts.length ? `<div class="sub">${esc(l.opts.map(x => x.en || x.ko).join(", "))}</div>` : ""}`).join("")}
     <div class="hr"></div>
     ${svcValue(o) ? `<div class="row b"><span>Service</span><span>${peso(svcValue(o))} FREE</span></div>` : ""}
