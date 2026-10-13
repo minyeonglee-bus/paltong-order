@@ -2963,7 +2963,7 @@ function parseOrderPaste(raw){
   const PHONE = /(?:\+?63|0)[\s.-]?9\d{2}[\s.-]?\d{3}[\s.-]?\d{4}/;
   const ADDRISH = /\b(st\.?|street|ave\.?|avenue|blvd|boulevard|road|rd\.?|brgy|barangay|bgy|tower|towers|condo|condominium|residences?|suites?|bldg|building|unit|floor|flr|rm|room|hotel|inn|village|subd|phase|block|blk|lot|malate|ermita|manila|makati|pasay|taguig|bgc|paranaque|parañaque|pasig|mandaluyong|ortigas|quezon|city|apartment|apt)\b|#\s?\d|\d+(?:st|nd|rd|th)\s*f(?:loor|lr)?\b|호텔|콘도|타워|호\b|층|동\b/i;
   const money = s => { const m = String(s).replace(/,/g, "").match(/(\d+(?:\.\d+)?)/); return m ? Math.round(+m[1]) : null; };
-  const FEE_IN = /(배달(?!\s*(?:주소|지|위치|시간))|배송\s*비|delivery|del\.?\s*fee|rider\s*fee|shipping)/i;   // 줄 중간에 있어도 배달비
+  const FEE_IN = /(배달(?!\s*(?:주소|지|위치|시간|주문|요청))|배송\s*비|delivery|del\.?\s*fee|rider\s*fee|shipping)/i;   // 줄 중간에 있어도 배달비
   const NOT_ITEM = /(거스름|포인트|points?\b|잔돈|change\s*(?:for|from)|pay(?:ing)?\s*with|bayad|gcash|g-cash|maya|paymaya|bank|transfer|cash|cod|현금|계좌|이체|지캐시|discount|할인|쿠폰|coupon|tip\b|팁)/i;
   const addr = [], loose = [], feeNums = [], aliases = menuAliases(); let addrNext = false;
   out.items = [];
@@ -2992,7 +2992,7 @@ function parseOrderPaste(raw){
     if(FEE_IN.test(line) && (/무료|free/i.test(line) || /\d/.test(line) && (!ADDRISH.test(line) || priceTokens(line).length))){
       const pt = priceTokens(line), nums = (line.replace(/,/g, "").match(/\d+(?:\.\d+)?/g) || []).map(Number);
       const n = pt.length ? pt[pt.length - 1].v : nums.length ? Math.round(nums[nums.length - 1]) : 0;
-      if(pt.length || n === 0 || n >= 20){ out.fee = n; feeNums.push(n); continue; }   // "배달 2번째 골목" 같은 건 배달비 아님
+      if(pt.length || n === 0 || (n >= 20 && n <= 5000)){ out.fee = n; feeNums.push(n); continue; }   // 주문번호 같은 큰 숫자는 배달비 아님   // "배달 2번째 골목" 같은 건 배달비 아님
     }
     const ph = line.match(PHONE);
     if(/^(dropped pin|pinned location|shared location|current location|my location|location|위치 공유|현재 위치|내 위치|지도)$/i.test(line)) continue;
@@ -3118,7 +3118,7 @@ async function loadDkInbox(first){
     for(const x of fresh){
       const done = !first && dkAuto() ? await dkAutoCreate(x).catch(() => null) : null;
       if(done) alarm("order", `📥 DK ${L("자동 등록", "auto-added")} ${done.code} — ${done.name} · ${peso(done.total)}`, goOrders("all"));
-      else alarm("order", `📥 DK ${L("새 주문", "new order")} — ${(x.title || "")} ${(x.body || "").slice(0, 60)}`, () => dkInboxModal());
+      else { const d = dkParse(x); alarm("order", d.isDk ? `📥 DK ${L("새 주문", "new order")} — ${d.name || ""} · ${d.kind}${d.id ? ` · #${d.id}` : ""} — ${L("눌러서 메뉴 넣고 등록", "tap to add items")}` : `📥 DK ${L("새 주문", "new order")} — ${(x.title || "")} ${(x.body || "").slice(0, 60)}`, () => dkInboxModal()); }
     }
     if(fresh.length) dkInbox = await api.dkInboxList().catch(() => dkInbox);
     renderDaybar();
@@ -3128,7 +3128,7 @@ async function loadDkInbox(first){
    못 읽으면 지금처럼 📥 목록에 남겨서 사람이 [등록] */
 const dkAuto = () => ls.get("paltong_dk_auto", true);
 async function dkAutoCreate(x){
-  const text = x.body || x.title || "", p = parseOrderPaste(text);
+  const text = dkPasteText(x), p = parseOrderPaste(text);
   const items = (p.items || []).filter(l => l.unitPrice > 0 && !l.needPrice);
   const amount = items.length ? items.reduce((a, l) => a + l.unitPrice * l.qty, 0) : Math.round(+p.amount || 0) || (p.total != null ? Math.max(0, p.total - (p.fee || 0) + (p.points || 0)) : 0);
   if(!(amount > 0) || !(p.name || p.phone) || (p.items || []).some(l => l.needPrice)) return null;   // 확실하지 않으면 사람이 확인
@@ -3152,6 +3152,22 @@ async function dkAutoCreate(x){
     return null;
   }
 }
+/* DK 사장님 앱 알림 모양: "빨통 업소에 주문이 접수 되었습니다" / "배달주문 / 주문하신분 이민영 / 주문아이디 14266348"
+   → 메뉴·금액은 알림에 없어서 이름 · 배달/픽업 · DK 주문아이디만 읽음 */
+function dkParse(x){
+  const t = [x.title, x.body].filter(Boolean).join("\n");
+  const id = (t.match(/주문\s*아이디\s*[:#]?\s*(\d{4,})/) || t.match(/order\s*(?:id|no\.?)\s*[:#]?\s*(\d{4,})/i) || [])[1] || "";
+  const name = ((t.match(/주문\s*하신\s*분\s*[:：]?\s*([^/\n]+)/) || t.match(/(?:customer|name)\s*[:：]\s*([^/\n]+)/i) || [])[1] || "").trim();
+  const pickup = /(픽업|포장)\s*주문|pick\s*-?\s*up|take\s*-?\s*out/i.test(t);
+  const isDk = !!(id || name) && /주문|order/i.test(t);
+  return { id, name, pickup, isDk, kind: pickup ? L("픽업", "Pickup") : L("배달", "Delivery") };
+}
+/* DK 알림 → 외부 주문 창에 넣을 글 (이름 · 픽업 · 요청사항에 DK 주문아이디) */
+function dkPasteText(x){
+  const d = dkParse(x);
+  if(!d.isDk) return x.body || x.title || "";
+  return [d.name, d.pickup ? "픽업" : "", d.id ? `요청: DK 주문아이디 ${d.id}` : ""].filter(Boolean).join("\n");
+}
 const DK_URL = key => `${CFG.SUPABASE_URL}/functions/v1/dk-inbox?k=${key}`;
 async function dkInboxModal(){
   let key = "";
@@ -3161,13 +3177,13 @@ async function dkInboxModal(){
   const paint = () => {
     const box = ov.querySelector("#dkList");
     box.innerHTML = dkReady ? (dkInbox.length ? dkInbox.map(x => `<div class="card" style="margin-bottom:8px">
-        <div style="display:flex;justify-content:space-between;gap:8px"><b>${esc(x.title || "DK")}</b><span class="hint" style="margin:0">${ago(x.created_at)}</span></div>
+        <div style="display:flex;justify-content:space-between;gap:8px"><b>${(d => d.isDk ? `${d.pickup ? "🏃" : "🛵"} ${esc(d.name || "DK")} · ${d.kind}${d.id ? ` · DK #${esc(d.id)}` : ""}` : esc(x.title || "DK"))(dkParse(x))}</b><span class="hint" style="margin:0">${ago(x.created_at)}</span></div>
         <div data-raw style="white-space:pre-wrap;font-size:14px;margin:6px 0">${esc(x.body || "")}</div>
         <div class="btn-row"><button class="primary-btn sm" data-dkgo="${x.id}">➕ ${L("외부 주문으로 등록", "Create order")}</button><button class="ghost-btn sm" data-dkno="${x.id}">${L("무시", "Ignore")}</button></div></div>`).join("")
       : `<p class="hint">${L("새로 들어온 DK 알림이 없어요. 아래 설정을 마치면 DK 주문 알림이 여기에 자동으로 떠요.", "No new DK notifications. Finish the setup below and DK orders will appear here automatically.")}</p>`)
       : `<p class="hint" style="color:#b45309">⚠️ ${L("Supabase에서 50단계 SQL(50-dk-inbox.sql)을 먼저 실행해 주세요.", "Run SQL step 50 (50-dk-inbox.sql) first.")}</p>`;
     box.querySelectorAll("[data-dkgo]").forEach(b => b.onclick = () => { const x = dkInbox.find(i => i.id === b.dataset.dkgo); if(!x) return;
-      ov.remove(); extOrderModal({ text: x.body || x.title || "", ch: "DK", inboxId: x.id }); });   // 알림 제목(예: '새 주문')은 이름으로 잘못 들어가서 본문만
+      ov.remove(); extOrderModal({ text: dkPasteText(x), ch: "DK", inboxId: x.id }); });   // 알림 제목(예: '새 주문')은 이름으로 잘못 들어가서 본문만
     box.querySelectorAll("[data-dkno]").forEach(b => b.onclick = async () => { await api.dkInboxSet(b.dataset.dkno, "ignored").catch(e => toast(PT.errMsg(e))); await loadDkInbox(); paint(); });
   };
   const paintSetup = () => {
