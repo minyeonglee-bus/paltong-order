@@ -2191,7 +2191,7 @@ function renderMembersView(){
 
     <div class="ocard">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px"><h3 style="font-size:18px">🏷 쿠폰 코드</h3><button class="sm-btn red" id="newCode">+ 새 코드</button></div>
-      <p class="hint" style="margin-top:0">코드를 만들어 카톡·페이스북에 올리면, 회원이 '내 정보'에서 코드를 입력해 쿠폰을 받습니다.</p>
+      <p class="hint" style="margin-top:0">코드를 만들어 카톡·페이스북에 올리면, 회원은 '내 정보'에서 코드를 등록해 쿠폰함에 받고, 비회원은 주문 화면에서 코드를 입력해 바로 써요 (같은 코드는 전화번호 하나당 한 번).</p>
       ${mvCodes.length ? mvCodes.map(k => `<div class="so-item ${k.active ? "" : "out"}" style="margin-bottom:6px">
           <span><b style="font-size:15px;letter-spacing:.5px">${esc(k.code)}</b> · ${esc(cval(k))}<br>
           <span class="hint"><span data-raw>${esc(k.title)}</span> · ${L("최소", "min")} ${peso(k.min_order)} · ${L("받은 사람", "claimed")} ${k.claimed_count}${k.total_limit ? "/" + k.total_limit : ""}${k.valid_days ? L(` · 받은 뒤 ${k.valid_days}일`, ` · ${k.valid_days} days after claim`) : ""}${k.ends_at ? L(` · ${dstr(k.ends_at)} 마감`, ` · ends ${dstr(k.ends_at)}`) : ""}</span></span>

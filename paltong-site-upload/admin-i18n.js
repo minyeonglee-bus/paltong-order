@@ -175,7 +175,7 @@ const DICT = [
   ["최종 보상 개수가 되면 쿠폰을 주고 스탬프는 0개부터 다시 시작합니다. 중간 보상 금액을 0으로 하면 중간 보상은 없습니다.", "At the final count a coupon is given and stamps restart from 0. Set the mid reward to 0 to turn it off."],
   ["📸 리뷰 인증", "📸 Review reward"], ["— 승인할 때마다 스탬프 +1", "— +1 stamp per approved review"], ["설정 저장", "Save settings"],
   ["🏷 쿠폰 코드", "🏷 Coupon codes"], ["+ 새 코드", "+ New code"],
-  ["코드를 만들어 카톡·페이스북에 올리면, 회원이 '내 정보'에서 코드를 입력해 쿠폰을 받습니다.", "Post a code on Kakao/Facebook — members enter it in 'My info' to get the coupon."],
+  ["코드를 만들어 카톡·페이스북에 올리면, 회원은 '내 정보'에서 코드를 등록해 쿠폰함에 받고, 비회원은 주문 화면에서 코드를 입력해 바로 써요 (같은 코드는 전화번호 하나당 한 번).", "Post a code on Kakao/Facebook — members add it in 'My info'; guests type it at checkout (once per phone number)."],
   ["사용중 → 중지", "Active → stop"], ["중지됨 → 재개", "Stopped → resume"], ["아직 만든 코드가 없습니다.", "No codes yet."],
   ["🎁 쿠폰 지급", "🎁 Give coupon"], ["쿠폰함", "Coupons"], ["스탬프 수정", "Edit stamps"], ["🎂 생일", "🎂 Birthday"], ["비번 초기화", "Reset password"],
   ["회원이 없습니다.", "No members."], ["👥 회원", "👥 Members"], ["이름 또는 전화번호 검색", "Search name or phone"], ["검색", "Search"],

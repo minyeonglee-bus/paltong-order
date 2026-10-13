@@ -462,7 +462,9 @@ function errMsg(e){
     [/code_invalid/, ["없는 쿠폰 코드입니다", "Invalid coupon code"]],
     [/code_expired/, ["등록 기간이 끝난 코드입니다", "This code has expired"]],
     [/code_sold_out/, ["선착순 수량이 모두 소진되었습니다", "This code has run out"]],
-    [/code_already_used/, ["이미 등록한 코드입니다", "You already used this code"]],
+    [/code_already_used/, ["이미 사용(등록)한 코드입니다", "You already used this code"]],
+    [/coupon_code_member/, ["회원은 쿠폰 코드를 등록한 뒤 쿠폰함에서 골라 써주세요", "Members: add the code first, then pick it from your coupons"]],
+    [/check_coupon_code|coupon_code.*(function|column)/i, ["가게에서 48단계 설치가 필요해요 (비회원 쿠폰 코드)", "Guest coupon codes are not set up yet"]],
     [/closing_time/, ["오전 7:50~8:00은 마감 정산 시간이라 주문을 받지 않아요. 8시부터 다시 주문할 수 있어요", "Orders pause 7:50–8:00 AM for daily closing. Please order again from 8:00 AM"]],
     [/store_closed/, ["지금은 영업 종료라 주문을 받을 수 없어요", "We are closed right now — orders are not available"]],
     [/sold_out/, ["품절된 메뉴가 있습니다", "Some items are sold out"]],
@@ -627,6 +629,7 @@ function makeSupabaseApi(){
     },
     async updateProfile(name, addr){ unwrap(await sb.rpc("update_profile", { p_name: name, p_addr: addr })); },
     async claimCoupon(code){ return unwrap(await sb.rpc("claim_coupon", { p_code: code })); },
+    async checkCouponCode(code, phone){ return unwrap(await sb.rpc("check_coupon_code", { p_code: code, p_phone: phone || null })); },   // 비회원 쿠폰 코드 (48단계)
     async setBirthday(d){ unwrap(await sb.rpc("set_birthday", { p: d })); },
     async birthdayCheck(){ return unwrap(await sb.rpc("birthday_check")); },
     async forgetAddress(addr){ unwrap(await sb.rpc("forget_address", { p_addr: addr })); },
@@ -1078,6 +1081,13 @@ function makeDemoApi(){
         }
       }
       return null;
+    },
+    async checkCouponCode(code){
+      const k = CD().find(x => x.code === String(code).trim().toUpperCase());
+      if(!k || !k.active) throw new Error("code_invalid");
+      if(k.ends_at && new Date(k.ends_at) < new Date()) throw new Error("code_expired");
+      if(k.total_limit != null && k.claimed_count >= k.total_limit) throw new Error("code_sold_out");
+      return { ...k, source:"code", min_order:k.min_order || 0 };
     },
     async claimCoupon(code){
       const id = me(); if(!id || !MB()[id]) throw new Error("login_required");

@@ -427,6 +427,7 @@ function openCheckout(){
   let addrW = null;       // 주소 입력 위젯 (다시 그려도 지도·입력값 유지)
   let quote = null, quoteFor = null, quoteSeq = 0;   // 배달비 자동 견적
   let codeBusy = false;
+  let guestCode = null;   // 비회원이 입력한 쿠폰 코드 (48단계) — 주문할 때 바로 적용
   if(acct){
     const m = acct.member;
     if(m.name) cust.name = m.name;
@@ -450,7 +451,9 @@ function openCheckout(){
     const st = stackSt();
     let chosen = coupons.filter(c => couponIds.includes(c.id) && PT.couponUsable(c, sub));
     if(!PT.couponStackOk(chosen, st, sub)){ chosen = PT.bestCoupons(chosen, sub, st); }
-    couponIds = chosen.map(c => c.id);
+    if(acct) couponIds = chosen.map(c => c.id);
+    else chosen = guestCode && PT.couponUsable(guestCode, sub) ? [guestCode] : [];
+    const gcWhy = !acct && guestCode && !chosen.length ? (sub < (guestCode.min_order || 0) ? T(`${peso(guestCode.min_order)} 이상 주문 시 사용 가능`, `Min. order ${peso(guestCode.min_order)}`) : T("쿠폰 금액이 주문 금액보다 커요","Coupon exceeds the order")) : "";
     const disc = PT.couponsDiscount(chosen, sub);
     const multi = (st.coupon_stack || []).length > 0;
     const welcome = shopSettings && shopSettings.welcome_enabled && shopSettings.welcome_amount > 0 ? shopSettings.welcome_amount : 0;
@@ -476,9 +479,18 @@ function openCheckout(){
           ${chosen.length && autoPicked ? `<p class="hint" style="margin:8px 0 0;color:var(--green);font-weight:700">✔ ${chosen.length > 1 ? L(`할인이 가장 큰 조합(${chosen.length}장)이 자동으로 적용됐어요`, `The best combination (${chosen.length} coupons) was applied automatically`) : L("할인이 가장 큰 쿠폰이 자동으로 적용됐어요","The best coupon was applied automatically")}</p>` : ""}
           <div class="code-row"><input id="ckCode" placeholder="${esc(T("이벤트 쿠폰 코드 입력","Enter event coupon code"))}" autocapitalize="characters" maxlength="30"><button class="sm-btn red" id="ckCodeBtn">${esc(T("적용","Apply"))}</button></div>
         </div>` : `
+        <div class="card">
+          <h4>${L("쿠폰 코드","Coupon code")}</h4>
+          ${guestCode ? `<div class="cp-row ${chosen.length ? "" : "dis"}">
+              <span><b>${esc(PT.couponValue(guestCode))}</b> ${esc(guestCode.title)} <small>(${esc(guestCode.code)})</small><br><small>${esc(PT.couponCond(guestCode))}${gcWhy ? ` · <span style="color:var(--red-deep)">${esc(gcWhy)}</span>` : ""}</small></span>
+              ${chosen.length ? (guestCode.discount_type === "item" ? `<b class="cp-save">🎁 ${esc(T("무료","FREE"))}</b>` : `<b class="cp-save">-${peso(PT.couponDiscount(guestCode, sub))}</b>`) : ""}
+              <button type="button" class="sm-link" id="gcDel">✕ ${L("빼기","Remove")}</button></div>`
+            : `<div class="code-row"><input id="gcCode" placeholder="${esc(T("쿠폰 코드 입력","Enter coupon code"))}" autocapitalize="characters" maxlength="30"><button class="sm-btn red" id="gcBtn">${esc(T("적용","Apply"))}</button></div>`}
+          <p class="hint" style="margin:6px 0 0">${L("비회원도 쿠폰 코드를 쓸 수 있어요 · 같은 코드는 전화번호 하나당 한 번","Guests can use coupon codes too · once per phone number")}</p>
+        </div>
         <div class="promo-box">
           ${welcome ? `🎁 ${L(`회원가입하면 ${peso(welcome)} 할인 쿠폰을 바로 드려요!`, `Sign up and get a ${peso(welcome)} coupon now!`)}` : `🎁 ${L("회원이 되면 쿠폰과 스탬프 혜택을 받을 수 있어요","Members get coupons and stamp rewards")}`}
-          <br><small>${L("회원은 주소와 주문 내역이 자동 저장되고, 이벤트 쿠폰 코드도 쓸 수 있어요. 비회원 주문은 내역이 남지 않아요.","Members get saved addresses, order history and event coupon codes. Guest orders are not kept.")}</small>
+          <br><small>${L("회원은 주소와 주문 내역이 자동 저장되고, 스탬프·쿠폰함을 쓸 수 있어요. 비회원 주문은 내역이 남지 않아요.","Members get saved addresses, order history, stamps and a coupon box. Guest orders are not kept.")}</small>
           <button class="sm-link" id="goAuth">${L("로그인 / 회원가입","Log in / Sign up")} ›</button>
         </div>`}
       <div class="seg" id="typeSeg">
@@ -580,6 +592,16 @@ function openCheckout(){
       }catch(e){ toast(PT.errMsg(e), 3500); }
       codeBusy = false; const b2 = $("#ckCodeBtn"); if(b2) b2.disabled = false;
     };
+    { const gb = $("#gcBtn"); if(gb) gb.onclick = async () => {   // 비회원 쿠폰 코드
+        const v = $("#gcCode").value.trim(); if(!v || codeBusy) return; codeBusy = true; gb.disabled = true; sync();
+        try{
+          guestCode = await api.checkCouponCode(v, PT.phoneOk(cust.phone) ? cust.phone : null);
+          toast(PT.couponUsable(guestCode, cartTotal()) ? T(`쿠폰 적용: ${guestCode.title}`, `Coupon applied: ${guestCode.title}`) : T(`쿠폰 확인됨 (${PT.couponCond(guestCode)})`, `Coupon found (${PT.couponCond(guestCode)})`), 3000);
+          render();
+        }catch(e){ toast(PT.errMsg(e), 3500); gb.disabled = false; }
+        codeBusy = false; };
+      const gi = $("#gcCode"); if(gi) gi.addEventListener("keydown", e => { if(e.key === "Enter"){ e.preventDefault(); $("#gcBtn").click(); } });
+      const gd = $("#gcDel"); if(gd) gd.onclick = () => { sync(); guestCode = null; render(); }; }
     { const ci = $("#ckCode"); if(ci) ci.addEventListener("keydown", e => { if(e.key === "Enter"){ e.preventDefault(); $("#ckCodeBtn").click(); } }); }
     s.el.querySelectorAll("input[data-cp]").forEach(r => r.onchange = () => {
       sync(); autoPicked = false;
@@ -640,7 +662,7 @@ function openCheckout(){
           items: cart.map(l => ({ id:l.id, name:l.name, en:l.en, opts:l.opts, unitPrice:l.unitPrice, qty:l.qty })),
           subtotal: sub, name:cust.name.trim(), phone:cust.phone.trim(), addr: isPickup() ? "Store pickup" : cust.addr.trim(), lat: av.lat, lng: av.lng,
           order_type: isPickup() ? "pickup" : "delivery", scheduled_at: schedISO(),
-          memo:cust.memo.trim(), payment:cust.payment, lang:PT.LANG, coupon_id: chosen.length ? chosen[0].id : null, coupon_ids: chosen.map(c => c.id), quote_id: qok ? quote.quote_id : null });
+          memo:cust.memo.trim(), payment:cust.payment, lang:PT.LANG, coupon_id: acct && chosen.length ? chosen[0].id : null, coupon_ids: acct ? chosen.map(c => c.id) : [], ...(!acct && chosen.length ? { coupon_code: guestCode.code } : {}), quote_id: qok ? quote.quote_id : null });
         rememberOrder(res.id);
         cart = []; saveCart(); cust.memo = ""; cust.sched = false; cust.sTime = ""; saveCust();
         s.close(); openTracker(res.id); loadAccount();
@@ -649,6 +671,7 @@ function openCheckout(){
         toast(PT.errMsg(e), 4000);
         if(m.includes("sold_out")) loadSoldOut();
         if(m.includes("coupon")) loadAccount().then(render);
+        if(!acct && /code_(?:already_used|invalid|expired|sold_out)/.test(m)){ guestCode = null; render(); }
         busy = false; $("#placeBtn").disabled = false; $("#placeBtn").innerHTML = L("주문 요청하기","Place order");
       }
     };
