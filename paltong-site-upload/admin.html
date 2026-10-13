@@ -3110,52 +3110,55 @@ async function extOrderModal(){
     <p class="hint" style="margin-top:0">${L("주문톡을 거치지 않은 배달(전화·카톡 등)도 기사를 배정하고 손님에게 추적 링크를 보낼 수 있어요. 주문은 바로 '조리 중'으로 들어갑니다.", "Register a delivery that didn't come through the website, assign a rider and send the customer a tracking link. It starts as 'Preparing'.")}</p>
     ${pasteBoxHTML()}
     <div class="field"><label>${L("주문 경로", "Channel")}</label><div class="chips" id="exCh">${EXT_CHANNELS.map((c, i) => `<button type="button" class="chip ${i === 0 ? "sel" : ""}" data-ch="${c[0]}">${c[0] === "DK" ? "DK" : `${L(c[0], c[1])} <span class="en">P</span>`}</button>`).join("")}</div></div>
+    <div class="seg" id="exType" style="margin-bottom:12px"><button type="button" data-ot="delivery" class="sel">🛵 ${L("배달", "Delivery")}</button><button type="button" data-ot="pickup">🏃 ${L("픽업", "Pickup")}</button></div>
     <div class="field"><label>${L("손님 이름", "Customer name")}</label><input data-f="name" placeholder="Juan"></div>
     <div class="field"><label>${L("손님 연락처", "Customer phone")}</label><input data-f="phone" inputmode="tel" placeholder="09xx xxx xxxx"></div>
-    <div class="field"><label>${L("주소", "Address")}</label><input data-f="addr" placeholder="Building, street, area"></div>
-    ${pinFieldHTML()}
+    <div class="ex-dlv"><div class="field"><label>${L("주소", "Address")}</label><input data-f="addr" placeholder="Building, street, area"></div>
+    ${pinFieldHTML()}</div>
     <div class="field"><label>🍽 ${L("메뉴 (고르면 음식값 자동 계산 · 안 고르면 음식값만 입력)", "Menu (picked items set the food amount · or just type the amount)")}</label>
       <div id="exItems"></div><button type="button" class="ghost-btn sm" id="exAdd" style="width:auto">➕ ${L("메뉴 넣기", "Add item")}</button></div>
     <div class="fee-row" style="margin:0 0 6px;align-items:flex-end">
       <div style="flex:1;min-width:0"><label class="hint" style="display:block;margin:0 0 3px;font-weight:700">🍽 ${L("음식값", "Food")} ₱</label><input data-f="amount" type="number" inputmode="numeric" min="0" placeholder="0" style="font-size:16px;width:100%"></div>
-      <div style="flex:1;min-width:0"><label class="hint" style="display:block;margin:0 0 3px;font-weight:700">🛵 ${L("배달비", "Delivery")} ₱</label><input data-f="fee" type="number" inputmode="numeric" min="0" placeholder="0" style="font-size:16px;width:100%"></div>
+      <div style="flex:1;min-width:0" class="ex-dlv"><label class="hint" style="display:block;margin:0 0 3px;font-weight:700">🛵 ${L("배달비", "Delivery")} ₱</label><input data-f="fee" type="number" inputmode="numeric" min="0" placeholder="0" style="font-size:16px;width:100%"></div>
       <div style="flex:1;min-width:0" id="exPtsBox" hidden><label class="hint" style="display:block;margin:0 0 3px;font-weight:700;color:#0f766e">⭐ ${L("포인트 공제", "Points used")} ₱</label><input data-f="points" type="number" inputmode="numeric" min="0" placeholder="0" style="font-size:16px;width:100%"></div></div>
     <div class="sum-row total" id="exTotal" style="margin:0 0 12px"></div>
     <div class="field"><label>${L("결제", "Payment")}</label><select data-f="payment" class="note-in" style="margin:0">
-      <option value="cash">${L("현금 (기사가 받음)", "Cash (rider collects)")}</option><option value="gcash">GCash ${L("결제 완료", "paid")}</option><option value="maya">Maya ${L("결제 완료", "paid")}</option><option value="bank">${L("계좌이체 결제 완료", "Bank transfer paid")}</option></select></div>
+      <option value="cash" data-cashopt>${L("현금 (기사가 받음)", "Cash (rider collects)")}</option><option value="gcash">GCash ${L("결제 완료", "paid")}</option><option value="maya">Maya ${L("결제 완료", "paid")}</option><option value="bank">${L("계좌이체 결제 완료", "Bank transfer paid")}</option></select></div>
     <div class="field"><label>${L("요청사항 (기사에게 보임)", "Notes (shown to rider)")}</label><textarea data-f="memo" rows="2" class="note-in" style="margin:0"></textarea></div>
-    <div class="field"><label>🛵 ${L("기사", "Rider")}</label><select data-f="rider_id" class="note-in" style="margin:0"><option value="">${L("— 나중에 배정 —", "— Assign later —")}</option>${act.map(r => `<option value="${r.user_id}">${r.on_duty ? "🟢" : "⚪"} ${esc(r.name)}</option>`).join("")}</select></div>`,
+    <div class="field ex-dlv"><label>🛵 ${L("기사", "Rider")}</label><select data-f="rider_id" class="note-in" style="margin:0"><option value="">${L("— 나중에 배정 —", "— Assign later —")}</option>${act.map(r => `<option value="${r.user_id}">${r.on_duty ? "🟢" : "⚪"} ${esc(r.name)}</option>`).join("")}</select></div>`,
     async ov => {
       const f = readFields(ov);
       if(!f.name){ toast(L("손님 이름을 입력하세요", "Enter the customer name")); return false; }
-      if(!f.addr && !ov._pin){ toast(L("주소를 쓰거나 지도에 핀을 찍어주세요", "Enter an address or drop a pin")); return false; }
+      const pickup = ov._ot === "pickup";
+      if(!pickup && !f.addr && !ov._pin){ toast(L("주소를 쓰거나 지도에 핀을 찍어주세요", "Enter an address or drop a pin")); return false; }
       if(f.amount === "" || isNaN(+f.amount)){ toast(L("음식값을 숫자로 입력하세요", "Enter the food amount")); return false; }
       const zero = ov._items.filter(l => !l.unitPrice);
       if(zero.length && !confirm(L(`가격이 ₱0인 메뉴가 있어요: ${zero.map(l => l.name).join(", ")}\n이대로 등록할까요? (취소 = 가격 입력하러 돌아가기)`, `Some items are ₱0: ${zero.map(l => l.en || l.name).join(", ")}\nCreate anyway?`))) return false;
-      let pin = ov._pin;
-      if(!pin && f.addr){ const g = await geocodeAddr(f.addr); if(g && confirm(L(`지도 핀이 없어서 주소로 대략 위치를 찾았어요.\n${g.label || ""}\n이 위치를 손님 지도에 표시할까요? (취소 = 핀 없이 등록)`, `No pin, so we looked up the address:\n${g.label || ""}\nShow this on the customer map? (Cancel = no pin)`))) pin = g; }
+      let pin = pickup ? null : ov._pin;
+      if(!pickup && !pin && f.addr){ const g = await geocodeAddr(f.addr); if(g && confirm(L(`지도 핀이 없어서 주소로 대략 위치를 찾았어요.\n${g.label || ""}\n이 위치를 손님 지도에 표시할까요? (취소 = 핀 없이 등록)`, `No pin, so we looked up the address:\n${g.label || ""}\nShow this on the customer map? (Cancel = no pin)`))) pin = g; }
       const stf = await staffPick(L("이 외부 주문을 받은 직원", "Who took this outside order?")); if(!stf) return false;
-      const r = await api.createExternalOrder({ name: f.name, phone: f.phone, addr: f.addr, lat: pin ? pin.lat : "", lng: pin ? pin.lng : "",
-        amount: Math.round(+f.amount), fee: Math.round(+f.fee || 0), payment: f.payment, memo: f.memo, channel: ov._ch, rider_id: f.rider_id,
+      const r = await api.createExternalOrder({ name: f.name, phone: f.phone, addr: pickup ? "매장 픽업 / Store pickup" : f.addr, lat: pin ? pin.lat : "", lng: pin ? pin.lng : "",
+        amount: Math.round(+f.amount), fee: pickup ? 0 : Math.round(+f.fee || 0), payment: f.payment, memo: f.memo, channel: ov._ch, rider_id: pickup ? "" : f.rider_id,
         ...(ov._items.length ? { items: ov._items.map(({ pasted, needPrice, ...l }) => l) } : {}) });
       // 메뉴 저장 확인: 서버가 44단계 이전 버전이면 '외부 주문' 한 줄로만 저장되므로 메뉴를 한 번 더 넣어줌
       if(ov._items.length) await api.setItems(r.id, ov._items.map(({ pasted, needPrice, ...l }) => l)).catch(e => toast(L("메뉴 저장 실패 — SQL 44단계(44-external-menu.sql)를 실행해 주세요", "Items not saved — run SQL step 44") + " · " + PT.errMsg(e), 6000));
+      if(pickup) await api.updateOrder(r.id, { order_type: "pickup", fee_source: "pickup" }).catch(e => toast(L("픽업 저장 실패: ", "Pickup not saved: ") + PT.errMsg(e), 5000));   // 🏃 픽업 (배달비 0 · 기사 없음)
       const pts = ov._ch === "DK" ? Math.min(Math.round(+f.amount || 0), Math.max(0, Math.round(+f.points || 0))) : 0;
       if(pts){   // ⭐ 포인트 공제 (DK) — 매장 할인 칸에 '포인트 공제'로 저장 → 합계에서 빠짐
         const patch = { store_discount: pts, store_discount_label: "포인트 공제" };
-        if(f.payment !== "cash") patch.paid_total = Math.max(0, Math.round(+f.amount || 0) - pts) + Math.round(+f.fee || 0);
+        if(f.payment !== "cash") patch.paid_total = Math.max(0, Math.round(+f.amount || 0) - pts) + (pickup ? 0 : Math.round(+f.fee || 0));
         await api.updateOrder(r.id, patch).catch(e => toast(L("포인트 공제 저장 실패: ", "Points not saved: ") + PT.errMsg(e), 5000));
       }
       if(stf.id) await api.setOrderStaff(r.id, stf.id, stf.pin).catch(e => toast(staffErr(e), 4000));
       await loadOrders(); loadRiders();
       shareTrack({ id: r.id, order_no: r.order_no, tracking_url: r.tracking_url, cust_phone: f.phone, cust_name: f.name }, true);
     }, L("등록하고 링크 받기", "Create & get link"));
-  ov._ch = EXT_CHANNELS[0][0]; ov._items = [];
+  ov._ch = EXT_CHANNELS[0][0]; ov._items = []; ov._ot = "delivery";
   const F = k => ov.querySelector(`[data-f="${k}"]`);
   const itemSum = () => ov._items.reduce((a, l) => a + l.unitPrice * l.qty, 0);
   /* 음식값 + 배달비 = 합계 (붙여넣은 글의 합계와 다르면 경고) */
   const paintTotal = () => {
-    const a = Math.round(+F("amount").value || 0), fe = Math.round(+F("fee").value || 0), el = ov.querySelector("#exTotal");
+    const a = Math.round(+F("amount").value || 0), fe = ov._ot === "pickup" ? 0 : Math.round(+F("fee").value || 0), el = ov.querySelector("#exTotal");
     const pt = ov._ch === "DK" ? Math.min(a, Math.max(0, Math.round(+F("points").value || 0))) : 0;
     const bad = ov._pastedTotal != null && a + fe - pt !== ov._pastedTotal && a + fe !== ov._pastedTotal;
     el.innerHTML = `<span>${L("합계", "Total")} <span class="hint" style="margin:0;font-weight:400">${peso(a)} + ${peso(fe)}${pt ? ` − ⭐${peso(pt)}` : ""}</span></span><b>${peso(a + fe - pt)}</b>`
@@ -3186,6 +3189,12 @@ async function extOrderModal(){
   ov.querySelector("#exAdd").onclick = () => addItemModal({ pickOnly: l => { ov._items.push(l); paintItems(); }, items: [] }, false);
   const pickCh = ch => { ov._ch = ch; ov.querySelectorAll("[data-ch]").forEach(x => x.classList.toggle("sel", x.dataset.ch === ch)); ov.querySelector("#exPtsBox").hidden = ch !== "DK"; paintTotal(); };
   ov.querySelectorAll("[data-ch]").forEach(b => b.onclick = () => pickCh(b.dataset.ch));
+  /* 🛵 배달 / 🏃 픽업 — 픽업이면 주소·지도·배달비·기사 칸을 숨기고 배달비 0 */
+  const pickOt = t => { ov._ot = t; ov.querySelectorAll("[data-ot]").forEach(x => x.classList.toggle("sel", x.dataset.ot === t));
+    ov.querySelectorAll(".ex-dlv").forEach(x => x.hidden = t === "pickup");
+    const co = ov.querySelector("[data-cashopt]"); if(co) co.textContent = t === "pickup" ? L("현금 (매장에서 받음)", "Cash (paid at store)") : L("현금 (기사가 받음)", "Cash (rider collects)");
+    paintTotal(); };
+  ov.querySelectorAll("[data-ot]").forEach(b => b.onclick = () => pickOt(b.dataset.ot));
   ["amount", "fee", "points"].forEach(k => F(k).addEventListener("input", paintTotal));
   paintTotal();
   bindPaste(ov, p => {
@@ -3206,6 +3215,7 @@ async function extOrderModal(){
     if(p.payKey){ F("payment").value = p.payKey; got.push(L("결제", "payment")); }
     if(p.link || p.coord){ F("coord").value = p.link || `${p.coord.lat}, ${p.coord.lng}`; got.push(L("지도 위치", "map pin")); }
     const raw = ov.querySelector("[data-paste]").value.toLowerCase();
+    if(/pick\s*-?\s*up|픽업|포장|take\s*-?\s*out|takeout/.test(raw)){ pickOt("pickup"); got.push("🏃 " + L("픽업", "pickup")); }
     if(/kakao|카톡|카카오/.test(raw)) pickCh("카카오톡"); else if(/messenger|facebook|페북|페이스북|sms|문자/.test(raw)) pickCh("메세지"); else if(/viber|바이버/.test(raw)) pickCh("바이버");
     return got;
   });
