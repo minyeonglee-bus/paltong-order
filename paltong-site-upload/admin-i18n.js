@@ -72,7 +72,7 @@ const DICT = [
 
   // ---- 프린터 ----
   ["영수증 프린터 설정", "Receipt printer"], ["연결 방식", "Connection"], ["블루투스 바로 연결", "Bluetooth direct"], ["RawBT 앱 (안드로이드)", "RawBT app (Android)"],
-  ["브라우저 인쇄창 (PC 드라이버)", "Browser print dialog (PC driver)"], ["🔗 블루투스 프린터 찾기 / 연결", "🔗 Find / connect Bluetooth printer"], ["테스트 인쇄", "Test print"],
+  ["브라우저 인쇄창 (PC 드라이버)", "Browser print dialog (PC driver)"], ["🔗 블루투스 프린터 찾기 / 연결", "🔗 Find / connect Bluetooth printer"], ["✏️ 자유 인쇄 (메모 · 마감 종이)", "✏️ Free print (memo · closing slip)"], ["📡 와이파이 프린터 (인쇄 스테이션)", "📡 Wi-Fi printer (print station)"], ["테스트 인쇄", "Test print"],
   ["프린터 전원을 켜고", "Turn the printer on,"], ["휴대폰 블루투스 설정에서 미리 페어링하지 말고", "do NOT pair it in phone Bluetooth settings first,"],
   ["아래 '프린터 찾기'를 누른 뒤 목록에서 프린터를 고르세요.", "then tap 'Find printer' below and pick it from the list."],
   ["• 안드로이드 Chrome 또는 PC Chrome/Edge에서만 됩니다 (아이폰 불가).", "• Works only in Android Chrome or PC Chrome/Edge (not iPhone)."],

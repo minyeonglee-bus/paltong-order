@@ -76,6 +76,8 @@
       <p class="hint" id="msg" style="margin:8px 0 0"></p>
     </div>
 
+    <button class="primary-btn" id="noteBtn" style="margin-bottom:12px;background:#333" data-t="✏️ 자유 인쇄 (메모 · 마감 종이)|✏️ Free print (memo · closing slip)"></button>
+
     <div class="card">
       <h4 data-t="최근 인쇄|Recent prints"></h4>
       <ul class="jobs" id="jobs"></ul>
@@ -144,6 +146,7 @@ function kindsFor(set, o){
   return k;
 }
 function copiesFor(job){
+  if(job.payload && job.payload._note) return typeof job.copies === "number" ? job.copies : 1;   // ✏️ 자유 인쇄 = 적은 장수 그대로
   if(stSet !== "follow" && job.payload) return kindsFor(stSet, job.payload);
   const c = job.copies; return Array.isArray(c) || typeof c === "number" ? c : kindsFor(ls.get("paltong_print_set", "kc"), job.payload || {});
 }
@@ -242,6 +245,13 @@ async function pump(force){
   }catch(e){ lastErr = PT.errMsg(e); }
   finally{ busy = false; paintState(); paintJobs(); }
 }
+$("noteBtn").onclick = () => PTPrinter.openNoteEditor({ en: lang === "en",
+  loadOrders: day => api.listOrdersByDay(day),
+  onPrint: async (note, copies) => {
+    const job = { payload: { _note: note }, copies };
+    const b = await bytesFor(job);
+    if(mode === "tap") PTPrinter.rawbtSend(b); else await PTPrinter.rawbtWsSend(b);
+  } });
 $("retryBtn").onclick = () => { lastErr = ""; pump(true); };
 $("testBtn").onclick = async () => {
   const sample = { order_no: 0, created_at: new Date().toISOString(), status:"confirmed", payment:"cash",

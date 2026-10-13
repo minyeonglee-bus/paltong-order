@@ -1357,6 +1357,7 @@ $("printerBtn").onclick = () => {
     <div class="opt-group"><div class="opt-title">🖨 인쇄 누르면 나오는 영수증</div>
       <div class="opt-choices" id="psets">${Object.entries(PT.PRINT_SETS).map(([k, v]) => `<button class="opt-choice" data-ps="${k}">${v}</button>`).join("")}</div>
       <p class="hint" style="margin:6px 0 0">🍳 주방용 = 주문번호 · 메뉴 · 수량 · 옵션 · 요청사항 (가격 없음, 큰 글씨)<br>🧾 손님용 = 주문번호 · 메뉴 · 가격 · 합계 · 결제 · 요청사항</p></div>
+    <button class="primary-btn" id="pnote" style="margin-bottom:8px;background:#333">✏️ 자유 인쇄 (메모 · 마감 종이)</button>
     <button class="primary-btn" id="pconnect" style="margin-bottom:8px">🔗 블루투스 프린터 찾기 / 연결</button>
     <button class="primary-btn green" id="ptest">테스트 인쇄</button>
     <p class="hint" id="pstat"></p></div>`;
@@ -1407,6 +1408,9 @@ $("printerBtn").onclick = () => {
     try{ const n = await PTPrinter.bleConnect(true); q("#pstat").textContent = "✔ 연결됨: " + n; paintPrinterBtn(true); }
     catch(e){ q("#pstat").textContent = "연결 실패: " + (e.message || e); paintPrinterBtn(false); }
   };
+  q("#pnote").onclick = () => { close(); PTPrinter.openNoteEditor({ en: EN(),
+    loadOrders: day => day === today() ? Promise.resolve(orders.filter(o => PT.orderDay(o) === day)) : api.listOrdersByDay(day),
+    onPrint: (note, copies) => PTPrinter.print([{ _note: note }], copies) }); };
   q("#ptest").onclick = async () => {
     q("#pstat").textContent = "인쇄 데이터 보내는 중…";
     try{ await PTPrinter.print(SAMPLE); q("#pstat").textContent = PTPrinter.getMode() === "station" ? "✔ 인쇄 스테이션으로 보냈어요. 몇 초 안에 영수증이 나오는지 확인하세요." : "✔ 전송했습니다. 영수증이 나왔는지 확인하세요."; if(PTPrinter.getMode()==="ble") paintPrinterBtn(true); }

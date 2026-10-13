@@ -128,6 +128,129 @@ function drawReceipt(o, copyLabel, kitchen){
   return out;
 }
 
+/* ---------- 1-b) ✏️ 자유 인쇄 (메모 · 마감 종이) ----------
+   note = { title, body, size: "m" | "l", at }
+   본문에서  "---" 줄 = 구분선,  "# 글자" 줄 = 굵고 크게,  "왼쪽 | 오른쪽" 줄 = 양쪽 정렬 */
+function drawNote(note){
+  const W = DOTS, pad = 6, S = DOTS / 384, base = note.size === "l" ? 28 : 22;
+  const c = document.createElement("canvas"); c.width = W; c.height = 6000;
+  const g = c.getContext("2d");
+  g.fillStyle = "#fff"; g.fillRect(0, 0, W, c.height); g.fillStyle = "#000"; g.textBaseline = "top";
+  let y = 8;
+  const font = (px, bold) => { g.font = `${bold ? 700 : 500} ${Math.round(px * S)}px ${FONT}`; return Math.round(px * S); };
+  const wrap = (t, maxW) => { const out = []; let line = ""; for(const ch of String(t)){ if(g.measureText(line + ch).width > maxW && line){ out.push(line); line = ch.trim() ? ch : ""; } else line += ch; } out.push(line); return out; };
+  const text = (t, size, bold, center) => { const h = font(size, bold); wrap(t, W - pad * 2).forEach(l => { g.fillText(l, center ? (W - g.measureText(l).width) / 2 : pad, y); y += h + 5; }); };
+  const hr = () => { y += 4; g.fillRect(pad, y, W - pad * 2, 2); y += 10; };
+  if(note.title){ text(note.title, base + 10, true, true); }
+  const at = note.at ? new Date(note.at) : new Date();
+  text(at.toLocaleString("en-PH", { timeZone: "Asia/Manila", year: "numeric", month: "short", day: "numeric", weekday: "short", hour: "2-digit", minute: "2-digit", hour12: false }), 18, false, true);
+  hr();
+  String(note.body || "").split("\n").forEach(raw => {
+    const ln = raw.replace(/\s+$/, "");
+    if(/^\s*-{3,}\s*$/.test(ln)) return hr();
+    if(!ln.trim()){ y += Math.round(base * S * 0.6); return; }
+    const big = /^#\s*/.test(ln), body = ln.replace(/^#\s*/, ""), sz = big ? base + 6 : base;
+    const m = body.match(/^(.*?)\s*\|\s*(.*)$/);
+    if(!m) return text(body, sz, big);
+    { const h = font(sz, big), rw = g.measureText(m[2]).width; wrap(m[1], W - pad * 2 - rw - 10).forEach((l, i) => { g.fillText(l, pad, y); if(i === 0) g.fillText(m[2], W - pad - rw, y); y += h + 5; }); return; }
+  });
+  y += 10;
+  const out = document.createElement("canvas"); out.width = W; out.height = Math.ceil(y / 8) * 8;
+  out.getContext("2d").drawImage(c, 0, 0);
+  return out;
+}
+
+/* 📊 오늘 마감 요약 (영업일 하루 주문) → 메모 본문 */
+function closingText(orders, day, en){
+  const T = (k, e) => en ? e : k;
+  const P = n => "₱" + Math.round(n || 0).toLocaleString("en-PH");
+  const live = (orders || []).filter(o => o.status !== "cancelled"), done = live.filter(o => o.status === "done");
+  const cancelled = (orders || []).length - live.length, open = live.length - done.length;
+  const sum = a => a.reduce((s, o) => s + (o.total || 0), 0);
+  const byPay = {};
+  done.forEach(o => { const k = o.payment || "cash"; byPay[k] = (byPay[k] || 0) + (o.total || 0); });
+  const kind = o => PT.isDine(o) ? T("다이닝", "Dine-in") : o.order_type === "pickup" ? T("픽업", "Pickup") : T("배달", "Delivery");
+  const byKind = {}; done.forEach(o => { const k = kind(o); byKind[k] = byKind[k] || [0, 0]; byKind[k][0]++; byKind[k][1] += o.total || 0; });
+  const fees = done.reduce((s, o) => s + (o.delivery_fee || 0), 0), disc = done.reduce((s, o) => s + (o.discount || 0), 0);
+  const diff = done.filter(o => o.received_diff).reduce((s, o) => s + o.received_diff, 0);
+  const L = [];
+  L.push(`# ${T("완료 매출", "Sales (done)")} | ${P(sum(done))}`);
+  L.push(`${T("완료 주문", "Done orders")} | ${done.length}`);
+  if(open) L.push(`${T("미완료 주문", "Not finished")} | ${open}`);
+  if(cancelled) L.push(`${T("취소", "Cancelled")} | ${cancelled}`);
+  L.push("---");
+  Object.entries(byPay).forEach(([k, v]) => { const p = PT.payInfo(k); L.push(`${en ? (p.labelEn || p.label) : (k === "cash" ? "현금" : p.label)} | ${P(v)}`); });
+  L.push("---");
+  Object.entries(byKind).forEach(([k, v]) => L.push(`${k} ${v[0]}${T("건", "")} | ${P(v[1])}`));
+  if(fees) L.push(`${T("배달비 합계", "Delivery fees")} | ${P(fees)}`);
+  if(disc) L.push(`${T("할인 합계", "Discounts")} | -${P(disc)}`);
+  if(diff) L.push(`${T("받은 금액 차액", "Received diff")} | ${diff > 0 ? "+" : ""}${P(diff)}`);
+  L.push("---");
+  L.push(`${T("현금 시재 (실제)", "Cash counted")} | ₱`);
+  L.push(`${T("지출", "Expenses")} | ₱`);
+  L.push(`${T("마감 담당", "Closed by")} |`);
+  L.push(`${T("특이사항", "Notes")}:`);
+  return L.join("\n");
+}
+
+/* ✏️ 자유 인쇄 편집 창 (관리자 · 인쇄 스테이션 공통)
+   opts = { en, onPrint(note, copies), loadOrders: async () => orders (마감 불러오기용) } */
+function openNoteEditor(opts){
+  const en = !!opts.en, T = (k, e) => en ? e : k;
+  const saved = ls.get("paltong_note_draft", null) || {};
+  const bg = document.createElement("div");
+  bg.style.cssText = "position:fixed;inset:0;z-index:9999;background:rgba(20,12,8,.6);display:flex;align-items:flex-end;justify-content:center";
+  bg.innerHTML = `<div style="background:#fff;width:100%;max-width:520px;max-height:94vh;overflow:auto;border-radius:20px 20px 0 0;padding:16px 16px calc(18px + env(safe-area-inset-bottom));font-family:inherit">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px"><b style="font-size:18px">✏️ ${T("자유 인쇄 (메모 · 마감)", "Free print (memo · closing)")}</b><button data-x style="border:0;background:none;font-size:22px">✕</button></div>
+    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px">
+      ${opts.loadOrders ? `<button data-tpl="close" class="pill">📊 ${T("오늘 마감 불러오기", "Load today's closing")}</button>` : ""}
+      <button data-tpl="blank" class="pill">🧾 ${T("마감 빈 양식", "Blank closing form")}</button>
+      <button data-tpl="clear" class="pill">🗑 ${T("지우기", "Clear")}</button>
+    </div>
+    <input data-f="title" placeholder="${T("제목 (예: 마감 / 발주 / 메모)", "Title (e.g. Closing / Order list / Memo)")}" style="width:100%;box-sizing:border-box;font-size:17px;padding:10px;border:1px solid #ddd;border-radius:10px;margin-bottom:8px" value="${PT.esc(saved.title || "")}">
+    <textarea data-f="body" rows="12" placeholder="${T("내용을 적으세요\n\n· '---' 한 줄 = 구분선\n· '# 글자' = 굵고 크게\n· '현금 | ₱5,000' = 왼쪽·오른쪽 정렬", "Type anything\n\n· '---' line = divider\n· '# text' = big bold\n· 'Cash | ₱5,000' = left/right aligned")}" style="width:100%;box-sizing:border-box;font-size:15px;padding:10px;border:1px solid #ddd;border-radius:10px;font-family:inherit">${PT.esc(saved.body || "")}</textarea>
+    <div style="display:flex;gap:8px;align-items:center;margin:8px 0;flex-wrap:wrap">
+      <span style="font-size:13px;color:#666">${T("글자", "Text")}</span>
+      <button data-size="m" class="pill">${T("보통", "Normal")}</button><button data-size="l" class="pill">${T("크게", "Large")}</button>
+      <span style="font-size:13px;color:#666;margin-left:8px">${T("장수", "Copies")}</span>
+      <input data-f="copies" type="number" min="1" max="5" value="1" style="width:56px;padding:6px;border:1px solid #ddd;border-radius:8px">
+    </div>
+    <details style="margin-bottom:8px"><summary style="font-size:13px;color:#666">${T("미리보기", "Preview")}</summary><img data-prev style="width:100%;border:1px solid #ddd;border-radius:8px;margin-top:6px"></details>
+    <button data-go style="width:100%;padding:16px;border:0;border-radius:14px;background:#d33d2a;color:#fff;font-size:17px;font-weight:800">🖨 ${T("인쇄", "Print")}</button>
+    <p data-msg style="font-size:13px;color:#666;margin:8px 0 0"></p></div>`;
+  document.body.append(bg);
+  const q = x => bg.querySelector(x), title = q('[data-f="title"]'), body = q('[data-f="body"]');
+  let size = saved.size || "m";
+  const note = () => ({ title: title.value.trim(), body: body.value, size, at: new Date().toISOString() });
+  const save = () => ls.set("paltong_note_draft", { title: title.value, body: body.value, size });
+  const prev = () => { try{ q("[data-prev]").src = drawNote(note()).toDataURL(); }catch(e){} };
+  const paintSize = () => bg.querySelectorAll("[data-size]").forEach(b => { b.classList.toggle("sel", b.dataset.size === size); b.style.fontWeight = b.dataset.size === size ? "800" : ""; });
+  paintSize(); prev();
+  [title, body].forEach(el => el.addEventListener("input", () => { save(); prev(); }));
+  bg.querySelectorAll("[data-size]").forEach(b => b.onclick = () => { size = b.dataset.size; save(); paintSize(); prev(); });
+  const close = () => bg.remove();
+  q("[data-x]").onclick = close; bg.onclick = e => { if(e.target === bg) close(); };
+  bg.querySelectorAll("[data-tpl]").forEach(b => b.onclick = async () => {
+    const t = b.dataset.tpl;
+    if(t === "clear"){ title.value = ""; body.value = ""; }
+    if(t === "blank"){ title.value = T("마감", "CLOSING"); body.value = [T("완료 매출", "Sales"), T("현금", "Cash"), "GCash", "Maya", T("계좌이체", "Bank"), "---", T("현금 시재 (실제)", "Cash counted"), T("지출", "Expenses"), T("마감 담당", "Closed by")].map(x => `${x} | ₱`).join("\n") + `\n---\n${T("특이사항", "Notes")}:`; }
+    if(t === "close"){
+      q("[data-msg]").textContent = T("오늘 주문 불러오는 중…", "Loading today's orders…");
+      try{ const day = PT.bizDay(new Date()); const list = await opts.loadOrders(day);
+        title.value = `${T("마감", "CLOSING")} ${day}`; body.value = closingText(list, day, en); q("[data-msg]").textContent = T("✔ 오늘(영업일) 주문으로 채웠어요. 고칠 곳은 고친 뒤 인쇄하세요.", "✔ Filled from today's orders. Edit if needed, then print."); }
+      catch(e){ q("[data-msg]").textContent = "✖ " + PT.errMsg(e); }
+    }
+    save(); prev();
+  });
+  q("[data-go]").onclick = async () => {
+    const n = note(); if(!n.title && !n.body.trim()){ q("[data-msg]").textContent = T("내용을 적어주세요", "Please type something"); return; }
+    const copies = Math.max(1, Math.min(5, Math.round(+q('[data-f="copies"]').value || 1)));
+    q("[data-go]").disabled = true; q("[data-msg]").textContent = T("보내는 중…", "Sending…");
+    try{ await opts.onPrint(n, copies); q("[data-msg]").textContent = T("✔ 보냈어요", "✔ Sent"); setTimeout(close, 900); }
+    catch(e){ q("[data-msg]").textContent = "✖ " + (e.message || e); q("[data-go]").disabled = false; }
+  };
+}
+
 /* ---------- 2) 캔버스 → ESC/POS 래스터 바이트 ---------- */
 function canvasToEscPos(canvas){
   const W = canvas.width, H = canvas.height, bw = W / 8;
@@ -155,6 +278,7 @@ const FEED_CUT = new Uint8Array([0x1b, 0x64, 0x04, 0x1d, 0x56, 0x42, 0x00]);   /
 function buildSlips(orders, copies){
   const out = [];
   orders.forEach(o => {
+    if(o && o._note){ const n = typeof copies === "number" ? copies : 1; for(let i = 0; i < n; i++) out.push(drawNote(o._note)); return; }
     if(typeof copies === "number"){ for(let i = 0; i < copies; i++) out.push(drawReceipt(o, "")); return; }
     (Array.isArray(copies) ? copies : PT.printKinds(o)).forEach(k => out.push(k === "kitchen" ? drawReceipt(o, "", true) : drawReceipt(o, PT.KIND_LABEL[k] ? PT.KIND_LABEL[k] : PT.isDine(o) ? "HALL / CUSTOMER" : "손님 CUSTOMER")));
   });
@@ -254,6 +378,7 @@ function rawbtWsSend(bytes, timeoutMs){
 /* 📡 인쇄 스테이션으로 보내기 — 주문마다 인쇄할 장(주방용·손님용…)을 이 기기 설정대로 정해서 보냄 */
 async function stationSend(orders, copies){
   for(const o of orders){
+    if(o._note){ await PT.api.printJobAdd(JSON.parse(JSON.stringify(o)), typeof copies === "number" ? copies : 1, "✏️ " + (o._note.title || "메모")); continue; }
     const kinds = typeof copies === "number" ? copies : PT.printKinds(o);
     const items = (o.items || []).filter(l => !l.svc || l.couponFree);
     const label = `${PT.orderCode ? PT.orderCode(o) : "#" + (o.order_no ?? "")} · ${(items[0] && (items[0].en || items[0].name)) || ""}${items.length > 1 ? ` +${items.length - 1}` : ""}`;
@@ -318,6 +443,11 @@ async function print(orders, copies){
   orders = Array.isArray(orders) ? orders : [orders];
   copies = copies ?? "auto";   // auto = 프린터 설정의 '인쇄할 장' (기본 주방용 + 손님용)
   const mode = getMode();
+  if(mode === "browser" && orders.some(o => o._note)){
+    await (document.fonts && document.fonts.ready);
+    const w = window.open("", "_blank"); if(!w) throw new Error("팝업이 막혔어요");
+    w.document.write(`<html><body style="margin:0">${buildSlips(orders, copies).map(c => `<img src="${c.toDataURL()}" style="width:58mm;display:block;page-break-after:always">`).join("")}<script>onload=()=>{print();}<\/script></body></html>`); w.document.close(); return;
+  }
   if(mode === "browser") return PT.printReceipt(orders, copies);
   if(mode === "share") return shareSend(orders, copies);
   if(mode === "station") return stationSend(orders, copies);   // 글꼴 대기(await) 전에 바로 — 공유 창은 버튼 누른 직후에만 열림
@@ -328,6 +458,6 @@ async function print(orders, copies){
 }
 function previewCanvas(o){ return drawReceipt(o, ""); }
 
-window.PTPrinter = { print, getMode, setMode, isIOS, bleConnect, bleSupported, buildJob, previewCanvas, drawReceipt, canvasToEscPos, rawbtWsSend, rawbtSend, stationSend, buildSlips,
+window.PTPrinter = { openNoteEditor, drawNote, closingText, print, getMode, setMode, isIOS, bleConnect, bleSupported, buildJob, previewCanvas, drawReceipt, canvasToEscPos, rawbtWsSend, rawbtSend, stationSend, buildSlips,
   get bleName(){ return (bleDevice && bleDevice.name) || ls.get("paltong_ble_name", ""); } };
 })();
