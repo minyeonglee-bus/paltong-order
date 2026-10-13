@@ -1209,7 +1209,7 @@ async function act(o, a, btn){
   // (외부 주문은 우리 추적 링크가 자동으로 붙어 있어서 예전엔 이 칸이 안 떴음)
   if(a === "deliver" && (o.order_type === "pickup" || o.rider_id || (o.tracking_url && !isOurTrack(o)))){ await run({ status: "delivering" }, L(`#${o.order_no} 배달 출발`, `#${o.order_no} out for delivery`)); return; }
   if(a === "deliver" || a === "tracklink"){
-    const v = prompt(L(`#${o.order_no} 배달 위치 링크 (라라무브·삼성 추적 링크 등)\n붙여넣으면 손님 화면에 '📍 배달 위치 확인' 버튼이 생깁니다. 없으면 비워두세요.`, `#${o.order_no} rider tracking link (Lalamove / Samsung tracker etc.)\nThe customer gets a '📍 Track my rider' button. Leave empty if none.`), o.tracking_url || "");
+    const v = prompt(L(`#${o.order_no} 배달 위치 링크 (라라무브·삼성 추적 링크 등)\n붙여넣으면 손님 화면에 '📍 배달 위치 확인' 버튼이 생깁니다. 없으면 비워두세요.`, `#${o.order_no} rider tracking link (Lalamove / Samsung tracker etc.)\nThe customer gets a '📍 Track my rider' button. Leave empty if none.`), o.tracking_url && !isOurTrack(o) ? o.tracking_url : "");   // 우리 추적 링크는 미리 채우지 않음 (빈칸)
     if(v === null) return;
     const url = v.trim();
     if(url && !/^https?:\/\//i.test(url)){ toast("https:// 로 시작하는 링크를 붙여넣어 주세요", 3500); return; }
@@ -1242,13 +1242,13 @@ async function act(o, a, btn){
     modal(`#${o.order_no} ${L("🛵 라라무브 링크·금액", "🛵 Lalamove link·fee")}`, `
       <p class="hint" style="margin-top:0">${L(`라라무브 예약 후 나온 공유 링크와 앱에 표시된 배달 금액을 넣으세요. 금액이 바뀌면 손님 화면과 채팅에 "배달료가 수정되었습니다"가 자동 안내되고, 링크는 손님 화면의 '📍 배달 위치 확인' 버튼이 됩니다.`,
         `Paste the share link from your Lalamove booking and the fee shown in the app. If the fee changes, the customer is told "delivery fee updated" automatically, and the link becomes their '📍 Track my rider' button.`)}</p>
-      <div class="field"><label>${L("라라무브 공유 링크", "Lalamove share link")}</label><input data-f="url" value="${esc(o.tracking_url || "")}" placeholder="https://..."></div>
+      <div class="field"><label>${L("라라무브 공유 링크", "Lalamove share link")}</label><input data-f="url" value="${esc(o.tracking_url && !isOurTrack(o) ? o.tracking_url : "")}" placeholder="https://..."></div>
       <div class="field"><label>${L(`라라무브 배달 금액 ₱ (지금 ${peso(o.delivery_fee ?? 0)})`, `Lalamove fee ₱ (now ${peso(o.delivery_fee ?? 0)})`)}</label><input data-f="fee" type="number" inputmode="numeric" min="0" value="${esc(o.delivery_fee ?? "")}"></div>`,
       async ov => {
         const f = readFields(ov);
         if(f.url && !/^https?:\/\//i.test(f.url)){ toast("https:// 로 시작하는 링크를 붙여넣어 주세요", 3500); return false; }
         if(f.fee === "" || isNaN(+f.fee) || +f.fee < 0){ toast("금액을 숫자로 입력하세요"); return false; }
-        const r = await api.setFeeLink(o.id, Math.round(+f.fee), f.url);
+        const r = await api.setFeeLink(o.id, Math.round(+f.fee), f.url || (isOurTrack(o) ? o.tracking_url : ""));   // 비워두면 우리 추적 링크 유지
         toast(r.changed ? L(`#${o.order_no} 배달료 ${peso(r.fee)} → 최종 ${peso(r.total)} · 손님에게 안내했습니다`, `#${o.order_no} fee ${peso(r.fee)} → total ${peso(r.total)} · customer notified`) : L("링크를 저장했습니다 (배달료 그대로)", "Link saved (fee unchanged)"), 4500);
         await loadOrders(); loadThreads();
       }, "저장");
