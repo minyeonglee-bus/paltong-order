@@ -2950,7 +2950,7 @@ function parseOrderPaste(raw){
   const link = text.match(MAP_LINK_RE); if(link) out.link = link[0];
   const coord = parseLatLng(text) || plusCode(text, rdStore || CFG.STORE_LOCATION || { lat: 14.5695, lng: 120.989 }); if(coord) out.coord = coord;
   const LBL = [
-    ["name",    /^(?:이름|성함|성명|고객명?|손님|받는\s*(?:분|사람)|수령인|주문자|name|customer|recipient|receiver)\s*[:：=\-]?\s*/i],
+    ["name",    /^(?:주문\s*하신\s*분|이름|성함|성명|고객명?|손님|받는\s*(?:분|사람)|수령인|주문자|name|customer|recipient|receiver)\s*[:：=\-]?\s*/i],
     ["phone",   /^(?:연락처|전화(?:번호)?|휴대폰|핸드폰|폰|번호|phone|mobile|contact(?:\s*no\.?)?|tel|cp|number|viber|whatsapp)\s*[:：=\-]?\s*/i],
     ["addr",    /^(?:(?:selected|saved|pinned|chosen|current|my)\s+(?:address|location)|선택(?:한|된)\s*(?:주소|위치)|주소|배달\s*주소|배송지|도착지|위치|장소|호텔|콘도|address|addr|location|drop[\s-]?off|deliver(?:y)?\s*(?:to|address)|hotel|condo)\s*[:：=\-]?\s*/i],
     ["fee",     /^(?:배달\s*(?:비|료|팁)|배송비|delivery(?:\s*(?:fee|charge))?|del\.?\s*fee|rider\s*fee|fee|df)\s*[:：=\-]?\s*/i],
@@ -2964,7 +2964,7 @@ function parseOrderPaste(raw){
   const ADDRISH = /\b(st\.?|street|ave\.?|avenue|blvd|boulevard|road|rd\.?|brgy|barangay|bgy|tower|towers|condo|condominium|residences?|suites?|bldg|building|unit|floor|flr|rm|room|hotel|inn|village|subd|phase|block|blk|lot|malate|ermita|manila|makati|pasay|taguig|bgc|paranaque|parañaque|pasig|mandaluyong|ortigas|quezon|city|apartment|apt)\b|#\s?\d|\d+(?:st|nd|rd|th)\s*f(?:loor|lr)?\b|호텔|콘도|타워|호\b|층|동\b/i;
   const money = s => { const m = String(s).replace(/,/g, "").match(/(\d+(?:\.\d+)?)/); return m ? Math.round(+m[1]) : null; };
   const FEE_IN = /(배달(?!\s*(?:주소|지|위치|시간|주문|요청))|배송\s*비|delivery|del\.?\s*fee|rider\s*fee|shipping)/i;   // 줄 중간에 있어도 배달비
-  const NOT_ITEM = /(거스름|포인트|points?\b|잔돈|change\s*(?:for|from)|pay(?:ing)?\s*with|bayad|gcash|g-cash|maya|paymaya|bank|transfer|cash|cod|현금|계좌|이체|지캐시|discount|할인|쿠폰|coupon|tip\b|팁)/i;
+  const NOT_ITEM = /(주문\s*아이디|주문\s*번호|order\s*(?:id|no)|거스름|포인트|points?\b|잔돈|change\s*(?:for|from)|pay(?:ing)?\s*with|bayad|gcash|g-cash|maya|paymaya|bank|transfer|cash|cod|현금|계좌|이체|지캐시|discount|할인|쿠폰|coupon|tip\b|팁)/i;
   const addr = [], loose = [], feeNums = [], aliases = menuAliases(); let addrNext = false;
   out.items = [];
   for(let line of text.split("\n")){
@@ -3117,6 +3117,7 @@ async function loadDkInbox(first){
     dkSeen = new Set(list.map(x => x.id)); dkInbox = list;
     for(const x of fresh){
       const done = !first && dkAuto() ? await dkAutoCreate(x).catch(() => null) : null;
+      if(done && done.dup) continue;   // 같은 DK 주문 → 조용히 정리
       if(done) alarm("order", `📥 DK ${L("자동 등록", "auto-added")} ${done.code} — ${done.name} · ${peso(done.total)}`, goOrders("all"));
       else { const d = dkParse(x); alarm("order", d.isDk ? `📥 DK ${L("새 주문", "new order")} — ${d.name || ""} · ${d.kind}${d.id ? ` · #${d.id}` : ""} — ${L("눌러서 메뉴 넣고 등록", "tap to add items")}` : `📥 DK ${L("새 주문", "new order")} — ${(x.title || "")} ${(x.body || "").slice(0, 60)}`, () => dkInboxModal()); }
     }
@@ -3131,19 +3132,23 @@ async function dkAutoCreate(x){
   const text = dkPasteText(x), p = parseOrderPaste(text);
   const items = (p.items || []).filter(l => l.unitPrice > 0 && !l.needPrice);
   const amount = items.length ? items.reduce((a, l) => a + l.unitPrice * l.qty, 0) : Math.round(+p.amount || 0) || (p.total != null ? Math.max(0, p.total - (p.fee || 0) + (p.points || 0)) : 0);
+  const dkId = dkParse(x).id, dup = dkId && orders.find(o => o.source === "external" && String(o.memo || "").includes(`DK 주문아이디 ${dkId}`));
+  if(dup){ if(await api.dkInboxClaim(x.id)) await api.dkInboxSet(x.id, "done", dup.id).catch(() => {}); return { dup: true }; }   // 같은 DK 주문 두 번 등록 방지
   if(!(amount > 0) || !(p.name || p.phone) || (p.items || []).some(l => l.needPrice)) return null;   // 확실하지 않으면 사람이 확인
+  if(p.total != null && Math.abs(p.total - (amount + (Math.round(+p.fee || 0)) - Math.round(+p.points || 0))) > 1) return null;   // DK 합계와 안 맞으면 (가격 차이 등) 사람이 확인
   if(!(await api.dkInboxClaim(x.id))) return null;                                                // 다른 기기가 이미 등록
   const pickup = /pick\s*-?\s*up|픽업|포장|take\s*-?\s*out|takeout/i.test(text);
   try{
     const r = await api.createExternalOrder({ name: p.name || "DK", phone: p.phone || "", addr: pickup ? "매장 픽업 / Store pickup" : (p.addr || (p.coord ? "" : "DK")),
       lat: !pickup && p.coord ? p.coord.lat : "", lng: !pickup && p.coord ? p.coord.lng : "",
-      amount, fee: pickup ? 0 : Math.round(+p.fee || 0), payment: p.payKey || "cash", memo: [p.memo && p.memo.join ? p.memo.join(" / ") : p.memo, "📥 DK 자동 등록"].filter(Boolean).join(" · "), channel: "DK", rider_id: "",
+      amount, fee: pickup ? 0 : Math.round(+p.fee || 0), payment: p.payKey || "cash", memo: [dkId ? `DK 주문아이디 ${dkId}` : "", "📥 DK 자동 등록"].filter(Boolean).join(" · "), channel: "DK", rider_id: "",
       ...(items.length ? { items: items.map(({ pasted, needPrice, ...l }) => l) } : {}) });
     if(items.length) await api.setItems(r.id, items.map(({ pasted, needPrice, ...l }) => l)).catch(() => {});
     if(pickup) await api.updateOrder(r.id, { order_type: "pickup", fee_source: "pickup" }).catch(() => {});
     const pts = Math.min(amount, Math.max(0, Math.round(+p.points || 0)));
     if(pts) await api.updateOrder(r.id, { store_discount: pts, store_discount_label: "포인트 공제" }).catch(() => {});
     await api.dkInboxSet(x.id, "done", r.id).catch(() => {});
+    if(dkId) for(const y of dkInbox.filter(y => y.id !== x.id && dkParse(y).id === dkId)) await api.dkInboxSet(y.id, "done", r.id).catch(() => {});   // 같은 DK 주문의 알림도 정리
     await loadOrders();
     return { code: `DK-${r.order_no}`, name: p.name || p.phone, total: amount - pts + (pickup ? 0 : Math.round(+p.fee || 0)) };
   }catch(e){
@@ -3164,8 +3169,10 @@ function dkParse(x){
 }
 /* DK 알림 → 외부 주문 창에 넣을 글 (이름 · 픽업 · 요청사항에 DK 주문아이디) */
 function dkPasteText(x){
-  const d = dkParse(x);
-  if(!d.isDk) return x.body || x.title || "";
+  const d = dkParse(x), full = x.body || x.title || "";
+  // 📤 DK 주문 화면을 통째로 보낸 경우 (메뉴가 읽힘) → 전체 글 + DK 주문아이디
+  if((parseOrderPaste(full).items || []).length) return full + (d.id && !/요청:\s*DK 주문아이디/.test(full) ? `\n요청: DK 주문아이디 ${d.id}` : "");
+  if(!d.isDk) return full;
   return [d.name, d.pickup ? "픽업" : "", d.id ? `요청: DK 주문아이디 ${d.id}` : ""].filter(Boolean).join("\n");
 }
 const DK_URL = key => `${CFG.SUPABASE_URL}/functions/v1/dk-inbox?k=${key}`;
@@ -3196,6 +3203,13 @@ async function dkInboxModal(){
           <input readonly value="${esc(url)}" style="width:100%;font-size:12px;padding:6px;margin:4px 0" id="dkUrl"> <button class="chip" id="dkCopy">📋 ${L("주소 복사", "Copy URL")}</button></li>
         <li>${L("본문(Body) 내용 유형 <b>text/plain</b> → 본문에 아래 두 줄 (매직 텍스트 버튼으로 넣기)", "Body content type <b>text/plain</b> → body (use the magic-text button)")}<br><code>{not_title}<br>{notification}</code></li>
         <li>${L("매크로 이름 'DK → 빨통' 저장 → DK 테스트 주문이나 알림이 오면 이 창에 떠요", "Save as 'DK → PAL TONG' → a DK notification will appear in this window")}</li>
+      </ol>
+      <b>📤 ${L("메뉴·금액까지 자동으로 (매크로 하나 더)", "Menu & amount too (one more macro)")}</b>
+      <ol style="padding-left:18px;margin:6px 0">
+        <li>${L("새 매크로 → 트리거: <b>플로팅 버튼 (Floating Button)</b> — 화면에 떠 있는 작은 버튼", "New macro → Trigger: <b>Floating Button</b>")}</li>
+        <li>${L("액션 1: <b>화면 내용 읽기 (Read Screen Contents)</b> → 새 문자열 변수 <b>dk_screen</b> 에 저장 (접근성 권한 허용)", "Action 1: <b>Read Screen Contents</b> → save to a new string variable <b>dk_screen</b> (allow accessibility)")}</li>
+        <li>${L("액션 2: <b>HTTP 요청</b> → POST → 위와 같은 주소 → 본문 text/plain 에 매직 텍스트로 <b>dk_screen</b> 변수 넣기", "Action 2: <b>HTTP Request</b> → POST → same URL → body text/plain = the <b>dk_screen</b> variable")}</li>
+        <li>${L("쓰는 법: DK 앱에서 <b>주문 상세 화면</b>을 연 채로 떠 있는 버튼을 한 번 탭 → 메뉴·금액·주소가 읽히면 바로 DK 주문으로 자동 등록 (같은 주문아이디는 한 번만)", "Use: open the <b>order detail</b> in the DK app and tap the floating button → auto-added as a DK order (same order id only once)")}</li>
       </ol>
       <div class="btn-row"><button class="ghost-btn sm" id="dkTest">🧪 ${L("테스트 알림 보내기", "Send a test")}</button><button class="ghost-btn sm" id="dkRotate">🔑 ${L("새 키 만들기", "New key")}</button></div>
       <p class="hint" style="margin:6px 0 0">${L("주소 끝의 k=… 는 가게 전용 비밀 키예요. 다른 사람에게 보내지 마세요. 새 키를 만들면 MacroDroid 주소도 바꿔야 해요.", "The k=… part is your secret key. Don't share it. If you make a new key, update MacroDroid too.")}</p>`;
