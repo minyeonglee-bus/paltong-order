@@ -493,7 +493,7 @@ function renderDaybar(){
     <input type="date" id="dayPick" value="${d || t}" max="${t}" title="${L("다른 날짜 보기", "Pick another day")}">
     <button class="pill" data-dstep="1" ${!d ? "disabled" : ""} title="${L("다음날", "Next day")}">▶</button>
     <button class="pill" id="cbBtn" style="margin-left:auto;background:#0E6B57;border-color:#0E6B57;color:#fff" title="${L("이 날 완료된 주문을 Paltong Cash Book 매출로 보내기", "Send this day's completed orders to the Paltong Cash Book")}">📒 ${L("캐시북으로", "To Cash Book")}</button>
-    <button class="pill" id="extBtn" style="background:var(--red);border-color:var(--red);color:#fff">➕ ${L("외부 주문 (전화·카톡)", "Outside order")}</button>`;
+    <button class="pill" id="extBtn" style="background:var(--red);border-color:var(--red);color:#fff">➕ ${L("외부 주문", "Outside order")}</button>`;
   $("extBtn").onclick = () => extOrderModal();
   $("cbBtn").onclick = () => cashbookModal(viewDay || today());
   $("daybar").querySelectorAll("[data-day]").forEach(b => b.onclick = () => setViewDay(b.dataset.day));
@@ -2921,13 +2921,13 @@ function parseMenuLine(raw, ADDRISH){
 }
 /* 카톡·문자·페이스북 메시지를 통째로 붙여넣으면 이름·연락처·주소·위치·금액·요청사항을 나눠 줌 */
 function parseOrderPaste(raw){
-  const out = { memo: [] }, text = String(raw || "").replace(/\r/g, "");
+  const out = { memo: [] }, text = String(raw || "").replace(/\r/g, "").replace(/\b(?:selected|saved|pinned|chosen)\s+(?:address|location)\b\s*[:：\-]?\s*/gi, "\n\u0001").replace(/선택(?:한|된)\s*(?:주소|위치)\s*[:：\-]?\s*/g, "\n\u0001");   // "Selected address" 같은 앱 문구는 지워요
   const link = text.match(MAP_LINK_RE); if(link) out.link = link[0];
   const coord = parseLatLng(text) || plusCode(text, rdStore || CFG.STORE_LOCATION || { lat: 14.5695, lng: 120.989 }); if(coord) out.coord = coord;
   const LBL = [
     ["name",    /^(?:이름|성함|성명|고객명?|손님|받는\s*(?:분|사람)|수령인|주문자|name|customer|recipient|receiver)\s*[:：=\-]?\s*/i],
     ["phone",   /^(?:연락처|전화(?:번호)?|휴대폰|핸드폰|폰|번호|phone|mobile|contact(?:\s*no\.?)?|tel|cp|number|viber|whatsapp)\s*[:：=\-]?\s*/i],
-    ["addr",    /^(?:주소|배달\s*주소|배송지|도착지|위치|장소|호텔|콘도|address|addr|location|drop[\s-]?off|deliver(?:y)?\s*(?:to|address)|hotel|condo)\s*[:：=\-]?\s*/i],
+    ["addr",    /^(?:(?:selected|saved|pinned|chosen|current|my)\s+(?:address|location)|선택(?:한|된)\s*(?:주소|위치)|주소|배달\s*주소|배송지|도착지|위치|장소|호텔|콘도|address|addr|location|drop[\s-]?off|deliver(?:y)?\s*(?:to|address)|hotel|condo)\s*[:：=\-]?\s*/i],
     ["fee",     /^(?:배달\s*(?:비|료|팁)|배송비|delivery(?:\s*(?:fee|charge))?|del\.?\s*fee|rider\s*fee|fee|df)\s*[:：=\-]?\s*/i],
     ["amount",  /^(?:음식\s*(?:값|비|금액)|메뉴\s*(?:합계|금액)|food(?:\s*(?:total|amount))?|subtotal|sub-total)\s*[:：=\-]?\s*/i],
     ["total",   /^(?:=\s*)?(?:금액|합계|총\s*(?:액|금액|합계)?|결제\s*금액|가격|grand\s*total|total(?:\s*amount)?|amount(?:\s*due)?|price)\s*[:：=\-]?\s*/i],
@@ -2939,13 +2939,15 @@ function parseOrderPaste(raw){
   const money = s => { const m = String(s).replace(/,/g, "").match(/(\d+(?:\.\d+)?)/); return m ? Math.round(+m[1]) : null; };
   const FEE_IN = /(배달(?!\s*(?:주소|지|위치|시간))|배송\s*비|delivery|del\.?\s*fee|rider\s*fee|shipping)/i;   // 줄 중간에 있어도 배달비
   const NOT_ITEM = /(거스름|잔돈|change\s*(?:for|from)|pay(?:ing)?\s*with|bayad|gcash|g-cash|maya|paymaya|bank|transfer|cash|cod|현금|계좌|이체|지캐시|discount|할인|쿠폰|coupon|tip\b|팁)/i;
-  const addr = [], loose = [], feeNums = [], aliases = menuAliases();
+  const addr = [], loose = [], feeNums = [], aliases = menuAliases(); let addrNext = false;
   out.items = [];
   for(let line of text.split("\n")){
     line = line.replace(/^[\s•·\-*+▶►✔✅📍📞☎️🏠👤💰💵📝🛵🍽🍱🍜🍚🥘]+/u, "").trim();
     if(!line) continue;
     if(out.link && line.includes(out.link)){ line = line.replace(out.link, "").trim(); if(!line) continue; }
-    line = line.replace(/^(?:메뉴|주문\s*(?:내역|메뉴)?|order(?:s)?|menu|items?)\s*[:：]\s*/i, "").trim(); if(!line) continue;   // "메뉴: 닭도리탕 1, 콜라 2"
+    line = line.replace(/^(?:메뉴|주문\s*(?:내역|메뉴)?|order(?:s)?|menu|items?)\s*[:：]\s*/i, "").trim(); if(!line) continue;
+    if(line[0] === "\u0001"){ line = line.slice(1).trim(); if(line) addr.push(line); else addrNext = true; continue; }   // "Selected address" 다음 = 주소
+    if(addrNext){ addrNext = false; if(!PHONE.test(line) && !priceTokens(line).length){ addr.push(line); continue; } }   // "메뉴: 닭도리탕 1, 콜라 2"
     let hit = false;
     for(const [k, re] of LBL){
       if(!re.test(line)) continue;
@@ -3082,7 +3084,7 @@ async function extOrderModal(){
   const ov = modal(`➕ ${L("외부 주문 등록", "New outside order")}`, `
     <p class="hint" style="margin-top:0">${L("주문톡을 거치지 않은 배달(전화·카톡 등)도 기사를 배정하고 손님에게 추적 링크를 보낼 수 있어요. 주문은 바로 '조리 중'으로 들어갑니다.", "Register a delivery that didn't come through the website, assign a rider and send the customer a tracking link. It starts as 'Preparing'.")}</p>
     ${pasteBoxHTML()}
-    <div class="field"><label>${L("주문 경로", "Channel")}</label><div class="chips" id="exCh">${EXT_CHANNELS.map((c, i) => `<button type="button" class="chip ${i === 0 ? "sel" : ""}" data-ch="${c[0]}">${L(c[0], c[1])} <span class="en">${c[0] === "기타" ? "DK" : "P"}</span></button>`).join("")}</div></div>
+    <div class="field"><label>${L("주문 경로", "Channel")}</label><div class="chips" id="exCh">${EXT_CHANNELS.map((c, i) => `<button type="button" class="chip ${i === 0 ? "sel" : ""}" data-ch="${c[0]}">${c[0] === "기타" ? "DK" : `${L(c[0], c[1])} <span class="en">P</span>`}</button>`).join("")}</div></div>
     <div class="field"><label>${L("손님 이름", "Customer name")}</label><input data-f="name" placeholder="Juan"></div>
     <div class="field"><label>${L("손님 연락처", "Customer phone")}</label><input data-f="phone" inputmode="tel" placeholder="09xx xxx xxxx"></div>
     <div class="field"><label>${L("주소", "Address")}</label><input data-f="addr" placeholder="Building, street, area"></div>
