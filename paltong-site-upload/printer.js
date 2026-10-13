@@ -6,6 +6,7 @@
      ble     : Chrome에서 블루투스로 바로 연결 (안드로이드/PC Chrome, BLE 지원 프린터)
      rawbt   : 안드로이드 'RawBT' 앱을 통해 인쇄 (블루투스 클래식 프린터도 대부분 가능)
      share   : 아이패드·아이폰 — 영수증 이미지를 공유 창으로 프린터 제조사 앱에 보내 인쇄
+     station : 📡 와이파이 프린터 — 인쇄 요청을 서버에 올리면 가게 안드로이드폰(/print-station)이 받아서 출력 (49단계)
    ===================================================================== */
 (function(){
 const { CFG, ITEM_BY_ID, peso, ls, payInfo, isOnlinePay } = PT;
@@ -155,7 +156,7 @@ function buildSlips(orders, copies){
   const out = [];
   orders.forEach(o => {
     if(typeof copies === "number"){ for(let i = 0; i < copies; i++) out.push(drawReceipt(o, "")); return; }
-    PT.printKinds(o).forEach(k => out.push(k === "kitchen" ? drawReceipt(o, "", true) : drawReceipt(o, k === "rider" ? "배달 RIDER" : PT.isDine(o) ? "HALL / CUSTOMER" : "손님 CUSTOMER")));
+    (Array.isArray(copies) ? copies : PT.printKinds(o)).forEach(k => out.push(k === "kitchen" ? drawReceipt(o, "", true) : drawReceipt(o, k === "rider" ? "배달 RIDER" : PT.isDine(o) ? "HALL / CUSTOMER" : "손님 CUSTOMER")));
   });
   return out;
 }
@@ -222,10 +223,33 @@ async function bleSend(bytes){
 }
 
 /* ---------- 3-b) RawBT (안드로이드 앱) ---------- */
-function rawbtSend(bytes){
+function rawbtIntent(bytes){
   let bin = ""; for(let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000));
-  const b64 = btoa(bin);
-  location.href = "intent:base64," + b64 + "#Intent;scheme=rawbt;package=ru.a402d.rawbtprinter;end;";
+  return "intent:base64," + btoa(bin) + "#Intent;scheme=rawbt;package=ru.a402d.rawbtprinter;end;";
+}
+function rawbtSend(bytes){ location.href = rawbtIntent(bytes); }
+/* RawBT 웹소켓 (안드로이드 'Server for RawBT' 앱 · PC용 rawbt_ws_server) — 누르지 않아도 자동 인쇄
+   ws://127.0.0.1:40213 로 intent 문자열을 보내면 RawBT 서버가 프린터(와이파이 9100 등)로 출력 */
+function rawbtWsSend(bytes, timeoutMs){
+  const msg = rawbtIntent(bytes);
+  return new Promise((ok, fail) => {
+    let ws, done = false;
+    const end = (e) => { if(done) return; done = true; clearTimeout(t); try{ ws && ws.close(1000); }catch(_){} e ? fail(e) : ok(); };
+    const t = setTimeout(() => end(new Error("RawBT 서버 응답 없음 (Server for RawBT 앱이 켜져 있는지 확인)")), timeoutMs || 6000);
+    try{ ws = new WebSocket("ws://127.0.0.1:40213/"); }catch(e){ return end(new Error("RawBT 서버에 연결할 수 없어요: " + (e.message || e))); }
+    ws.binaryType = "arraybuffer";
+    ws.onerror = () => end(new Error("RawBT 서버에 연결할 수 없어요 (Server for RawBT 앱이 켜져 있는지 확인)"));
+    ws.onopen = () => { try{ ws.send(msg); setTimeout(() => end(), 600); }catch(e){ end(e); } };
+  });
+}
+/* 📡 인쇄 스테이션으로 보내기 — 주문마다 인쇄할 장(주방용·손님용…)을 이 기기 설정대로 정해서 보냄 */
+async function stationSend(orders, copies){
+  for(const o of orders){
+    const kinds = typeof copies === "number" ? copies : PT.printKinds(o);
+    const items = (o.items || []).filter(l => !l.svc || l.couponFree);
+    const label = `${PT.orderCode ? PT.orderCode(o) : "#" + (o.order_no ?? "")} · ${(items[0] && (items[0].en || items[0].name)) || ""}${items.length > 1 ? ` +${items.length - 1}` : ""}`;
+    await PT.api.printJobAdd(JSON.parse(JSON.stringify(o)), kinds, label);
+  }
 }
 
 /* ---------- 3-c) 아이패드·아이폰: 이미지 공유 → 프린터 앱 ----------
@@ -286,7 +310,8 @@ async function print(orders, copies){
   copies = copies ?? "auto";   // auto = 프린터 설정의 '인쇄할 장' (기본 주방용 + 손님용)
   const mode = getMode();
   if(mode === "browser") return PT.printReceipt(orders, copies);
-  if(mode === "share") return shareSend(orders, copies);   // 글꼴 대기(await) 전에 바로 — 공유 창은 버튼 누른 직후에만 열림
+  if(mode === "share") return shareSend(orders, copies);
+  if(mode === "station") return stationSend(orders, copies);   // 글꼴 대기(await) 전에 바로 — 공유 창은 버튼 누른 직후에만 열림
   await (document.fonts && document.fonts.ready);
   const bytes = buildJob(orders, copies);
   if(mode === "ble") return bleSend(bytes);
@@ -294,6 +319,6 @@ async function print(orders, copies){
 }
 function previewCanvas(o){ return drawReceipt(o, ""); }
 
-window.PTPrinter = { print, getMode, setMode, isIOS, bleConnect, bleSupported, buildJob, previewCanvas, drawReceipt, canvasToEscPos,
+window.PTPrinter = { print, getMode, setMode, isIOS, bleConnect, bleSupported, buildJob, previewCanvas, drawReceipt, canvasToEscPos, rawbtWsSend, rawbtSend, stationSend, buildSlips,
   get bleName(){ return (bleDevice && bleDevice.name) || ls.get("paltong_ble_name", ""); } };
 })();

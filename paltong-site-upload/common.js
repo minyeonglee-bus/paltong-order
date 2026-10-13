@@ -463,6 +463,7 @@ function errMsg(e){
     [/code_expired/, ["등록 기간이 끝난 코드입니다", "This code has expired"]],
     [/code_sold_out/, ["선착순 수량이 모두 소진되었습니다", "This code has run out"]],
     [/code_already_used/, ["이미 사용(등록)한 코드입니다", "You already used this code"]],
+    [/print_jobs|print_station/, ["가게에서 49단계 SQL 설치가 필요해요 (인쇄 스테이션)", "Run SQL step 49 first (print station)"]],
     [/coupon_code_member/, ["회원은 쿠폰 코드를 등록한 뒤 쿠폰함에서 골라 써주세요", "Members: add the code first, then pick it from your coupons"]],
     [/check_coupon_code|coupon_code.*(function|column)/i, ["가게에서 48단계 설치가 필요해요 (비회원 쿠폰 코드)", "Guest coupon codes are not set up yet"]],
     [/closing_time/, ["오전 7:50~8:00은 마감 정산 시간이라 주문을 받지 않아요. 8시부터 다시 주문할 수 있어요", "Orders pause 7:50–8:00 AM for daily closing. Please order again from 8:00 AM"]],
@@ -612,6 +613,21 @@ function makeSupabaseApi(){
     async setSoldOut(itemId, soldOut){
       unwrap(await sb.from("menu_status").upsert({ item_id: itemId, sold_out: soldOut, updated_at: new Date().toISOString() }));
     },
+    /* ---- 📡 인쇄 스테이션 (49단계) ---- */
+    async printJobAdd(order, copies, label){
+      unwrap(await sb.from("print_jobs").insert({ order_id: order && order.id && /^[0-9a-f-]{36}$/i.test(order.id) ? order.id : null, label: label || null, payload: order, copies: copies ?? "auto" }));
+    },
+    async printJobsPending(){
+      return unwrap(await sb.from("print_jobs").select("*").is("printed_at", null).gte("created_at", new Date(Date.now() - 6 * 3600e3).toISOString()).order("created_at").limit(30)) || [];
+    },
+    async printJobsRecent(){ return unwrap(await sb.from("print_jobs").select("id,label,created_at,printed_at,error,tries").order("created_at", { ascending:false }).limit(15)) || []; },
+    async printJobDone(id, error, tries){
+      unwrap(await sb.from("print_jobs").update(error ? { error: String(error).slice(0, 300), tries: (tries || 0) + 1 } : { printed_at: new Date().toISOString(), error: null }).eq("id", id));
+    },
+    async printJobsCleanup(){ await sb.from("print_jobs").delete().lt("created_at", new Date(Date.now() - 3 * 864e5).toISOString()); },
+    async printStationPing(info){ unwrap(await sb.from("print_station").upsert({ id: 1, last_seen: new Date().toISOString(), info: info || null })); },
+    async printStationStatus(){ const r = await sb.from("print_station").select("*").eq("id", 1).maybeSingle(); if(r.error) throw r.error; return r.data; },
+    onPrintJobs(cb){ sb.channel("print_jobs").on("postgres_changes", { event:"INSERT", schema:"public", table:"print_jobs" }, p => cb(p)).subscribe(); },
     onOrdersChange(cb){
       sb.channel("orders_admin").on("postgres_changes", { event:"*", schema:"public", table:"orders" }, p => cb(p)).subscribe();
     },
@@ -1089,6 +1105,14 @@ function makeDemoApi(){
       if(k.total_limit != null && k.claimed_count >= k.total_limit) throw new Error("code_sold_out");
       return { ...k, source:"code", min_order:k.min_order || 0 };
     },
+    async printJobAdd(order, copies, label){ const q = ls.get("paltong_demo_print_jobs", []); q.push({ id: "pj" + Date.now() + Math.random().toString(36).slice(2, 6), label, payload: order, copies: copies ?? "auto", created_at: new Date().toISOString(), printed_at: null, tries: 0 }); ls.set("paltong_demo_print_jobs", q.slice(-50)); },
+    async printJobsPending(){ return ls.get("paltong_demo_print_jobs", []).filter(j => !j.printed_at); },
+    async printJobsRecent(){ return ls.get("paltong_demo_print_jobs", []).slice(-15).reverse(); },
+    async printJobDone(id, error, tries){ const q = ls.get("paltong_demo_print_jobs", []); const j = q.find(x => x.id === id); if(j){ if(error){ j.error = String(error); j.tries = (tries || 0) + 1; } else { j.printed_at = new Date().toISOString(); j.error = null; } } ls.set("paltong_demo_print_jobs", q); },
+    async printJobsCleanup(){},
+    async printStationPing(info){ ls.set("paltong_demo_station", { id: 1, last_seen: new Date().toISOString(), info }); },
+    async printStationStatus(){ return ls.get("paltong_demo_station", null); },
+    onPrintJobs(cb){ window.addEventListener("storage", e => { if(e.key && e.key.includes("paltong_demo_print_jobs")) cb({}); }); },
     async claimCoupon(code){
       const id = me(); if(!id || !MB()[id]) throw new Error("login_required");
       const codes = CD(); const k = codes.find(x => x.code === String(code).trim().toUpperCase());
