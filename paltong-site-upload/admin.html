@@ -3178,7 +3178,7 @@ async function dkInboxModal(){
         <li>${L("<b>＋ 매크로 추가</b> → 트리거: <b>기기 이벤트 → 알림 → 알림 수신</b> → 앱 선택: <b>DK 사장님 앱</b> → 모든 내용", "<b>＋ Add macro</b> → Trigger: <b>Notification received</b> → app: <b>the DK app</b> → any content")}</li>
         <li>${L("동작: <b>연결 → HTTP 요청</b> → 방식 <b>POST</b> → 아래 주소 붙여넣기", "Action: <b>Connectivity → HTTP Request</b> → method <b>POST</b> → paste this URL")}<br>
           <input readonly value="${esc(url)}" style="width:100%;font-size:12px;padding:6px;margin:4px 0" id="dkUrl"> <button class="chip" id="dkCopy">📋 ${L("주소 복사", "Copy URL")}</button></li>
-        <li>${L("본문(Body) 내용 유형 <b>text/plain</b> → 본문에 아래 두 줄 (매직 텍스트 버튼으로 넣기)", "Body content type <b>text/plain</b> → body (use the magic-text button)")}<br><code>[notification_title]<br>[notification]</code></li>
+        <li>${L("본문(Body) 내용 유형 <b>text/plain</b> → 본문에 아래 두 줄 (매직 텍스트 버튼으로 넣기)", "Body content type <b>text/plain</b> → body (use the magic-text button)")}<br><code>{not_title}<br>{notification}</code></li>
         <li>${L("매크로 이름 'DK → 빨통' 저장 → DK 테스트 주문이나 알림이 오면 이 창에 떠요", "Save as 'DK → PAL TONG' → a DK notification will appear in this window")}</li>
       </ol>
       <div class="btn-row"><button class="ghost-btn sm" id="dkTest">🧪 ${L("테스트 알림 보내기", "Send a test")}</button><button class="ghost-btn sm" id="dkRotate">🔑 ${L("새 키 만들기", "New key")}</button></div>
