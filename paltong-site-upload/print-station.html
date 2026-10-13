@@ -40,58 +40,56 @@
 </head>
 <body>
 <div class="wrap">
-  <div class="ps-head"><h1>📡 빨통 인쇄 스테이션</h1><button class="pill" id="outBtn" hidden>로그아웃</button></div>
+  <div class="ps-head"><h1>📡 <span data-t="빨통 인쇄 스테이션|PAL TONG Print Station"></span></h1>
+    <span><button class="pill" id="langBtn">🌐 EN</button> <button class="pill" id="outBtn" hidden data-t="로그아웃|Log out"></button></span></div>
 
   <!-- 로그인 -->
   <div class="card" id="loginView" hidden>
-    <h4>관리자 로그인</h4>
-    <p class="hint" style="margin-top:0">관리자 화면과 같은 아이디·비밀번호로 로그인하세요. 이 폰은 계속 로그인된 채로 있어요.</p>
-    <div class="field"><label>아이디</label><input id="lEmail" placeholder="Admin" autocapitalize="none"></div>
-    <div class="field"><label>비밀번호</label><input id="lPw" type="password"></div>
-    <button class="primary-btn" id="lBtn">로그인</button>
+    <h4 data-t="관리자 로그인|Admin sign-in"></h4>
+    <p class="hint" style="margin-top:0" data-t="관리자 화면과 같은 아이디·비밀번호로 로그인하세요. 이 폰은 계속 로그인된 채로 있어요.|Use the same ID and password as the admin page. This phone stays signed in."></p>
+    <div class="field"><label data-t="아이디|ID"></label><input id="lEmail" placeholder="Admin" autocapitalize="none"></div>
+    <div class="field"><label data-t="비밀번호|Password"></label><input id="lPw" type="password"></div>
+    <button class="primary-btn" id="lBtn" data-t="로그인|Sign in"></button>
   </div>
 
   <div id="appView" hidden>
-    <div class="big idle" id="state"><b>시작하는 중…</b><small></small></div>
+    <div class="big idle" id="state"><b>…</b><small></small></div>
 
     <div class="card" id="queueCard" hidden>
-      <h4>📋 인쇄 대기 <span class="en" id="qCount"></span></h4>
+      <h4><span data-t="📋 인쇄 대기|📋 Waiting to print"></span> <span class="en" id="qCount"></span></h4>
       <ul class="jobs" id="queue"></ul>
-      <p class="hint" style="margin:6px 0 0">아이패드에서 🖨 누른 주문이 여기 쌓여요. <b>🖨 인쇄</b>를 누르면 RawBT로 바로 나가요.</p>
+      <p class="hint" style="margin:6px 0 0" data-t="아이패드에서 🖨 누른 주문이 여기 쌓여요. <b>🖨 인쇄</b>를 누르면 RawBT로 바로 나가요.|Orders sent from the iPad 🖨 appear here. Tap <b>🖨 Print</b> to send them to RawBT."></p>
     </div>
 
     <div class="card">
-      <h4>프린터로 보내는 방법</h4>
+      <h4 data-t="프린터로 보내는 방법|How to send to the printer"></h4>
       <div class="opt-choices" id="modes">
-        <button class="opt-choice" data-m="tap">📋 목록에서 눌러서 인쇄 (RawBT 앱) — 추천</button>
-        <button class="opt-choice" data-m="ws">⚡ 자동 인쇄 (Server for RawBT)</button>
+        <button class="opt-choice" data-m="tap" data-t="📋 목록에서 눌러서 인쇄 (RawBT 앱) — 추천|📋 Tap to print from the list (RawBT app) — recommended"></button>
+        <button class="opt-choice" data-m="ws" data-t="⚡ 자동 인쇄 (Server for RawBT)|⚡ Auto print (Server for RawBT)"></button>
       </div>
-      <div class="opt-group" style="margin-top:10px"><div class="opt-title">인쇄할 장 (관리자 화면 설정이 우선)</div>
+      <div class="opt-group" style="margin-top:10px"><div class="opt-title" data-t="인쇄할 장|Slips to print"></div>
         <div class="opt-choices" id="psets"></div></div>
       <div class="row" style="margin-top:10px">
-        <button class="primary-btn green" id="testBtn">테스트 인쇄</button>
-        <button class="primary-btn" id="retryBtn" style="background:#555">밀린 인쇄 다시</button>
+        <button class="primary-btn green" id="testBtn" data-t="테스트 인쇄|Test print"></button>
+        <button class="primary-btn" id="retryBtn" style="background:#555" data-t="밀린 인쇄 다시|Retry waiting"></button>
       </div>
       <p class="hint" id="msg" style="margin:8px 0 0"></p>
     </div>
 
     <div class="card">
-      <h4>최근 인쇄</h4>
-      <ul class="jobs" id="jobs"><li class="hint">아직 없어요</li></ul>
+      <h4 data-t="최근 인쇄|Recent prints"></h4>
+      <ul class="jobs" id="jobs"></ul>
     </div>
 
     <details class="card" id="guide">
-      <summary><b>처음 설정 방법 (한 번만)</b></summary>
+      <summary><b data-t="처음 설정 방법 (한 번만)|First-time setup (once)"></b></summary>
       <ol class="ps-steps">
-        <li>와이파이 프린터를 가게 와이파이에 연결하고, 프린터 <b>IP 주소</b>를 확인해요 (전원 켤 때 나오는 자가 테스트 종이, 또는 FEED 버튼 길게 누르기 → 종이에 적힌 IP, 예: 192.168.1.87)</li>
-        <li>이 안드로이드폰도 <b>같은 와이파이</b>에 연결해요</li>
-        <li>Play 스토어에서 <b>RawBT</b>(ESC/POS thermal printer driver)와 <b>Server for RawBT</b> 앱을 설치해요</li>
-        <li>RawBT 앱 → 설정 → 연결 방식 <b>네트워크(LAN/Wi‑Fi)</b> → 프린터 IP 입력, 포트 <b>9100</b> → RawBT 안에서 테스트 인쇄가 나오는지 확인</li>
-        <li><b>Server for RawBT</b> 앱을 열고 켜두기 (배터리 최적화 '제외'로 설정하면 꺼지지 않아요)</li>
-        <li>(자동을 쓰려면) 이 화면에서 <b>⚡ 자동 인쇄</b>를 고르고 '테스트 인쇄' → 영수증이 나오면 끝!<br>
-          <small class="hint">"로컬 네트워크 기기 접근" 허용 창이 뜨면 <b>허용</b>을 눌러주세요</small></li>
-        <li>자동이 안 되면 <b>📋 목록에서 눌러서 인쇄</b>를 고르세요. 아이패드에서 🖨 누른 주문이 목록에 뜨고(띵동 소리), <b>🖨 인쇄</b>를 누르면 나와요</li>
-        <li>이 폰은 <b>충전기에 꽂고 이 화면을 켜둔 채</b> 두세요. 아이패드 관리자 화면 🖨 프린터 설정에서 <b>📡 와이파이 프린터 (인쇄 스테이션)</b>을 고르면 연결 끝</li>
+        <li data-t="와이파이 프린터를 가게 와이파이에 연결하고, 프린터 <b>IP 주소</b>를 확인해요 (FEED 버튼을 누른 채 전원을 켜면 나오는 설정 종이의 IPADDR)|Connect the printer to the shop Wi-Fi and check its <b>IP address</b> (hold FEED while powering on → IPADDR on the slip)"></li>
+        <li data-t="이 안드로이드폰도 <b>같은 와이파이</b>에 연결해요|Connect this Android phone to the <b>same Wi-Fi</b>"></li>
+        <li data-t="Play 스토어에서 <b>RawBT</b> 앱을 설치하고 → 연결 방식 <b>WiFi or Ethernet</b> → 프린터 IP, 포트 <b>9100</b> → RawBT 안에서 테스트 인쇄|Install <b>RawBT</b> from Play Store → <b>WiFi or Ethernet</b> → printer IP, port <b>9100</b> → test print inside RawBT"></li>
+        <li data-t="이 화면에서 <b>📋 목록에서 눌러서 인쇄</b>를 고르고 '테스트 인쇄' → 처음 한 번 'RawBT로 열기 · 항상'을 눌러요|Choose <b>📋 Tap to print</b> here and press 'Test print' → the first time, choose 'Open with RawBT · Always'"></li>
+        <li data-t="(자동 인쇄를 쓰려면) <b>Server for RawBT</b> 앱도 설치해 켜두고 <b>⚡ 자동 인쇄</b>를 골라요|(For auto print) also install and run <b>Server for RawBT</b>, then choose <b>⚡ Auto print</b>"></li>
+        <li data-t="이 폰은 <b>충전기에 꽂고 이 화면을 켜둔 채</b> 두세요. 아이패드 관리자 🖨 프린터 설정에서 <b>📡 와이파이 프린터 (인쇄 스테이션)</b>을 고르면 끝|Keep this phone <b>on the charger with this screen open</b>. On the iPad admin 🖨 Printer settings choose <b>📡 Wi-Fi printer (print station)</b>"></li>
       </ol>
     </details>
   </div>
@@ -105,12 +103,24 @@
 <script>
 const { api, ls, toast, esc } = PT;
 const $ = id => document.getElementById(id);
-let mode = ls.get("paltong_station_mode", "tap");   // tap = 목록에서 눌러서 인쇄, ws = 자동
-let recent = [];
-let busy = false, tapQueue = [], lastOk = null, lastErr = "", wake = null;
+let lang = ls.get("paltong_station_lang", "ko");
+const T = (ko, en) => lang === "en" ? en : ko;
+let mode = ls.get("paltong_station_mode", "tap");          // tap = 목록에서 눌러서 인쇄, ws = 자동
+let stSet = ls.get("paltong_station_set", "ksc");          // follow = 아이패드 설정대로, 그 외 = 이 스테이션 설정
+let recent = [], busy = false, tapQueue = [], lastOk = null, lastErr = "", wake = null;
+
+/* ---------- 한/영 ---------- */
+function applyLang(){
+  document.documentElement.lang = lang;
+  document.querySelectorAll("[data-t]").forEach(el => { const [ko, en] = el.dataset.t.split("|"); el.innerHTML = lang === "en" ? en : ko; });
+  $("langBtn").textContent = lang === "en" ? "🌐 한국어" : "🌐 EN";
+  document.title = T("빨통 인쇄 스테이션", "PAL TONG Print Station");
+}
+$("langBtn").onclick = () => { lang = lang === "en" ? "ko" : "en"; ls.set("paltong_station_lang", lang); applyLang(); if(!$("appView").hidden){ paintModes(); paintState(); paintJobs(); } };
 
 /* ---------- 로그인 ---------- */
 async function boot(){
+  applyLang();
   if(await api.hasSession()) return start();
   $("loginView").hidden = false;
 }
@@ -118,40 +128,71 @@ $("lBtn").onclick = async () => {
   $("lBtn").disabled = true;
   const id = $("lEmail").value.trim(), email = id.includes("@") ? id : `${id.toLowerCase()}@paltong.app`;
   try{ await api.signIn(email, $("lPw").value); $("loginView").hidden = true; start(); }
-  catch(e){ toast("로그인 실패: " + (e.message || e), 4000); }
+  catch(e){ toast(T("로그인 실패: ", "Sign-in failed: ") + (e.message || e), 4000); }
   $("lBtn").disabled = false;
 };
 $("lPw").addEventListener("keydown", e => { if(e.key === "Enter") $("lBtn").click(); });
 $("outBtn").onclick = async () => { await api.signOut(); location.reload(); };
 
+/* ---------- 인쇄할 장 (이 스테이션 설정이 아이패드 설정보다 우선) ---------- */
+function kindsFor(set, o){
+  if(set === "c") return ["customer"];
+  if(set === "k") return ["kitchen"];
+  if(set === "ksc") return ["kitchen", "staff", "customer"];
+  const k = ["kitchen", "customer"];
+  if(set === "kcr" && !PT.isDine(o) && o.order_type !== "pickup") k.push("rider");
+  return k;
+}
+function copiesFor(job){
+  if(stSet !== "follow" && job.payload) return kindsFor(stSet, job.payload);
+  const c = job.copies; return Array.isArray(c) || typeof c === "number" ? c : kindsFor(ls.get("paltong_print_set", "kc"), job.payload || {});
+}
+
 /* ---------- 화면 ---------- */
 function paintModes(){
   document.querySelectorAll("[data-m]").forEach(b => b.classList.toggle("sel", b.dataset.m === mode));
-  const cur = ls.get("paltong_print_set", "kc");
-  $("psets").innerHTML = Object.entries(PT.PRINT_SETS).map(([k, v]) => `<button class="opt-choice ${k === cur ? "sel" : ""}" data-ps="${k}">${v}</button>`).join("");
-  $("psets").querySelectorAll("[data-ps]").forEach(b => b.onclick = () => { ls.set("paltong_print_set", b.dataset.ps); paintModes(); });
+  const sets = [["follow", "아이패드 설정대로", "Same as iPad"]].concat(Object.keys(PT.PRINT_SETS).map(k => [k, PT.PRINT_SETS[k], (PT.PRINT_SETS_EN || {})[k] || PT.PRINT_SETS[k]]));
+  $("psets").innerHTML = sets.map(([k, ko, en]) => `<button class="opt-choice ${k === stSet ? "sel" : ""}" data-ps="${k}">${esc(T(ko, en))}</button>`).join("");
+  $("psets").querySelectorAll("[data-ps]").forEach(b => b.onclick = () => { stSet = b.dataset.ps; ls.set("paltong_station_set", stSet); paintModes(); });
 }
-document.querySelectorAll("[data-m]").forEach(b => b.onclick = () => { mode = b.dataset.m; ls.set("paltong_station_mode", mode); paintModes(); paintState(); ping(); if(mode === "ws") pump(); });
-function ago(t){ const s = Math.round((Date.now() - new Date(t)) / 1000); return s < 60 ? `${s}초 전` : s < 3600 ? `${Math.round(s / 60)}분 전` : `${Math.round(s / 3600)}시간 전`; }
+document.querySelectorAll("[data-m]").forEach(b => b.onclick = () => { mode = b.dataset.m; ls.set("paltong_station_mode", mode); paintModes(); paintState(); ping(); pump(); });
+function ago(t){ const s = Math.max(0, Math.round((Date.now() - new Date(t)) / 1000)); return s < 60 ? T(`${s}초 전`, `${s}s ago`) : s < 3600 ? T(`${Math.round(s / 60)}분 전`, `${Math.round(s / 60)} min ago`) : T(`${Math.round(s / 3600)}시간 전`, `${Math.round(s / 3600)} h ago`); }
 function paintState(){
   const el = $("state");
   if(mode === "tap" && tapQueue.length){
-    el.className = "big warn"; el.innerHTML = `<b>🖨 인쇄 ${tapQueue.length}건 대기</b><small>아래 목록에서 🖨 인쇄를 눌러주세요</small>`;
+    el.className = "big warn"; el.innerHTML = `<b>${T(`🖨 인쇄 ${tapQueue.length}건 대기`, `🖨 ${tapQueue.length} waiting to print`)}</b><small>${T("아래 목록에서 🖨 인쇄를 눌러주세요", "Tap 🖨 Print in the list below")}</small>`;
   } else if(lastErr){
-    el.className = "big warn"; el.innerHTML = `<b>⚠ 인쇄가 안 돼요</b><small>${esc(lastErr)}<br>프린터 전원·와이파이, Server for RawBT 앱이 켜져 있는지 확인 → '밀린 인쇄 다시'</small>`;
+    el.className = "big warn"; el.innerHTML = `<b>${T("⚠ 인쇄가 안 돼요", "⚠ Printing failed")}</b><small>${esc(lastErr)}<br>${T("프린터 전원·와이파이, RawBT 앱을 확인 → '밀린 인쇄 다시'", "Check printer power / Wi-Fi and RawBT → 'Retry waiting'")}</small>`;
   } else {
-    el.className = "big"; el.innerHTML = `<b>🟢 인쇄 대기 중</b><small>${mode === "ws" ? "아이패드에서 🖨 인쇄를 누르면 바로 나와요" : "아이패드에서 🖨 누르면 아래 목록에 떠요 → 🖨 인쇄"}${lastOk ? `<br>마지막 인쇄: ${ago(lastOk)}` : ""}${wake ? "" : "<br>⚠ 화면 꺼짐 방지가 꺼져 있어요 — 화면을 한 번 눌러주세요"}</small>`;
+    el.className = "big"; el.innerHTML = `<b>${T("🟢 인쇄 대기 중", "🟢 Ready")}</b><small>${mode === "ws" ? T("아이패드에서 🖨 인쇄를 누르면 바로 나와요", "Prints right away when the iPad presses 🖨") : T("아이패드에서 🖨 누르면 아래 목록에 떠요 → 🖨 인쇄", "iPad 🖨 → appears in the list below → 🖨 Print")}${lastOk ? `<br>${T("마지막 인쇄", "Last print")}: ${ago(lastOk)}` : ""}${wake ? "" : `<br>${T("⚠ 화면 꺼짐 방지가 꺼져 있어요 — 화면을 한 번 눌러주세요", "⚠ Screen may sleep — tap the screen once")}`}</small>`;
   }
   paintQueue();
 }
-const itemsText = p => ((p && p.items) || []).filter(l => !l.svc || l.couponFree).map(l => `${l.name || l.en} ×${l.qty}`).join(", ");
+const itemsText = p => ((p && p.items) || []).filter(l => !l.svc || l.couponFree).map(l => `${lang === "en" ? (l.en || l.name) : (l.name || l.en)} ×${l.qty}`).join(", ");
+const nSlips = j => { const c = copiesFor(j); return Array.isArray(c) ? c.length : c; };
 function paintQueue(){
   $("queueCard").hidden = mode !== "tap";
   if(mode !== "tap") return;
-  $("qCount").textContent = tapQueue.length ? tapQueue.length + "건" : "";
-  $("queue").innerHTML = tapQueue.length ? tapQueue.map(j => `<li><span class="who"><b>${esc(j.label || "주문")}</b><small>${esc(itemsText(j.payload))} · ${ago(j.created_at)}</small></span>
-      <button class="qbtn" data-print="${esc(j.id)}">🖨 인쇄</button></li>`).join("") : `<li class="hint">대기 중인 인쇄가 없어요</li>`;
+  $("qCount").textContent = tapQueue.length ? T(`${tapQueue.length}건`, `${tapQueue.length}`) : "";
+  $("queue").innerHTML = tapQueue.length ? tapQueue.map(j => `<li><span class="who"><b>${esc(j.label || T("주문", "Order"))}</b><small>${esc(itemsText(j.payload))} · ${T(`${nSlips(j)}장`, `${nSlips(j)} slips`)} · ${ago(j.created_at)}</small></span>
+      <button class="qbtn" data-print="${esc(j.id)}">${T("🖨 인쇄", "🖨 Print")}</button></li>`).join("") : `<li class="hint">${T("대기 중인 인쇄가 없어요", "Nothing waiting")}</li>`;
   $("queue").querySelectorAll("[data-print]").forEach(b => b.onclick = () => printById(b.dataset.print, tapQueue));
+}
+async function paintJobs(){
+  try{
+    const list = await api.printJobsRecent();
+    recent = list;
+    $("jobs").innerHTML = list.length ? list.map(j => `<li><span class="who">${esc(j.label || T("주문", "Order"))}<small>${esc(itemsText(j.payload))}</small></span>
+      <span class="t">${j.printed_at ? `<span class="ok">${T("✔ 인쇄됨", "✔ Printed")}</span>` : j.error ? `<span class="bad">${T(`✖ 실패 ${j.tries}회`, `✖ Failed ×${j.tries}`)}</span>` : T("대기", "Waiting")} · ${ago(j.created_at)}</span>
+      ${j.payload ? `<button class="qbtn sm" data-reprint="${esc(j.id)}">${T("다시", "Again")}</button>` : ""}</li>`).join("") : `<li class="hint">${T("아직 없어요", "None yet")}</li>`;
+    $("jobs").querySelectorAll("[data-reprint]").forEach(b => b.onclick = () => mode === "tap" ? printById(b.dataset.reprint, recent) : reprintWs(b.dataset.reprint));
+  }catch(e){ $("jobs").innerHTML = `<li class="bad">${esc(PT.errMsg(e))}</li>`; }
+}
+
+/* ---------- 인쇄 ---------- */
+async function bytesFor(job){
+  await (document.fonts && document.fonts.ready);
+  return PTPrinter.buildJob([job.payload], copiesFor(job));
 }
 /* 👆 눌러서 인쇄: 버튼을 누른 순간 RawBT 앱으로 넘김 (누르지 않고 자동으로 여는 건 Chrome이 막음) */
 async function printById(id, list){
@@ -165,6 +206,11 @@ async function printById(id, list){
   }catch(e){ toast(PT.errMsg(e), 4000); }
   paintState(); setTimeout(paintJobs, 800);
 }
+async function reprintWs(id){
+  const j = recent.find(x => x.id === id); if(!j) return;
+  try{ await PTPrinter.rawbtWsSend(await bytesFor(j)); toast(T("다시 인쇄했어요", "Printed again"), 2500); }
+  catch(e){ toast(e.message || String(e), 4500); }
+}
 let seen = null;
 function alertNew(jobs){
   const ids = jobs.map(j => j.id);
@@ -175,29 +221,12 @@ function alertNew(jobs){
   }
   seen = new Set(ids);
 }
-async function paintJobs(){
-  try{
-    const list = await api.printJobsRecent();
-    recent = list;
-    $("jobs").innerHTML = list.length ? list.map(j => `<li><span class="who">${esc(j.label || "주문")}<small>${esc(itemsText(j.payload))}</small></span>
-      <span class="t">${j.printed_at ? `<span class="ok">✔ 인쇄됨</span>` : j.error ? `<span class="bad">✖ 실패 ${j.tries}회</span>` : "대기"} · ${ago(j.created_at)}</span>
-      ${j.payload ? `<button class="qbtn sm" data-reprint="${esc(j.id)}">다시</button>` : ""}</li>`).join("") : `<li class="hint">아직 없어요</li>`;
-    $("jobs").querySelectorAll("[data-reprint]").forEach(b => b.onclick = () => mode === "tap" ? printById(b.dataset.reprint, recent) : reprintWs(b.dataset.reprint));
-  }catch(e){ $("jobs").innerHTML = `<li class="bad">${esc(PT.errMsg(e))}</li>`; }
-}
-
-/* ---------- 인쇄 ---------- */
-async function bytesFor(job){
-  await (document.fonts && document.fonts.ready);
-  const c = job.copies, copies = Array.isArray(c) || typeof c === "number" ? c : undefined;
-  return PTPrinter.buildJob([job.payload], copies);
-}
 async function pump(force){
   if(busy) return; busy = true;
   try{
     const jobs = await api.printJobsPending();
     alertNew(jobs);
-    if(mode === "tap"){ tapQueue = jobs; paintState(); return; }
+    if(mode === "tap"){ tapQueue = jobs; return; }
     for(const j of jobs){
       if(!force && j.tries >= 3) continue;                       // 3번 실패한 건 '밀린 인쇄 다시'를 눌러야 다시 시도
       try{
@@ -213,27 +242,22 @@ async function pump(force){
   }catch(e){ lastErr = PT.errMsg(e); }
   finally{ busy = false; paintState(); paintJobs(); }
 }
-async function reprintWs(id){
-  const j = recent.find(x => x.id === id); if(!j) return;
-  try{ await PTPrinter.rawbtWsSend(await bytesFor(j)); toast("다시 인쇄했어요", 2500); }
-  catch(e){ toast(e.message || String(e), 4500); }
-}
 $("retryBtn").onclick = () => { lastErr = ""; pump(true); };
 $("testBtn").onclick = async () => {
   const sample = { order_no: 0, created_at: new Date().toISOString(), status:"confirmed", payment:"cash",
     items:[{ id:"test", name:"테스트 인쇄", en:"Test print", opts:[], unitPrice:100, qty:1 }], subtotal:100, delivery_fee:0, total:100,
     cust_name:"인쇄 스테이션 Test", cust_phone:"0917 000 0000", cust_addr:"PAL TONG", memo:"📡 인쇄 스테이션 테스트 / Print station test" };
-  $("msg").textContent = "보내는 중…";
+  $("msg").textContent = T("보내는 중…", "Sending…");
   try{
     const b = await bytesFor({ payload: sample, copies: 1 });
-    if(mode === "tap"){ PTPrinter.rawbtSend(b); $("msg").textContent = "RawBT로 보냈어요. 영수증이 나왔는지 확인하세요."; }
-    else { await PTPrinter.rawbtWsSend(b); lastErr = ""; $("msg").textContent = "✔ RawBT가 인쇄 완료라고 알려왔어요. 영수증을 확인하세요."; }
-  }catch(e){ $("msg").textContent = "✖ " + (e.message || e) + " — 설정 방법 4·5번을 확인하거나 👆 RawBT 앱 방식을 써보세요."; }
+    if(mode === "tap"){ PTPrinter.rawbtSend(b); $("msg").textContent = T("RawBT로 보냈어요. 영수증이 나왔는지 확인하세요.", "Sent to RawBT. Check the printer."); }
+    else { await PTPrinter.rawbtWsSend(b); lastErr = ""; $("msg").textContent = T("✔ RawBT가 인쇄 완료라고 알려왔어요.", "✔ RawBT reported the print is done."); }
+  }catch(e){ $("msg").textContent = "✖ " + (e.message || e) + T(" — 📋 목록에서 눌러서 인쇄 방식을 써보세요.", " — try 📋 Tap to print."); }
   paintState();
 };
 
 /* ---------- 살아 있음 알림 · 화면 켜두기 ---------- */
-async function ping(){ try{ await api.printStationPing(mode === "ws" ? "자동" : "눌러서 인쇄"); }catch(e){ lastErr = PT.errMsg(e); paintState(); } }
+async function ping(){ try{ await api.printStationPing(mode === "ws" ? T("자동", "auto") : T("눌러서 인쇄", "tap to print")); }catch(e){ lastErr = PT.errMsg(e); paintState(); } }
 async function keepAwake(){
   try{ if("wakeLock" in navigator && !wake){ wake = await navigator.wakeLock.request("screen"); wake.addEventListener("release", () => { wake = null; paintState(); }); } }catch(e){}
   paintState();
@@ -243,7 +267,7 @@ document.addEventListener("click", keepAwake);
 
 function start(){
   $("appView").hidden = false; $("outBtn").hidden = false;
-  if(ls.get("paltong_station_setup_done", false)) $("guide").open = false; else $("guide").open = true;
+  $("guide").open = !ls.get("paltong_station_setup_done", false);
   paintModes(); keepAwake(); ping(); pump(); paintJobs();
   api.printJobsCleanup && api.printJobsCleanup().catch(() => {});
   try{ api.onPrintJobs(() => pump()); }catch(e){}

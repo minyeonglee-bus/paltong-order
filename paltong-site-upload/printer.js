@@ -156,7 +156,7 @@ function buildSlips(orders, copies){
   const out = [];
   orders.forEach(o => {
     if(typeof copies === "number"){ for(let i = 0; i < copies; i++) out.push(drawReceipt(o, "")); return; }
-    (Array.isArray(copies) ? copies : PT.printKinds(o)).forEach(k => out.push(k === "kitchen" ? drawReceipt(o, "", true) : drawReceipt(o, k === "rider" ? "배달 RIDER" : PT.isDine(o) ? "HALL / CUSTOMER" : "손님 CUSTOMER")));
+    (Array.isArray(copies) ? copies : PT.printKinds(o)).forEach(k => out.push(k === "kitchen" ? drawReceipt(o, "", true) : drawReceipt(o, PT.KIND_LABEL[k] ? PT.KIND_LABEL[k] : PT.isDine(o) ? "HALL / CUSTOMER" : "손님 CUSTOMER")));
   });
   return out;
 }

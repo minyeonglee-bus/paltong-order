@@ -1247,10 +1247,12 @@ if(DEMO){   // 데모 모드에서는 기사 기능 없음 (실제 Supabase 연�
    ===================================================================== */
 /* 🖨 인쇄할 장 (관리자 '프린터' 설정, 기기마다 저장) — 기본: 주방용 + 손님용 2장 자동
    kc = 주방+손님 · kcr = 주방+손님+배달기사(배달 주문만) · c = 손님용만 · k = 주방용만 */
-const PRINT_SETS = { kc: "주방용 + 손님용 (2장)", kcr: "주방용 + 손님용 + 배달기사용 (배달은 3장)", c: "손님용만 (1장)", k: "주방용만 (1장)" };
+const PRINT_SETS = { kc: "주방용 + 손님용 (2장)", ksc: "주방용 + 직원용 + 손님용 (3장)", kcr: "주방용 + 손님용 + 배달기사용 (배달은 3장)", c: "손님용만 (1장)", k: "주방용만 (1장)" };
+const PRINT_SETS_EN = { kc: "Kitchen + Customer (2)", ksc: "Kitchen + Staff + Customer (3)", kcr: "Kitchen + Customer + Rider (3 for delivery)", c: "Customer only (1)", k: "Kitchen only (1)" };
+const KIND_LABEL = { rider: "배달 RIDER", staff: "직원용 STAFF" };
 function printKinds(o){
   const set = ls.get("paltong_print_set", "kc");
-  const k = set === "c" ? ["customer"] : set === "k" ? ["kitchen"] : ["kitchen", "customer"];
+  const k = set === "c" ? ["customer"] : set === "k" ? ["kitchen"] : set === "ksc" ? ["kitchen", "staff", "customer"] : ["kitchen", "customer"];
   if(set === "kcr" && !isDine(o) && o.order_type !== "pickup") k.push("rider");
   return k;
 }
@@ -1353,7 +1355,7 @@ function receiptDoc(orders, copies = "auto"){
   const custLabel = o => isDine(o) ? "HALL / CUSTOMER" : "손님 CUSTOMER";
   const body = typeof copies === "number"
     ? orders.map(o => Array.from({ length: copies }, () => one(o, "")).join("")).join("")
-    : orders.map(o => printKinds(o).map(k => k === "kitchen" ? kitchenHTML(o) : one(o, k === "rider" ? "배달 RIDER" : custLabel(o))).join("")).join("");
+    : orders.map(o => printKinds(o).map(k => k === "kitchen" ? kitchenHTML(o) : one(o, KIND_LABEL[k] || custLabel(o))).join("")).join("");
   return `<!doctype html><html><head><meta charset="utf-8"><title>Receipt</title><style>
     @page { size: ${W}mm auto; margin: 0; }
     * { box-sizing: border-box; }
@@ -1394,6 +1396,6 @@ function toast(msg, ms = 2200){
   clearTimeout(t._h); t._h = setTimeout(() => t.classList.remove("show"), ms);
 }
 
-window.PT = { PRINT_SETS, printKinds, manilaDay, bizDay, bizStart, DAY_START_HOUR, orderDay, get menuCfgActive(){ return menuCfgActive; }, loadMenuData, exportMenu, priceSig, politeKo, CATS, get menuOv(){ return menuOv; }, applyMenuOverrides, cleanForTranslate, setTranslateKey, googleTranslate, splitKoEn, msgText, schedLabel, menuToEnglish, matchZone, zoneFee, phoneMask, phoneValue, phoneOk, phoneDigits, phoneFmt, englishOnly, EN_NAME, EN_ADDR, hasHangul, stampRewards, stampText, isMemberPhone, normPhone, phoneEmail, prettyPhone, couponDiscount, couponValue, couponFace, couponsFace, couponCond, couponUsable, COUPON_KINDS, couponKind, stackKey, stackMax, couponStackOk, couponsDiscount, bestCoupons, stackRulesText, repriceLine, errMsg, CFG, MENU, ITEM_BY_ID, esc, peso, ls, L, T, setLang, get LANG(){ return LANG; },
+window.PT = { PRINT_SETS, PRINT_SETS_EN, KIND_LABEL, printKinds, manilaDay, bizDay, bizStart, DAY_START_HOUR, orderDay, get menuCfgActive(){ return menuCfgActive; }, loadMenuData, exportMenu, priceSig, politeKo, CATS, get menuOv(){ return menuOv; }, applyMenuOverrides, cleanForTranslate, setTranslateKey, googleTranslate, splitKoEn, msgText, schedLabel, menuToEnglish, matchZone, zoneFee, phoneMask, phoneValue, phoneOk, phoneDigits, phoneFmt, englishOnly, EN_NAME, EN_ADDR, hasHangul, stampRewards, stampText, isMemberPhone, normPhone, phoneEmail, prettyPhone, couponDiscount, couponValue, couponFace, couponsFace, couponCond, couponUsable, COUPON_KINDS, couponKind, stackKey, stackMax, couponStackOk, couponsDiscount, bestCoupons, stackRulesText, repriceLine, errMsg, CFG, MENU, ITEM_BY_ID, esc, peso, ls, L, T, setLang, get LANG(){ return LANG; },
   orderPrefix, orderCode, isDine, inClosingWindow, isSvc, svcValue, riderPhone, riderEmail, STATUS, payInfo, isOnlinePay, lineName, lineOpt, compressImage, api, DEMO, receiptDoc, printReceipt, toast };
 })();
