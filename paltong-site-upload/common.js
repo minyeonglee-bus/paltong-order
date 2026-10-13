@@ -463,6 +463,7 @@ function errMsg(e){
     [/code_expired/, ["등록 기간이 끝난 코드입니다", "This code has expired"]],
     [/code_sold_out/, ["선착순 수량이 모두 소진되었습니다", "This code has run out"]],
     [/code_already_used/, ["이미 사용(등록)한 코드입니다", "You already used this code"]],
+    [/dk_inbox/, ["가게에서 50단계 SQL 설치가 필요해요 (DK 자동 접수)", "Run SQL step 50 first (DK auto inbox)"]],
     [/print_jobs|print_station/, ["가게에서 49단계 SQL 설치가 필요해요 (인쇄 스테이션)", "Run SQL step 49 first (print station)"]],
     [/coupon_code_member/, ["회원은 쿠폰 코드를 등록한 뒤 쿠폰함에서 골라 써주세요", "Members: add the code first, then pick it from your coupons"]],
     [/check_coupon_code|coupon_code.*(function|column)/i, ["가게에서 48단계 설치가 필요해요 (비회원 쿠폰 코드)", "Guest coupon codes are not set up yet"]],
@@ -613,6 +614,11 @@ function makeSupabaseApi(){
     async setSoldOut(itemId, soldOut){
       unwrap(await sb.from("menu_status").upsert({ item_id: itemId, sold_out: soldOut, updated_at: new Date().toISOString() }));
     },
+    /* ---- 📥 DK 자동 접수 (50단계) ---- */
+    async dkInboxList(){ return unwrap(await sb.from("dk_inbox").select("*").eq("status", "new").order("created_at", { ascending:false }).limit(30)) || []; },
+    async dkInboxSet(id, status, orderId){ unwrap(await sb.from("dk_inbox").update({ status, order_id: orderId || null, handled_at: new Date().toISOString() }).eq("id", id)); },
+    async dkInboxKey(rotate){ return unwrap(await sb.rpc("admin_dk_inbox_key", { p_rotate: !!rotate })); },
+    onDkInbox(cb){ sb.channel("dk_inbox").on("postgres_changes", { event:"INSERT", schema:"public", table:"dk_inbox" }, p => cb(p)).subscribe(); },
     /* ---- 📡 인쇄 스테이션 (49단계) ---- */
     async printJobAdd(order, copies, label){
       unwrap(await sb.from("print_jobs").insert({ order_id: order && order.id && /^[0-9a-f-]{36}$/i.test(order.id) ? order.id : null, label: label || null, payload: order, copies: copies ?? "auto" }));
@@ -1105,6 +1111,7 @@ function makeDemoApi(){
       if(k.total_limit != null && k.claimed_count >= k.total_limit) throw new Error("code_sold_out");
       return { ...k, source:"code", min_order:k.min_order || 0 };
     },
+    async dkInboxList(){ return []; }, async dkInboxSet(){}, async dkInboxKey(){ return "demo-key"; }, onDkInbox(){},
     async printJobAdd(order, copies, label){ const q = ls.get("paltong_demo_print_jobs", []); q.push({ id: "pj" + Date.now() + Math.random().toString(36).slice(2, 6), label, payload: order, copies: copies ?? "auto", created_at: new Date().toISOString(), printed_at: null, tries: 0 }); ls.set("paltong_demo_print_jobs", q.slice(-50)); },
     async printJobsPending(){ return ls.get("paltong_demo_print_jobs", []).filter(j => !j.printed_at); },
     async printJobsRecent(){ return ls.get("paltong_demo_print_jobs", []).slice(-15).reverse(); },
