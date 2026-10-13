@@ -160,95 +160,161 @@ function drawNote(note){
   return out;
 }
 
-/* 📊 오늘 마감 요약 (영업일 하루 주문) → 메모 본문 */
-function closingText(orders, day, en){
+/* 📊 마감 종이 — 가게 마감 양식 (S / E / Counting) */
+const DENOMS = [1000, 500, 100, 50, 20, 10, 5, 1];
+const PESO = n => "₱" + Math.round(n || 0).toLocaleString("en-PH");
+const PAY4 = [["cash", "Cash"], ["gcash", "GCash"], ["maya", "Maya"], ["bank", "Metro"]];
+/* 돈 세기: counts = { 1000: 3, 500: 2, ... } → 줄들 (비어 있으면 손으로 적는 칸) */
+function countingLines(counts, en){
+  const c = counts || {}, has = DENOMS.some(d => +c[d] > 0);
+  const L = ["# Counting"];
+  DENOMS.forEach(d => { const n = Math.round(+c[d] || 0); L.push(has ? `₱${d} × ${n} | ${PESO(d * n)}` : `₱${d} × ____ | ₱________`); });
+  L.push(`# = | ${has ? PESO(DENOMS.reduce((s, d) => s + d * Math.round(+c[d] || 0), 0)) : "₱________"}`);
+  return L;
+}
+const countTotal = counts => DENOMS.reduce((s, d) => s + d * Math.round(+(counts || {})[d] || 0), 0);
+/* S = 매출(결제수단별), E = 지출(결제수단별) — 가게 마감 종이와 같은 모양 */
+function cashSalesOf(orders){ return (orders || []).filter(o => o.status === "done" && (!o.payment || o.payment === "cash")).reduce((s, o) => s + (o.total || 0), 0); }
+/* 현금 매출 = 돈 세기(− 시작 거스름돈) 맞는지 */
+function cashCheck(cashSales, counts, float, en){
+  const T = (k, e) => en ? e : k, got = countTotal(counts) - (Math.round(+float || 0));
+  const d = got - cashSales;
+  return { got, d, text: d === 0 ? T("✔ 일치", "✔ Match") : d < 0 ? T(`⚠ ${PESO(-d)} 부족`, `⚠ Short ${PESO(-d)}`) : T(`⚠ ${PESO(d)} 남음`, `⚠ Over ${PESO(d)}`) };
+}
+function closingText(orders, day, en, counts, float){
   const T = (k, e) => en ? e : k;
-  const P = n => "₱" + Math.round(n || 0).toLocaleString("en-PH");
-  const live = (orders || []).filter(o => o.status !== "cancelled"), done = live.filter(o => o.status === "done");
-  const cancelled = (orders || []).length - live.length, open = live.length - done.length;
-  const sum = a => a.reduce((s, o) => s + (o.total || 0), 0);
-  const byPay = {};
-  done.forEach(o => { const k = o.payment || "cash"; byPay[k] = (byPay[k] || 0) + (o.total || 0); });
-  const kind = o => PT.isDine(o) ? T("다이닝", "Dine-in") : o.order_type === "pickup" ? T("픽업", "Pickup") : T("배달", "Delivery");
-  const byKind = {}; done.forEach(o => { const k = kind(o); byKind[k] = byKind[k] || [0, 0]; byKind[k][0]++; byKind[k][1] += o.total || 0; });
-  const fees = done.reduce((s, o) => s + (o.delivery_fee || 0), 0), disc = done.reduce((s, o) => s + (o.discount || 0), 0);
-  const diff = done.filter(o => o.received_diff).reduce((s, o) => s + o.received_diff, 0);
+  const list = orders || [], live = list.filter(o => o.status !== "cancelled"), done = live.filter(o => o.status === "done");
+  const byPay = { cash: 0, gcash: 0, maya: 0, bank: 0 };
+  done.forEach(o => { const k = byPay[o.payment] != null ? o.payment : "cash"; byPay[k] += o.total || 0; });
+  const S = done.reduce((s, o) => s + (o.total || 0), 0);
   const L = [];
-  L.push(`# ${T("완료 매출", "Sales (done)")} | ${P(sum(done))}`);
-  L.push(`${T("완료 주문", "Done orders")} | ${done.length}`);
-  if(open) L.push(`${T("미완료 주문", "Not finished")} | ${open}`);
-  if(cancelled) L.push(`${T("취소", "Cancelled")} | ${cancelled}`);
+  L.push(`# S = Cash+GCash+Maya+Metro`);
+  PAY4.forEach(([k, n]) => L.push(`${n} | ${PESO(byPay[k])}`));
+  L.push(`# S | ${PESO(S)}`);
+  L.push(`${T("완료", "Done")} ${done.length} · ${T("미완료", "Open")} ${live.length - done.length} · ${T("취소", "Cancelled")} ${list.length - live.length}`);
   L.push("---");
-  Object.entries(byPay).forEach(([k, v]) => { const p = PT.payInfo(k); L.push(`${en ? (p.labelEn || p.label) : (k === "cash" ? "현금" : p.label)} | ${P(v)}`); });
+  L.push(`# E = Cash+GCash+Maya+Metro`);
+  PAY4.forEach(([, n]) => L.push(`${n} | ₱________`));
+  L.push(`# E | ₱________`);
   L.push("---");
-  Object.entries(byKind).forEach(([k, v]) => L.push(`${k} ${v[0]}${T("건", "")} | ${P(v[1])}`));
-  if(fees) L.push(`${T("배달비 합계", "Delivery fees")} | ${P(fees)}`);
-  if(disc) L.push(`${T("할인 합계", "Discounts")} | -${P(disc)}`);
-  if(diff) L.push(`${T("받은 금액 차액", "Received diff")} | ${diff > 0 ? "+" : ""}${P(diff)}`);
+  L.push(...countingLines(counts, en));
   L.push("---");
-  L.push(`${T("현금 시재 (실제)", "Cash counted")} | ₱`);
-  L.push(`${T("지출", "Expenses")} | ₱`);
+  L.push(`# ${T("현금 매출 = Counting ?", "Cash sales = Counting ?")}`);
+  L.push(`${T("현금 매출 (시스템)", "Cash sales (system)")} | ${PESO(byPay.cash)}`);
+  if(+float) L.push(`${T("시작 거스름돈", "Starting change")} | -${PESO(float)}`);
+  if(countTotal(counts)){
+    const c = cashCheck(byPay.cash, counts, float, en);
+    L.push(`${T("세기 − 거스름돈", "Counted − change")} | ${PESO(c.got)}`);
+    L.push(`# ${c.text}`);
+  } else L.push(`${T("세기 − 거스름돈", "Counted − change")} | ₱________`, `${T("일치 / 차이", "Match / diff")} | ₱________`);
+  L.push("---");
   L.push(`${T("마감 담당", "Closed by")} |`);
   L.push(`${T("특이사항", "Notes")}:`);
   return L.join("\n");
 }
+function blankClosing(en, counts){
+  const T = (k, e) => en ? e : k, L = [];
+  L.push(`# S = Cash+GCash+Maya+Metro`); PAY4.forEach(([, n]) => L.push(`${n} | ₱________`)); L.push(`# S | ₱________`);
+  L.push("---");
+  L.push(`# E = Cash+GCash+Maya+Metro`); PAY4.forEach(([, n]) => L.push(`${n} | ₱________`)); L.push(`# E | ₱________`);
+  L.push("---");
+  L.push(...countingLines(counts, en));
+  L.push("---");
+  L.push(`${T("마감 담당", "Closed by")} |`); L.push(`${T("특이사항", "Notes")}:`);
+  return L.join("\n");
+}
 
 /* ✏️ 자유 인쇄 편집 창 (관리자 · 인쇄 스테이션 공통)
-   opts = { en, onPrint(note, copies), loadOrders: async () => orders (마감 불러오기용) } */
+   opts = { en, onPrint(note, copies), loadOrders: async day => orders (마감 불러오기용) } */
 function openNoteEditor(opts){
-  const en = !!opts.en, T = (k, e) => en ? e : k;
   const saved = ls.get("paltong_note_draft", null) || {};
+  let en = saved.en != null ? !!saved.en : !!opts.en, size = saved.size || "m", counts = saved.counts || {}, float = saved.float || 0, cashSales = null;
+  if(opts.loadOrders) opts.loadOrders(PT.bizDay(new Date())).then(list => { cashSales = cashSalesOf(list); const f = bg.querySelector("[data-check]"); if(f && f._paint) f._paint(); }).catch(() => {});
   const bg = document.createElement("div");
   bg.style.cssText = "position:fixed;inset:0;z-index:9999;background:rgba(20,12,8,.6);display:flex;align-items:flex-end;justify-content:center";
-  bg.innerHTML = `<div style="background:#fff;width:100%;max-width:520px;max-height:94vh;overflow:auto;border-radius:20px 20px 0 0;padding:16px 16px calc(18px + env(safe-area-inset-bottom));font-family:inherit">
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px"><b style="font-size:18px">✏️ ${T("자유 인쇄 (메모 · 마감)", "Free print (memo · closing)")}</b><button data-x style="border:0;background:none;font-size:22px">✕</button></div>
+  document.body.append(bg);
+  const close = () => bg.remove();
+  bg.onclick = e => { if(e.target === bg) close(); };
+  let title = saved.title || "", body = saved.body || "", copies = 1, msg = "";
+  function render(){
+    const T = (k, e) => en ? e : k;
+    bg.innerHTML = `<div style="background:#fff;width:100%;max-width:520px;max-height:94vh;overflow:auto;border-radius:20px 20px 0 0;padding:16px 16px calc(18px + env(safe-area-inset-bottom));font-family:inherit">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;gap:8px"><b style="font-size:18px">✏️ ${T("자유 인쇄 (메모 · 마감)", "Free print (memo · closing)")}</b>
+      <span style="white-space:nowrap"><button data-lang="ko" class="pill">한국어</button> <button data-lang="en" class="pill">English</button> <button data-x style="border:0;background:none;font-size:22px">✕</button></span></div>
     <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px">
       ${opts.loadOrders ? `<button data-tpl="close" class="pill">📊 ${T("오늘 마감 불러오기", "Load today's closing")}</button>` : ""}
       <button data-tpl="blank" class="pill">🧾 ${T("마감 빈 양식", "Blank closing form")}</button>
       <button data-tpl="clear" class="pill">🗑 ${T("지우기", "Clear")}</button>
     </div>
-    <input data-f="title" placeholder="${T("제목 (예: 마감 / 발주 / 메모)", "Title (e.g. Closing / Order list / Memo)")}" style="width:100%;box-sizing:border-box;font-size:17px;padding:10px;border:1px solid #ddd;border-radius:10px;margin-bottom:8px" value="${PT.esc(saved.title || "")}">
-    <textarea data-f="body" rows="12" placeholder="${T("내용을 적으세요\n\n· '---' 한 줄 = 구분선\n· '# 글자' = 굵고 크게\n· '현금 | ₱5,000' = 왼쪽·오른쪽 정렬", "Type anything\n\n· '---' line = divider\n· '# text' = big bold\n· 'Cash | ₱5,000' = left/right aligned")}" style="width:100%;box-sizing:border-box;font-size:15px;padding:10px;border:1px solid #ddd;border-radius:10px;font-family:inherit">${PT.esc(saved.body || "")}</textarea>
+    <details data-cnt style="border:1px solid #eee;border-radius:12px;padding:8px 10px;margin-bottom:8px" ${saved.cntOpen ? "open" : ""}><summary style="font-weight:700">💵 ${T("돈 세기 (Counting) — 몇 장 / 몇 개", "Counting — how many of each")} <span data-ctot style="color:#d33d2a"></span></summary>
+      <div style="display:grid;grid-template-columns:auto 1fr auto;gap:6px 10px;align-items:center;margin-top:8px">
+        ${DENOMS.map(d => `<b>₱${d}</b><input data-d="${d}" type="number" min="0" inputmode="numeric" placeholder="0" value="${counts[d] || ""}" style="padding:8px;border:1px solid #ddd;border-radius:8px;font-size:16px"><span data-sub="${d}" style="text-align:right;min-width:80px"></span>`).join("")}
+      </div>
+      <div style="display:flex;gap:8px;align-items:center;margin-top:8px"><span style="font-size:13px">${T("시작 거스름돈 (빼기)", "Starting change (minus)")}</span><input data-float type="number" min="0" inputmode="numeric" placeholder="0" value="${float || ""}" style="width:110px;padding:8px;border:1px solid #ddd;border-radius:8px;font-size:16px"></div>
+      <div data-check style="margin-top:8px;padding:10px;border-radius:10px;background:#f6efe6;font-size:14px"></div>
+      <div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap"><button data-cins class="pill">⬇ ${T("본문에 넣기", "Put into the slip")}</button><button data-creset class="pill">${T("0으로", "Reset")}</button></div>
+      <p style="font-size:12px;color:#888;margin:6px 0 0">${T("숫자를 넣으면 금액·합계가 자동 계산돼요. '마감 불러오기'를 누르면 세기 결과와 현금 매출 차이도 같이 나와요.", "Amounts and the total are calculated. 'Load today's closing' also shows the difference from cash sales.")}</p>
+    </details>
+    <input data-f="title" placeholder="${T("제목 (예: 마감 / 발주 / 메모)", "Title (e.g. Closing / Order list / Memo)")}" style="width:100%;box-sizing:border-box;font-size:17px;padding:10px;border:1px solid #ddd;border-radius:10px;margin-bottom:8px" value="${PT.esc(title)}">
+    <textarea data-f="body" rows="12" placeholder="${T("내용을 적으세요\n\n· '---' 한 줄 = 구분선\n· '# 글자' = 굵고 크게\n· '현금 | ₱5,000' = 왼쪽·오른쪽 정렬", "Type anything\n\n· '---' line = divider\n· '# text' = big bold\n· 'Cash | ₱5,000' = left/right aligned")}" style="width:100%;box-sizing:border-box;font-size:15px;padding:10px;border:1px solid #ddd;border-radius:10px;font-family:inherit">${PT.esc(body)}</textarea>
     <div style="display:flex;gap:8px;align-items:center;margin:8px 0;flex-wrap:wrap">
       <span style="font-size:13px;color:#666">${T("글자", "Text")}</span>
       <button data-size="m" class="pill">${T("보통", "Normal")}</button><button data-size="l" class="pill">${T("크게", "Large")}</button>
       <span style="font-size:13px;color:#666;margin-left:8px">${T("장수", "Copies")}</span>
-      <input data-f="copies" type="number" min="1" max="5" value="1" style="width:56px;padding:6px;border:1px solid #ddd;border-radius:8px">
+      <input data-f="copies" type="number" min="1" max="5" value="${copies}" style="width:56px;padding:6px;border:1px solid #ddd;border-radius:8px">
     </div>
     <details style="margin-bottom:8px"><summary style="font-size:13px;color:#666">${T("미리보기", "Preview")}</summary><img data-prev style="width:100%;border:1px solid #ddd;border-radius:8px;margin-top:6px"></details>
     <button data-go style="width:100%;padding:16px;border:0;border-radius:14px;background:#d33d2a;color:#fff;font-size:17px;font-weight:800">🖨 ${T("인쇄", "Print")}</button>
-    <p data-msg style="font-size:13px;color:#666;margin:8px 0 0"></p></div>`;
-  document.body.append(bg);
-  const q = x => bg.querySelector(x), title = q('[data-f="title"]'), body = q('[data-f="body"]');
-  let size = saved.size || "m";
-  const note = () => ({ title: title.value.trim(), body: body.value, size, at: new Date().toISOString() });
-  const save = () => ls.set("paltong_note_draft", { title: title.value, body: body.value, size });
-  const prev = () => { try{ q("[data-prev]").src = drawNote(note()).toDataURL(); }catch(e){} };
-  const paintSize = () => bg.querySelectorAll("[data-size]").forEach(b => { b.classList.toggle("sel", b.dataset.size === size); b.style.fontWeight = b.dataset.size === size ? "800" : ""; });
-  paintSize(); prev();
-  [title, body].forEach(el => el.addEventListener("input", () => { save(); prev(); }));
-  bg.querySelectorAll("[data-size]").forEach(b => b.onclick = () => { size = b.dataset.size; save(); paintSize(); prev(); });
-  const close = () => bg.remove();
-  q("[data-x]").onclick = close; bg.onclick = e => { if(e.target === bg) close(); };
-  bg.querySelectorAll("[data-tpl]").forEach(b => b.onclick = async () => {
-    const t = b.dataset.tpl;
-    if(t === "clear"){ title.value = ""; body.value = ""; }
-    if(t === "blank"){ title.value = T("마감", "CLOSING"); body.value = [T("완료 매출", "Sales"), T("현금", "Cash"), "GCash", "Maya", T("계좌이체", "Bank"), "---", T("현금 시재 (실제)", "Cash counted"), T("지출", "Expenses"), T("마감 담당", "Closed by")].map(x => `${x} | ₱`).join("\n") + `\n---\n${T("특이사항", "Notes")}:`; }
-    if(t === "close"){
-      q("[data-msg]").textContent = T("오늘 주문 불러오는 중…", "Loading today's orders…");
-      try{ const day = PT.bizDay(new Date()); const list = await opts.loadOrders(day);
-        title.value = `${T("마감", "CLOSING")} ${day}`; body.value = closingText(list, day, en); q("[data-msg]").textContent = T("✔ 오늘(영업일) 주문으로 채웠어요. 고칠 곳은 고친 뒤 인쇄하세요.", "✔ Filled from today's orders. Edit if needed, then print."); }
-      catch(e){ q("[data-msg]").textContent = "✖ " + PT.errMsg(e); }
-    }
-    save(); prev();
-  });
-  q("[data-go]").onclick = async () => {
-    const n = note(); if(!n.title && !n.body.trim()){ q("[data-msg]").textContent = T("내용을 적어주세요", "Please type something"); return; }
-    const copies = Math.max(1, Math.min(5, Math.round(+q('[data-f="copies"]').value || 1)));
-    q("[data-go]").disabled = true; q("[data-msg]").textContent = T("보내는 중…", "Sending…");
-    try{ await opts.onPrint(n, copies); q("[data-msg]").textContent = T("✔ 보냈어요", "✔ Sent"); setTimeout(close, 900); }
-    catch(e){ q("[data-msg]").textContent = "✖ " + (e.message || e); q("[data-go]").disabled = false; }
-  };
+    <p data-msg style="font-size:13px;color:#666;margin:8px 0 0">${PT.esc(msg)}</p></div>`;
+    const q = x => bg.querySelector(x), tEl = q('[data-f="title"]'), bEl = q('[data-f="body"]');
+    const save = () => { title = tEl.value; body = bEl.value; copies = Math.max(1, Math.min(5, Math.round(+q('[data-f="copies"]').value || 1))); ls.set("paltong_note_draft", { title, body, size, en, counts, float, cntOpen: q("[data-cnt]").open }); };
+    const note = () => ({ title: tEl.value.trim(), body: bEl.value, size, at: new Date().toISOString() });
+    const prev = () => { try{ q("[data-prev]").src = drawNote(note()).toDataURL(); }catch(e){} };
+    const say = t => { msg = t; q("[data-msg]").textContent = t; };
+    const paintCnt = () => { DENOMS.forEach(d => { const n = Math.round(+counts[d] || 0); q(`[data-sub="${d}"]`).textContent = n ? PESO(d * n) : ""; }); const t = countTotal(counts); q("[data-ctot]").textContent = t ? "= " + PESO(t) : "";
+      const box = q("[data-check]"); box._paint = paintCnt;
+      if(cashSales == null){ box.innerHTML = opts.loadOrders ? T("현금 매출 불러오는 중…", "Loading cash sales…") : ""; box.hidden = !opts.loadOrders; return; }
+      const c = cashCheck(cashSales, counts, float, en), ok = c.d === 0;
+      box.innerHTML = `${T("오늘 현금 매출", "Today's cash sales")} <b>${PESO(cashSales)}</b> · ${T("세기", "Counted")} <b>${PESO(t)}</b>${float ? ` − ${PESO(float)}` : ""}<br>`
+        + (t ? `<b style="font-size:17px;color:${ok ? "#2f8f4e" : "#d33d2a"}">${c.text}</b>` : `<span style="color:#888">${T("위에 장수를 넣으면 맞는지 바로 알려줘요", "Enter counts above to check")}</span>`); };
+    bg.querySelectorAll("[data-lang]").forEach(b => { b.style.fontWeight = (b.dataset.lang === "en") === en ? "800" : ""; b.classList.toggle("sel", (b.dataset.lang === "en") === en); b.onclick = () => { save(); en = b.dataset.lang === "en"; save(); msg = ""; render(); }; });
+    bg.querySelectorAll("[data-size]").forEach(b => { b.classList.toggle("sel", b.dataset.size === size); b.style.fontWeight = b.dataset.size === size ? "800" : ""; b.onclick = () => { size = b.dataset.size; save(); render(); }; });
+    q("[data-x]").onclick = close;
+    [tEl, bEl, q('[data-f="copies"]')].forEach(el => el.addEventListener("input", () => { save(); prev(); }));
+    q("[data-cnt]").addEventListener("toggle", save);
+    bg.querySelectorAll("[data-d]").forEach(inp => inp.addEventListener("input", () => { counts[inp.dataset.d] = Math.max(0, Math.round(+inp.value || 0)); save(); paintCnt(); }));
+    q("[data-creset]").onclick = () => { counts = {}; save(); render(); };
+    q("[data-float]").addEventListener("input", e => { float = Math.max(0, Math.round(+e.target.value || 0)); save(); paintCnt(); });
+    q("[data-cins]").onclick = () => {
+      const block = countingLines(counts, en).join("\n");
+      const cur = bEl.value, re = /# Counting[\s\S]*?\n# = \|[^\n]*/;
+      bEl.value = re.test(cur) ? cur.replace(re, block) : (cur.trim() ? cur.replace(/\s*$/, "\n---\n") : "") + block;
+      if(!tEl.value.trim()) tEl.value = "Counting";
+      save(); prev(); say(T("✔ 본문에 넣었어요", "✔ Added to the slip"));
+    };
+    bg.querySelectorAll("[data-tpl]").forEach(b => b.onclick = async () => {
+      const t = b.dataset.tpl, day = PT.bizDay(new Date());
+      if(t === "clear"){ tEl.value = ""; bEl.value = ""; }
+      if(t === "blank"){ tEl.value = `${T("마감", "CLOSING")} ${day}`; bEl.value = blankClosing(en, counts); }
+      if(t === "close"){
+        say(T("오늘 주문 불러오는 중…", "Loading today's orders…"));
+        try{ const list = await opts.loadOrders(day);
+          cashSales = cashSalesOf(list); tEl.value = `${T("마감", "CLOSING")} ${day}`; bEl.value = closingText(list, day, en, counts, float); paintCnt();
+          say(T("✔ 오늘(영업일) 주문으로 채웠어요. E(지출)는 손으로 적거나 여기서 고친 뒤 인쇄하세요.", "✔ Filled from today's orders. Write E (expenses) by hand or edit here, then print.")); }
+        catch(e){ say("✖ " + PT.errMsg(e)); }
+      }
+      save(); prev();
+    });
+    q("[data-go]").onclick = async () => {
+      save();
+      const n = note(); if(!n.title && !n.body.trim()){ say(T("내용을 적어주세요", "Please type something")); return; }
+      q("[data-go]").disabled = true; say(T("보내는 중…", "Sending…"));
+      try{ await opts.onPrint(n, copies); say(T("✔ 보냈어요", "✔ Sent")); setTimeout(close, 900); }
+      catch(e){ say("✖ " + (e.message || e)); q("[data-go]").disabled = false; }
+    };
+    paintCnt(); prev();
+  }
+  render();
 }
 
 /* ---------- 2) 캔버스 → ESC/POS 래스터 바이트 ---------- */
@@ -458,6 +524,6 @@ async function print(orders, copies){
 }
 function previewCanvas(o){ return drawReceipt(o, ""); }
 
-window.PTPrinter = { openNoteEditor, drawNote, closingText, print, getMode, setMode, isIOS, bleConnect, bleSupported, buildJob, previewCanvas, drawReceipt, canvasToEscPos, rawbtWsSend, rawbtSend, stationSend, buildSlips,
+window.PTPrinter = { openNoteEditor, drawNote, closingText, blankClosing, print, getMode, setMode, isIOS, bleConnect, bleSupported, buildJob, previewCanvas, drawReceipt, canvasToEscPos, rawbtWsSend, rawbtSend, stationSend, buildSlips,
   get bleName(){ return (bleDevice && bleDevice.name) || ls.get("paltong_ble_name", ""); } };
 })();
