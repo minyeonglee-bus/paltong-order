@@ -56,7 +56,7 @@ function drawReceipt(o, copyLabel, kitchen){
   const en = !!kitchen || isDine, B = (ko, e) => en ? e : `${ko} ${e}`;
   const nameEn = l => { const it = ITEM_BY_ID[l.id] || {}; return l.en || it.en || l.name || it.name; };
   const optEn = x => x.en || x.ko;
-  const discEn = lb => String(lb || "Discount").replace("다이닝 할인", "Dine-in discount").replace("매장 할인", "Store discount").replace("가격 조정", "Price adjustment");
+  const discEn = lb => String(lb || "Discount").replace("다이닝 할인", "Dine-in discount").replace("매장 할인", "Store discount").replace("포인트 공제", "Points used").replace("가격 조정", "Price adjustment");
   const kind = isDine ? B("다이닝", "DINE IN") : o.order_type === "pickup" ? B("픽업", "PICKUP") : B("배달", "DELIVERY");
   if(kitchen){   // 🍳 주방용 (영어): 번호 · 메뉴 · 수량 · 옵션 · 요청사항 (가격 없음)
     text("[KITCHEN]", { size:24, bold:true, align:"center" });

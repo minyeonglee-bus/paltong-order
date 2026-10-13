@@ -1258,7 +1258,7 @@ function printKinds(o){
 }
 /* 주방용: 주문번호 · 메뉴 · 수량 · 옵션 · 요청사항 (가격 없음, 큰 글씨) */
 const nameEnOf = l => { const it = ITEM_BY_ID[l.id] || {}; return l.en || it.en || l.name || it.name; };
-const discEnOf = lb => String(lb || "Discount").replace("다이닝 할인", "Dine-in discount").replace("매장 할인", "Store discount").replace("가격 조정", "Price adjustment");
+const discEnOf = lb => String(lb || "Discount").replace("다이닝 할인", "Dine-in discount").replace("매장 할인", "Store discount").replace("포인트 공제", "Points used").replace("가격 조정", "Price adjustment");
 /* 주방용 (영어만): 주문번호 · 메뉴 · 수량 · 옵션 · 요청사항 (가격 없음, 큰 글씨) */
 function kitchenHTML(o){
   const fmt = d => { try{ return new Date(d).toLocaleTimeString("en-PH", { hour:"2-digit", minute:"2-digit", hour12:false }); }catch(e){ return ""; } };
