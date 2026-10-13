@@ -620,7 +620,7 @@ function makeSupabaseApi(){
     async printJobsPending(){
       return unwrap(await sb.from("print_jobs").select("*").is("printed_at", null).gte("created_at", new Date(Date.now() - 6 * 3600e3).toISOString()).order("created_at").limit(30)) || [];
     },
-    async printJobsRecent(){ return unwrap(await sb.from("print_jobs").select("id,label,created_at,printed_at,error,tries").order("created_at", { ascending:false }).limit(15)) || []; },
+    async printJobsRecent(){ return unwrap(await sb.from("print_jobs").select("id,label,created_at,printed_at,error,tries,payload,copies").order("created_at", { ascending:false }).limit(15)) || []; },
     async printJobDone(id, error, tries){
       unwrap(await sb.from("print_jobs").update(error ? { error: String(error).slice(0, 300), tries: (tries || 0) + 1 } : { printed_at: new Date().toISOString(), error: null }).eq("id", id));
     },
