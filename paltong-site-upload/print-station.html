@@ -185,7 +185,7 @@ $("testBtn").onclick = async () => {
   try{
     const b = await bytesFor({ payload: sample, copies: 1 });
     if(mode === "tap"){ PTPrinter.rawbtSend(b); $("msg").textContent = "RawBT로 보냈어요. 영수증이 나왔는지 확인하세요."; }
-    else { await PTPrinter.rawbtWsSend(b); lastErr = ""; $("msg").textContent = "✔ 보냈어요. 영수증이 나왔는지 확인하세요."; }
+    else { await PTPrinter.rawbtWsSend(b); lastErr = ""; $("msg").textContent = "✔ RawBT 서버까지 보냈어요. 영수증이 안 나오면 RawBT 앱에서 프린터 연결(CONNECT)이 성공했는지 확인하세요."; }
   }catch(e){ $("msg").textContent = "✖ " + (e.message || e) + " — 설정 방법 4·5번을 확인하거나 👆 RawBT 앱 방식을 써보세요."; }
   paintState();
 };
