@@ -827,7 +827,7 @@ function makeDemoApi(){
     fee_mode:"auto", fee_base:49, fee_base_km:0, fee_per_km:6, fee_per_km2:5, fee_tier_km:5, fee_round:1, fee_max_km:15, fee_markup:0, default_eta:40,
     lalamove_enabled:false, lalamove_env:"production", lalamove_service:"MOTORCYCLE",
     chat_greeting:"안녕하세요, 빨통입니다! 확인 후 바로 답변드릴게요 😊", chat_greeting_en:"Hi, this is PAL TONG! We'll reply shortly. 😊",
-    chat_faq:[{"q": "영업시간이 어떻게 되나요?", "q_en": "Opening hours?", "a": "24시간 영업합니다.", "a_en": "We are open 24 hours."}, {"q": "연락처가 어떻게 되나요?", "q_en": "Contact?", "a": "Call · Viber · WhatsApp: 09951550156\n카카오톡: paltongmalate", "a_en": "Call · Viber · WhatsApp: 09951550156\nKakaoTalk: paltongmalate"}, {"q": "한화(원화)로 결제 가능한가요?", "q_en": "Can I pay in KRW?", "a": "직접적인 계좌이체는 불가능합니다만, Purple GLN 이나 네이버페이 다운로드 후 GLN 접속 후 결제 부탁드립니다.\n환율이 좀 높긴하지만, 현지뱅크 큐알 스캔하시면 한화를 현지은행으로 입금이 가능합니다.\n결제 후 결제한 은행 클릭 후 영수증 올려주시면 됩니다.\n\n[네이버페이 해외결제 이용방법]\n1. 네이버페이 앱 다운로드\n2. 네이버 아이디로 로그인 및 본인인증\n3. 검색창에 GLN 검색\n4. 상단 국기를 필리핀으로 변경\n5. 스캔하기 클릭 후 QR 스캔하여 결제", "a_en": "Direct bank transfer in KRW is not possible, but you can pay with Purple GLN or Naver Pay (GLN).\nThe exchange rate is a little high, but scanning our local bank QR lets you send KRW to our local bank.\nAfter paying, tap the bank you paid to and upload the receipt.\n\n[How to pay with Naver Pay abroad]\n1. Download the Naver Pay app\n2. Log in with your Naver ID and verify yourself\n3. Search \"GLN\"\n4. Change the flag at the top to the Philippines\n5. Tap Scan and scan our QR to pay"}, {"q": "배달비는 얼마인가요?", "q_en": "Delivery fee?", "a": "• 말라테 Malate: 배달비 없음 (무료)\n• 에르미타 Ermita: 배달비 없음 (무료)\n• 파사이 Pasay: ₱1,000 이상 무료 (미만 ₱100)\n• 뉴포트·마카티·파라냐케 탐보: ₱1,500 이상 무료 (미만 ₱150)\n• 만달루용·올티가스·파식·BGC·타기그: 배달비 ₱250\n• 그 외 지역은 따로 안내드립니다 (그랩·라라무브 가능)\n주소를 입력하면 배달비가 자동으로 계산돼요.", "a_en": "• Malate: free delivery\n• Ermita: free delivery\n• Pasay: free over ₱1,000 (otherwise ₱100)\n• Newport · Makati · Parañaque Tambo: free over ₱1,500 (otherwise ₱150)\n• Mandaluyong · Ortigas · Pasig · BGC · Taguig: ₱250\n• Other areas: we will let you know (Grab / Lalamove available)\nThe fee is calculated automatically from your address."}, {"q": "픽업 가능한가요?", "q_en": "Pickup?", "a": "네! 주문할 때 “픽업”을 선택하시면 이름과 연락처만 적으면 됩니다. 준비되면 알려드려요.", "a_en": "Yes! Choose Pickup when ordering — we will tell you when it is ready."}, {"q": "결제 방법은?", "q_en": "Payment methods?", "a": "GCash, Maya, Metrobank 송금 또는 현금결제(배달: 기사님께 / 픽업: 매장에서)가 가능합니다.", "a_en": "GCash, Maya, Metrobank transfer or cash (to the rider for delivery / at the store for pickup)."}],
+    chat_faq:[{"q": "영업시간이 어떻게 되나요?", "q_en": "Opening hours?", "a": "24시간 영업합니다.", "a_en": "We are open 24 hours."}, {"q": "연락처가 어떻게 되나요?", "q_en": "Contact?", "a": "카카오톡: paltongmalate\n전화·SMS: 0947 547 5177\nViber·WhatsApp: 0995 155 0156", "a_en": "KakaoTalk: paltongmalate\nCall·SMS: 0947 547 5177\nViber·WhatsApp: 0995 155 0156"}, {"q": "한화(원화)로 결제 가능한가요?", "q_en": "Can I pay in KRW?", "a": "직접적인 계좌이체는 불가능합니다만, Purple GLN 이나 네이버페이 다운로드 후 GLN 접속 후 결제 부탁드립니다.\n환율이 좀 높긴하지만, 현지뱅크 큐알 스캔하시면 한화를 현지은행으로 입금이 가능합니다.\n결제 후 결제한 은행 클릭 후 영수증 올려주시면 됩니다.\n\n[네이버페이 해외결제 이용방법]\n1. 네이버페이 앱 다운로드\n2. 네이버 아이디로 로그인 및 본인인증\n3. 검색창에 GLN 검색\n4. 상단 국기를 필리핀으로 변경\n5. 스캔하기 클릭 후 QR 스캔하여 결제", "a_en": "Direct bank transfer in KRW is not possible, but you can pay with Purple GLN or Naver Pay (GLN).\nThe exchange rate is a little high, but scanning our local bank QR lets you send KRW to our local bank.\nAfter paying, tap the bank you paid to and upload the receipt.\n\n[How to pay with Naver Pay abroad]\n1. Download the Naver Pay app\n2. Log in with your Naver ID and verify yourself\n3. Search \"GLN\"\n4. Change the flag at the top to the Philippines\n5. Tap Scan and scan our QR to pay"}, {"q": "배달비는 얼마인가요?", "q_en": "Delivery fee?", "a": "• 말라테 Malate: 배달비 없음 (무료)\n• 에르미타 Ermita: 배달비 없음 (무료)\n• 파사이 Pasay: ₱1,000 이상 무료 (미만 ₱100)\n• 뉴포트·마카티·파라냐케 탐보: ₱1,500 이상 무료 (미만 ₱150)\n• 만달루용·올티가스·파식·BGC·타기그: 배달비 ₱250\n• 그 외 지역은 따로 안내드립니다 (그랩·라라무브 가능)\n주소를 입력하면 배달비가 자동으로 계산돼요.", "a_en": "• Malate: free delivery\n• Ermita: free delivery\n• Pasay: free over ₱1,000 (otherwise ₱100)\n• Newport · Makati · Parañaque Tambo: free over ₱1,500 (otherwise ₱150)\n• Mandaluyong · Ortigas · Pasig · BGC · Taguig: ₱250\n• Other areas: we will let you know (Grab / Lalamove available)\nThe fee is calculated automatically from your address."}, {"q": "픽업 가능한가요?", "q_en": "Pickup?", "a": "네! 주문할 때 “픽업”을 선택하시면 이름과 연락처만 적으면 됩니다. 준비되면 알려드려요.", "a_en": "Yes! Choose Pickup when ordering — we will tell you when it is ready."}, {"q": "결제 방법은?", "q_en": "Payment methods?", "a": "GCash, Maya, Metrobank 송금 또는 현금결제(배달: 기사님께 / 픽업: 매장에서)가 가능합니다.", "a_en": "GCash, Maya, Metrobank transfer or cash (to the rider for delivery / at the store for pickup)."}],
     chat_quick:["네, 확인했습니다! / Noted, thank you!", "지금 조리 중이에요. 조금만 기다려주세요 🙏 / We are cooking now.", "기사님이 출발했어요! / The rider is on the way!"],
     birthday_enabled:true, birthday_percent:5, birthday_max_discount:null, translate_email:null,
     coupon_stack:[], coupon_stack_max:2,
@@ -1310,7 +1310,7 @@ function hallHTML(o, copyLabel, p){
     ${o.memo ? `<div class="hr"></div><div class="memo"><span class="b">Note:</span> ${esc(o.memo_en || o.memo)}</div>` : ""}
     <div class="hr"></div>
     <div class="c">Thank you!</div>
-    ${CFG.STORE_PHONE ? `<div class="c">${esc(CFG.STORE_PHONE)}</div>` : ""}
+    ${contactLines().map(t => `<div class="c">${esc(t)}</div>`).join("")}
     <div class="feed"></div></div>`;
 }
 function receiptDoc(orders, copies = "auto"){
@@ -1355,8 +1355,7 @@ function receiptDoc(orders, copies = "auto"){
       ${o.memo ? `<div class="memo"><span class="b">요청 Note:</span> ${esc(o.memo)}${o.memo_en && o.memo_en !== o.memo ? `<br>(${esc(o.memo_en)})` : ""}</div>` : ""}
       <div class="hr"></div>
       <div class="c">감사합니다! Thank you!</div>
-      ${CFG.STORE_PHONE ? `<div class="c">${esc(CFG.STORE_PHONE)}</div>` : ""}
-      <div class="c">KakaoTalk: ${esc(CFG.KAKAO_ID)}</div>
+      ${contactLines().map(t => `<div class="c">${esc(t)}</div>`).join("")}
       <div class="feed"></div>
     </div>`;
   };
@@ -1404,6 +1403,16 @@ function toast(msg, ms = 2200){
   clearTimeout(t._h); t._h = setTimeout(() => t.classList.remove("show"), ms);
 }
 
-window.PT = { PRINT_SETS, PRINT_SETS_EN, KIND_LABEL, printKinds, manilaDay, bizDay, bizStart, DAY_START_HOUR, orderDay, get menuCfgActive(){ return menuCfgActive; }, loadMenuData, exportMenu, priceSig, politeKo, CATS, get menuOv(){ return menuOv; }, applyMenuOverrides, cleanForTranslate, setTranslateKey, googleTranslate, splitKoEn, msgText, schedLabel, menuToEnglish, matchZone, zoneFee, phoneMask, phoneValue, phoneOk, phoneDigits, phoneFmt, englishOnly, EN_NAME, EN_ADDR, hasHangul, stampRewards, stampText, isMemberPhone, normPhone, phoneEmail, prettyPhone, couponDiscount, couponValue, couponFace, couponsFace, couponCond, couponUsable, COUPON_KINDS, couponKind, stackKey, stackMax, couponStackOk, couponsDiscount, bestCoupons, stackRulesText, repriceLine, errMsg, CFG, MENU, ITEM_BY_ID, esc, peso, ls, L, T, setLang, get LANG(){ return LANG; },
+/* 📞 가게 연락처 (영수증 · 손님 화면 공통) */
+function contactLines(){
+  return [CFG.KAKAO_ID ? `KakaoTalk: ${CFG.KAKAO_ID}` : "", CFG.STORE_PHONE ? `Call·SMS: ${CFG.STORE_PHONE}` : "", CFG.VIBER_PHONE ? `Viber·WhatsApp: ${CFG.VIBER_PHONE}` : ""].filter(Boolean);
+}
+function contactHTML(){
+  const num = x => String(x || "").replace(/\D/g, "").replace(/^0/, "63");
+  return [CFG.KAKAO_ID ? `카카오톡 KakaoTalk: <b>${esc(CFG.KAKAO_ID)}</b>` : "",
+    CFG.STORE_PHONE ? `${T("전화·SMS", "Call·SMS")}: <a href="tel:${esc(CFG.STORE_PHONE.replace(/\s/g, ""))}"><b>${esc(CFG.STORE_PHONE)}</b></a>` : "",
+    CFG.VIBER_PHONE ? `Viber·WhatsApp: <a href="https://wa.me/${num(CFG.VIBER_PHONE)}" target="_blank" rel="noopener"><b>${esc(CFG.VIBER_PHONE)}</b></a>` : ""].filter(Boolean).join("<br>");
+}
+window.PT = { contactLines, contactHTML, PRINT_SETS, PRINT_SETS_EN, KIND_LABEL, printKinds, manilaDay, bizDay, bizStart, DAY_START_HOUR, orderDay, get menuCfgActive(){ return menuCfgActive; }, loadMenuData, exportMenu, priceSig, politeKo, CATS, get menuOv(){ return menuOv; }, applyMenuOverrides, cleanForTranslate, setTranslateKey, googleTranslate, splitKoEn, msgText, schedLabel, menuToEnglish, matchZone, zoneFee, phoneMask, phoneValue, phoneOk, phoneDigits, phoneFmt, englishOnly, EN_NAME, EN_ADDR, hasHangul, stampRewards, stampText, isMemberPhone, normPhone, phoneEmail, prettyPhone, couponDiscount, couponValue, couponFace, couponsFace, couponCond, couponUsable, COUPON_KINDS, couponKind, stackKey, stackMax, couponStackOk, couponsDiscount, bestCoupons, stackRulesText, repriceLine, errMsg, CFG, MENU, ITEM_BY_ID, esc, peso, ls, L, T, setLang, get LANG(){ return LANG; },
   orderPrefix, orderCode, isDine, inClosingWindow, isSvc, svcValue, riderPhone, riderEmail, STATUS, payInfo, isOnlinePay, lineName, lineOpt, compressImage, api, DEMO, receiptDoc, printReceipt, toast };
 })();

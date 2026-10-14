@@ -118,8 +118,7 @@ function drawReceipt(o, copyLabel, kitchen){
   if(o.staff_name) text(`${en ? "Staff" : "받은 직원 Staff"}: ${o.staff_name}`, { size:20 });
   hr();
   text(en ? "Thank you!" : "감사합니다! Thank you!", { size:22, align:"center" });
-  if(CFG.STORE_PHONE) text(CFG.STORE_PHONE, { size:20, align:"center" });
-  text(`KakaoTalk: ${CFG.KAKAO_ID}`, { size:20, align:"center" });
+  PT.contactLines().forEach(t => text(t, { size:20, align:"center" }));
   y += 10;
 
   const out = document.createElement("canvas");

@@ -17,7 +17,8 @@ window.PALTONG_CONFIG = {
   STORE_NAME_KO: "빨통",
   STORE_NAME_EN: "PAL TONG",
   KAKAO_ID: "paltongmalate",
-  STORE_PHONE: "09951550156",          // 예: "0917 000 0000" (영수증 하단에 표시, 비우면 생략)
+  STORE_PHONE: "0947 547 5177",        // 전화·SMS (영수증 하단에 표시, 비우면 생략)
+  VIBER_PHONE: "0995 155 0156",        // Viber·WhatsApp
 
   /* ---- 기본 언어 ----  "both"(한/영 병기) | "ko" | "en" */
   DEFAULT_LANG: "both",

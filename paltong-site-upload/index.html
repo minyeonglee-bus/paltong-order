@@ -36,7 +36,7 @@
 <meta property="og:site_name" content="빨통 PAL TONG">
 <meta property="og:url" content="https://paltong-order.com/">
 <meta property="og:title" content="빨통 PAL TONG · 매운음식전문점">
-<meta property="og:description" content="매운음식전문점 · 배달전문점 · 홀이용가능 🛵 603 Remedios St, Malate · 카톡 paltongmalate · 0995 155 0156">
+<meta property="og:description" content="매운음식전문점 · 배달전문점 · 홀이용가능 🛵 603 Remedios St, Malate · 카톡 paltongmalate · ☎ 0947 547 5177 · Viber 0995 155 0156">
 <meta property="og:image" content="https://paltong-order.com/images/og.png?v=3">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
@@ -45,7 +45,7 @@
 <meta property="og:locale:alternate" content="en_US">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="빨통 PAL TONG · 매운음식전문점">
-<meta name="twitter:description" content="매운음식전문점 · 배달전문점 · 홀이용가능 · 603 Remedios St, Malate · 0995 155 0156">
+<meta name="twitter:description" content="매운음식전문점 · 배달전문점 · 홀이용가능 · 603 Remedios St, Malate · ☎ 0947 547 5177 · Viber 0995 155 0156">
 <meta name="twitter:image" content="https://paltong-order.com/images/og.png?v=3">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -142,7 +142,7 @@ function paintStatic(){
   document.getElementById("footNote").innerHTML =
     `${L("메뉴 및 가격은 매장 사정에 따라 변경될 수 있습니다.","Menu and prices may change without notice.")}<br>
      ${L("배달비는 주문 후 가게에서 주소 확인 뒤 안내드립니다.","Delivery fee is confirmed by the store after you order.")}<br>
-     ${L("문의","Inquiries")}: KakaoTalk <b>${esc(CFG.KAKAO_ID)}</b>`;
+     <b>${L("문의","Contact")}</b><br>${PT.contactHTML()}`;
   document.getElementById("inqLbl").textContent = PT.LANG === "en" ? "Chat" : "문의";
   paintAddBanner && addMode !== undefined && paintAddBanner();
   const db = document.getElementById("demoBanner");
@@ -1032,7 +1032,7 @@ function openTracker(id, opts = {}){
     if(o.status === "cancelled"){
       body = `<div class="card wait-box"><b>${L("취소된 주문입니다","This order was cancelled")}</b>
         ${o.admin_note ? `<p class="hint">${esc(o.admin_note)}</p>` : ""}
-        <p class="hint">${L("문의","Inquiries")}: KakaoTalk ${esc(CFG.KAKAO_ID)}</p></div>`;
+        <p class="hint">${L("문의","Contact")}<br>${PT.contactHTML()}</p></div>`;
     }
 
     let extra = "";
@@ -1068,7 +1068,7 @@ function openTracker(id, opts = {}){
         ${pick ? `<div class="sum-row"><span>🏃 ${L("픽업","Pickup")}</span><span>${esc(storeAddr())}</span></div>` : ""}<div class="sum-row" ${pick ? "hidden" : ""}><span>${L("배달비","Delivery")}${o.zone_name && o.fee_source === "zone" ? ` <span class="en">${esc(o.zone_name)}</span>` : ""}</span><span>${o.delivery_fee == null ? "—" : o.delivery_fee === 0 ? L("무료","FREE") : peso(o.delivery_fee)}</span></div>
         <div class="hint" style="margin-top:8px">${esc(o.cust_name)} · ${esc(o.cust_phone)}<br>${esc(o.cust_addr)}<br>${L("결제","Payment")}: ${L(p.label, p.labelEn)}${o.memo ? `<br>${esc(o.memo)}` : ""}</div>
         </div></details>
-      <p class="hint" style="text-align:center">${L("문의","Inquiries")}: KakaoTalk <b>${esc(CFG.KAKAO_ID)}</b></p>
+      <p class="hint" style="text-align:center">${L("문의","Contact")}<br>${PT.contactHTML()}</p>
       <button class="ghost-btn" id="backMenu">${L("메뉴로 돌아가기","Back to menu")}</button>`;
 
     const $ = q => s.el.querySelector(q);
