@@ -113,6 +113,7 @@ let recent = [], busy = false, tapQueue = [], lastOk = null, lastErr = "", wake 
 
 /* ---------- 한/영 ---------- */
 function applyLang(){
+  PT.setLang(lang);   // 오류 메시지 · 공통 문구도 같은 언어로
   document.documentElement.lang = lang;
   document.querySelectorAll("[data-t]").forEach(el => { const [ko, en] = el.dataset.t.split("|"); el.innerHTML = lang === "en" ? en : ko; });
   $("langBtn").textContent = lang === "en" ? "🌐 한국어" : "🌐 EN";

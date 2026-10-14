@@ -227,7 +227,7 @@ function blankClosing(en, counts){
    opts = { en, onPrint(note, copies), loadOrders: async day => orders (마감 불러오기용) } */
 function openNoteEditor(opts){
   const saved = ls.get("paltong_note_draft", null) || {};
-  let en = saved.en != null ? !!saved.en : !!opts.en, size = saved.size || "m", counts = saved.counts || {}, float = saved.float || 0, cashSales = null;
+  let en = !!opts.en, size = saved.size || "m", counts = saved.counts || {}, float = saved.float || 0, cashSales = null;
   if(opts.loadOrders) opts.loadOrders(PT.bizDay(new Date())).then(list => { cashSales = cashSalesOf(list); const f = bg.querySelector("[data-check]"); if(f && f._paint) f._paint(); }).catch(() => {});
   const bg = document.createElement("div");
   bg.style.cssText = "position:fixed;inset:0;z-index:9999;background:rgba(20,12,8,.6);display:flex;align-items:flex-end;justify-content:center";
@@ -372,7 +372,7 @@ async function findWritable(server){
       if(ch.properties.writeWithoutResponse || ch.properties.write) return ch;
     }
   }
-  throw new Error("이 프린터에서 쓰기 가능한 채널을 찾지 못했습니다");
+  throw new Error(PT.T("이 프린터에서 쓰기 가능한 채널을 찾지 못했습니다", "No writable channel found on this printer"));
 }
 async function bleConnect(pick){
   if(!bleSupported()) throw new Error("이 브라우저는 블루투스 연결을 지원하지 않습니다 (안드로이드/PC는 Chrome, 아이폰은 Bluefy 앱 사용)");
@@ -427,10 +427,10 @@ function rawbtWsSend(bytes, timeoutMs){
   return new Promise((ok, fail) => {
     let ws, done = false;
     const end = (e) => { if(done) return; done = true; clearTimeout(t); try{ ws && ws.close(1000); }catch(_){} e ? fail(e) : ok(); };
-    const t = setTimeout(() => end(new Error("RawBT 서버가 인쇄 결과를 알려주지 않았어요 (Server for RawBT 앱 · 프린터 전원 확인)")), timeoutMs || 25000);
-    try{ ws = new WebSocket("ws://localhost:40213/"); }catch(e){ return end(new Error("RawBT 서버에 연결할 수 없어요: " + (e.message || e))); }
-    ws.onerror = () => end(new Error("RawBT 서버에 연결할 수 없어요 (Server for RawBT 앱이 켜져 있는지 확인)"));
-    ws.onclose = () => end(new Error("RawBT 서버 연결이 끊겼어요"));
+    const t = setTimeout(() => end(new Error(PT.T("RawBT 서버가 인쇄 결과를 알려주지 않았어요 (Server for RawBT 앱 · 프린터 전원 확인)", "RawBT server did not confirm the print (check Server for RawBT app · printer power)"))), timeoutMs || 25000);
+    try{ ws = new WebSocket("ws://localhost:40213/"); }catch(e){ return end(new Error(PT.T("RawBT 서버에 연결할 수 없어요: ", "Cannot connect to the RawBT server: ") + (e.message || e))); }
+    ws.onerror = () => end(new Error(PT.T("RawBT 서버에 연결할 수 없어요 (Server for RawBT 앱이 켜져 있는지 확인)", "Cannot connect to the RawBT server (is the Server for RawBT app running?)")));
+    ws.onclose = () => end(new Error(PT.T("RawBT 서버 연결이 끊겼어요", "RawBT server connection closed")));
     ws.onopen = () => { try{ ws.send(job); }catch(e){ end(e); } };
     ws.onmessage = ev => {
       let r = null; try{ r = JSON.parse(ev.data); }catch(_){ return; }
@@ -443,7 +443,7 @@ function rawbtWsSend(bytes, timeoutMs){
 /* 📡 인쇄 스테이션으로 보내기 — 주문마다 인쇄할 장(주방용·손님용…)을 이 기기 설정대로 정해서 보냄 */
 async function stationSend(orders, copies){
   for(const o of orders){
-    if(o._note){ await PT.api.printJobAdd(JSON.parse(JSON.stringify(o)), typeof copies === "number" ? copies : 1, "✏️ " + (o._note.title || "메모")); continue; }
+    if(o._note){ await PT.api.printJobAdd(JSON.parse(JSON.stringify(o)), typeof copies === "number" ? copies : 1, "✏️ " + (o._note.title || PT.T("메모", "Memo"))); continue; }
     const kinds = typeof copies === "number" ? copies : PT.printKinds(o);
     const items = (o.items || []).filter(l => !l.svc || l.couponFree);
     const label = `${PT.orderCode ? PT.orderCode(o) : "#" + (o.order_no ?? "")} · ${(items[0] && (items[0].en || items[0].name)) || ""}${items.length > 1 ? ` +${items.length - 1}` : ""}`;
@@ -510,7 +510,7 @@ async function print(orders, copies){
   const mode = getMode();
   if(mode === "browser" && orders.some(o => o._note)){
     await (document.fonts && document.fonts.ready);
-    const w = window.open("", "_blank"); if(!w) throw new Error("팝업이 막혔어요");
+    const w = window.open("", "_blank"); if(!w) throw new Error(PT.T("팝업이 막혔어요", "Pop-up was blocked"));
     w.document.write(`<html><body style="margin:0">${buildSlips(orders, copies).map(c => `<img src="${c.toDataURL()}" style="width:58mm;display:block;page-break-after:always">`).join("")}<script>onload=()=>{print();}<\/script></body></html>`); w.document.close(); return;
   }
   if(mode === "browser") return PT.printReceipt(orders, copies);
