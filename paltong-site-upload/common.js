@@ -567,6 +567,7 @@ function makeSupabaseApi(){
     },
     /* 가격 바꾸기 — 가격 비밀번호 필요 (25단계 SQL). patch: { base_price: 정가|null, sale_price: 할인가|0 } */
     async setMenuPrice(itemId, patch, pin){ unwrap(await sb.rpc("admin_set_menu_price", { p_item: itemId, p_patch: patch, p_pin: String(pin || "") })); },
+    async checkPricePin(pin){ return !!unwrap(await sb.rpc("admin_check_price_pin", { p_pin: String(pin || "") })); },
     async changePricePin(oldPin, newPin){ unwrap(await sb.rpc("admin_change_price_pin", { p_old: String(oldPin || ""), p_new: String(newPin || "") })); },
     onMenuStatus(cb){
       sb.channel("menu_status").on("postgres_changes", { event:"*", schema:"public", table:"menu_status" }, () => cb())
@@ -1044,6 +1045,7 @@ function makeDemoApi(){
       ls.set("paltong_demo_menu_cfg", data); ping("menu"); fire("menu"); },
     async resetMenu(pin){ if(String(pin) !== ls.get("paltong_demo_price_pin", "1234")) throw new Error("price_pin_wrong"); ls.del("paltong_demo_menu_cfg"); ls.del("paltong_demo_menu_ov"); ping("menu"); fire("menu"); },
     async setMenuPrice(itemId, patch, pin){ if(String(pin) !== ls.get("paltong_demo_price_pin", "1234")) throw new Error("price_pin_wrong"); return this.setMenuOverride(itemId, patch); },
+    async checkPricePin(pin){ return String(pin) === ls.get("paltong_demo_price_pin", "1234"); },
     async changePricePin(oldPin, newPin){ if(String(oldPin) !== ls.get("paltong_demo_price_pin", "1234")) throw new Error("price_pin_wrong"); if(String(newPin || "").length < 4) throw new Error("price_pin_short"); ls.set("paltong_demo_price_pin", String(newPin)); },
     async setMenuOverride(itemId, patch){ const o = ls.get("paltong_demo_menu_ov", {}); o[itemId] = { ...(o[itemId] || {}), ...patch }; ls.set("paltong_demo_menu_ov", o); ping("menu"); fire("menu"); },
     onMenuStatus(cb){ listeners.menu.push(cb); },

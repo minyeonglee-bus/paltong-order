@@ -834,7 +834,7 @@ function cardHTML(o){
   return `<div class="ocard ${needsAction(o) ? "urgent" : ""}" data-id="${o.id}">
     <div class="ohead"><span class="no">${esc(PT.orderCode(o))}</span>
       <span class="status-pill" style="background:${st.color}">${L(st.ko, st.en)}</span>
-      <span class="status-pill" style="background:${isOnlinePay(o.payment) ? "#2a6fd3" : "#6b6b6b"}">${dine && o.payment === "cash" ? L("현금", "Cash") : esc(L(p.label, p.labelEn || p.label))}</span>
+      <button type="button" class="status-pill" data-act="editpay" title="${L("결제 방법 바꾸기 (가격 비밀번호)", "Change payment method (price password)")}" style="border:0;cursor:pointer;background:${o.received_method === "split" ? "#7a5cd3" : isOnlinePay(o.payment) ? "#2a6fd3" : "#6b6b6b"}">${o.received_method === "split" ? `🔀 ${L("나눠 받음", "Split")}` : dine && o.payment === "cash" ? L("현금", "Cash") : esc(L(p.label, p.labelEn || p.label))} ✎</button>
       ${dine ? `<span class="status-pill" style="background:#e5a731">🍽 ${L("다이닝", "Dining")}</span>` : ""}
       ${o.scheduled_at ? `<span class="status-pill" style="background:#c2410c">⏰ ${L("예약", "Scheduled")} ${schedText(o.scheduled_at)}</span>` : ""}
       ${pick && !dine ? `<span class="status-pill" style="background:#7a5cd3">🏃 픽업</span>` : ""}
@@ -1259,6 +1259,7 @@ async function act(o, a, btn){
     const ok = await run({ status: "delivering" }, L(`#${o.order_no} 픽업 준비 완료 — 손님에게 알렸습니다`, `#${o.order_no} ready for pickup — customer notified`));
     // 손님 채팅 안내는 서버(20단계 SQL)가 자동으로 보냄 — 배달 출발·도착도 같음
   }
+  if(a === "editpay") return editPayModal(o);
   if(a === "print")   doPrint(o);
   if(a === "showrc"){
     try{ const u = receiptUrls[o.id] || await api.receiptUrl(o.receipt_path); receiptUrls[o.id] = u; openViewer(u); }catch(e){ toast("영수증을 불러오지 못했습니다"); }
@@ -1699,6 +1700,49 @@ function openCatManager(){
   }
   function sync(){ B.querySelectorAll("[data-ri]").forEach(el => { const r = rows[+el.dataset.ri]; el.querySelectorAll("[data-r]").forEach(x => { r[x.dataset.r] = x.value; }); }); }
   paint();
+}
+/* 💳 결제 방법 바꾸기 — 완료된 주문 · 이미 받은 주문도 가격 비밀번호를 넣으면 수정 (캐시북도 자동으로 맞춰짐) */
+function editPayModal(o){
+  const total = o.total ?? o.subtotal ?? 0, done = o.status === "done" || o.received_amount != null || o.paid_total != null;
+  const cur = o.received_method === "split" ? "split" : (o.payment || "cash");
+  const WAYS = [["cash", L("💵 현금", "💵 Cash")], ["gcash", "GCash"], ["maya", "Maya"], ["bank", L("🏦 계좌이체", "🏦 Bank")]];
+  const sp = o.split_pay && typeof o.split_pay === "object" ? o.split_pay : {};
+  const ov = modal(`💳 ${esc(PT.orderCode(o))} ${L("결제 방법 바꾸기", "Change payment method")}`, `
+    <p class="hint" style="margin-top:0">${L("지금", "Now")}: <b>${esc(cur === "split" ? L("나눠 받음", "Split") : PAY_NAME(cur))}</b> · ${L("금액", "Amount")} <b>${peso(total)}</b>${done ? ` · <span style="color:#b45309">${L("완료·결제된 주문 — 비밀번호 필요", "Done/paid order — password needed")}</span>` : ""}</p>
+    <div class="chips" id="epWays">${WAYS.map(([k, n]) => `<button type="button" class="chip ${cur === k ? "sel" : ""}" data-pw="${k}" style="padding:10px 14px;font-size:15px">${n}</button>`).join("")}
+      <button type="button" class="chip ${cur === "split" ? "sel" : ""}" data-pw="split" style="padding:10px 14px;font-size:15px">🔀 ${L("나눠 받음", "Split")}</button></div>
+    <div id="epSplit" class="calc-box" style="margin:10px 0 0" ${cur === "split" ? "" : "hidden"}>
+      ${WAYS.map(([k, n]) => `<div class="field" style="margin:0 0 8px;display:flex;gap:8px;align-items:center"><label style="width:110px;margin:0">${n}</label><input type="number" inputmode="numeric" min="0" data-sp="${k}" value="${+sp[k] || ""}" placeholder="0" style="font-size:16px"></div>`).join("")}
+      <div class="sum-row total" id="epSum"><span>${L("합계", "Total")}</span><b>—</b></div></div>
+    <p class="hint" style="margin:10px 0 0">🔒 ${L("저장할 때 가격 비밀번호를 물어봐요. 매출·캐시북의 결제 방법도 같이 바뀌어요.", "You'll be asked for the price password. Sales and the Cash Book are updated too.")}</p>`,
+    async ov => {
+      const way = ov._way;
+      let patch;
+      if(way === "split"){
+        const parts = {}; ov.querySelectorAll("[data-sp]").forEach(i => { const v = Math.max(0, Math.round(+i.value || 0)); if(v) parts[i.dataset.sp] = v; });
+        const keys = Object.keys(parts), sum = keys.reduce((a, k) => a + parts[k], 0);
+        if(keys.length < 2){ toast(L("두 가지 이상 결제 방법에 금액을 넣어주세요", "Enter amounts for at least two methods"), 3500); return false; }
+        if(sum !== total && !confirm(L(`나눠 받은 합계 ${peso(sum)} 가 주문 금액 ${peso(total)} 와 달라요. 그래도 저장할까요?`, `Split total ${peso(sum)} differs from ${peso(total)}. Save anyway?`))) return false;
+        const main = keys.sort((a, b) => parts[b] - parts[a])[0];
+        patch = { payment: main, received_method: "split", split_pay: parts, ...(done ? { received_amount: sum } : {}) };
+        if(keys.some(k => k !== "cash") && done) patch.paid_total = total;
+      } else {
+        if(way === cur){ toast(L("바뀐 게 없어요", "Nothing changed")); return false; }
+        patch = { payment: way, split_pay: null, ...(done || o.received_method ? { received_method: way } : {}) };
+        if(done && way !== "cash" && o.paid_total == null) patch.paid_total = total;
+      }
+      const pin = await askPricePin(L(`${PT.orderCode(o)} 결제 방법을 ${way === "split" ? "나눠 받음" : PAY_NAME(way)}(으)로 바꿉니다`, `Change ${PT.orderCode(o)} payment to ${way === "split" ? "Split" : PAY_NAME(way)}`));
+      if(pin == null) return false;
+      try{ if(!(await api.checkPricePin(pin))){ toast(PT.errMsg("price_pin_wrong"), 3500); return false; } }
+      catch(e){ toast(PT.errMsg(e), 4000); return false; }
+      try{ await api.updateOrder(o.id, patch); toast(L(`💳 ${PT.orderCode(o)} 결제 방법을 바꿨어요`, `💳 ${PT.orderCode(o)} payment updated`), 3000); await loadOrders(); }
+      catch(e){ toast(L("저장 실패: ", "Save failed: ") + PT.errMsg(e), 5000); return false; }
+    }, L("저장", "Save"));
+  ov._way = cur;
+  const paintSum = () => { const sum = [...ov.querySelectorAll("[data-sp]")].reduce((a, i) => a + Math.max(0, Math.round(+i.value || 0)), 0), d = sum - total;
+    ov.querySelector("#epSum b").innerHTML = `${peso(sum)}${sum ? (d === 0 ? ` <span style="color:var(--green)">✔</span>` : ` <span style="color:var(--red)">${d > 0 ? "+" : "−"}${peso(Math.abs(d))}</span>`) : ""}`; };
+  ov.querySelectorAll("[data-pw]").forEach(b => b.onclick = () => { ov._way = b.dataset.pw; ov.querySelectorAll("[data-pw]").forEach(x => x.classList.toggle("sel", x === b)); ov.querySelector("#epSplit").hidden = ov._way !== "split"; paintSum(); });
+  ov.querySelectorAll("[data-sp]").forEach(i => i.oninput = paintSum); paintSum();
 }
 /* 가격을 바꿀 때마다 가격 비밀번호 확인 */
 function askPricePin(what){
