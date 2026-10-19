@@ -493,11 +493,9 @@ function renderDaybar(){
     <input type="date" id="dayPick" value="${d || t}" max="${t}" title="${L("다른 날짜 보기", "Pick another day")}">
     <button class="pill" data-dstep="1" ${!d ? "disabled" : ""} title="${L("다음날", "Next day")}">▶</button>
     <button class="pill" id="cbBtn" style="margin-left:auto;background:#0E6B57;border-color:#0E6B57;color:#fff" title="${L("이 날 완료된 주문을 Paltong Cash Book 매출로 보내기", "Send this day's completed orders to the Paltong Cash Book")}">📒 ${L("캐시북으로", "To Cash Book")}</button>
-    <button class="pill" id="dkBtn" style="${dkInbox.length ? "background:#0f766e;border-color:#0f766e;color:#fff;font-weight:800" : ""}">📥 DK${dkInbox.length ? ` <span class="n">${dkInbox.length}</span>` : ""}</button>
     <button class="pill" id="dkSnapBtn" style="background:#0f766e;border-color:#0f766e;color:#fff">📷 ${L("DK 캡처", "DK screenshot")}</button>
     <button class="pill" id="extBtn" style="background:var(--red);border-color:var(--red);color:#fff">➕ ${L("외부 주문", "Outside order")}</button>`;
   $("extBtn").onclick = () => extOrderModal();
-  $("dkBtn").onclick = () => dkInboxModal();
   $("dkSnapBtn").onclick = () => extOrderModal({ ch: "DK", ocr: true });
   $("cbBtn").onclick = () => cashbookModal(viewDay || today());
   $("daybar").querySelectorAll("[data-day]").forEach(b => b.onclick = () => setViewDay(b.dataset.day));
@@ -3299,58 +3297,6 @@ function bindPaste(ov, fill){
   ta.addEventListener("input", () => { clearTimeout(t); t = setTimeout(go, 600); });
 }
 
-/* ---------------- 📥 DK 자동 접수 (50단계) ----------------
-   DK 사장님 앱 알림 → (안드로이드 MacroDroid) → dk-inbox 함수 → 여기 목록 + 알림 소리
-   [등록]을 누르면 외부 주문 창이 DK로, 알림 내용이 채워진 채 열려요 */
-let dkInbox = [], dkSeen = null, dkReady = true;
-async function loadDkInbox(first){
-  if(!dkReady) return;
-  try{
-    const list = await api.dkInboxList();
-    const fresh = dkSeen ? list.filter(x => !dkSeen.has(x.id)) : [];
-    dkSeen = new Set(list.map(x => x.id)); dkInbox = list;
-    for(const x of fresh){
-      const done = !first && dkAuto() ? await dkAutoCreate(x).catch(() => null) : null;
-      if(done && done.dup) continue;   // 같은 DK 주문 → 조용히 정리
-      if(done) alarm("order", `📥 DK ${L("자동 등록", "auto-added")} ${done.code} — ${done.name} · ${peso(done.total)}`, goOrders("all"));
-      else { const d = dkParse(x); alarm("order", d.isDk ? `📥 DK ${L("새 주문", "new order")} — ${d.name || ""} · ${d.kind}${d.id ? ` · #${d.id}` : ""} — ${L("눌러서 메뉴 넣고 등록", "tap to add items")}` : `📥 DK ${L("새 주문", "new order")} — ${(x.title || "")} ${(x.body || "").slice(0, 60)}`, () => dkInboxModal()); }
-    }
-    if(fresh.length) dkInbox = await api.dkInboxList().catch(() => dkInbox);
-    renderDaybar();
-  }catch(e){ if(/dk_inbox|does not exist|schema cache|404/i.test(String(e.message || e))) dkReady = false; }   // 50단계 전이면 조용히 끔
-}
-/* ⚡ DK 자동 등록: 알림 글에서 (메뉴 또는 금액) + (이름 또는 연락처)를 읽을 수 있으면 바로 외부 주문으로 등록
-   못 읽으면 지금처럼 📥 목록에 남겨서 사람이 [등록] */
-const dkAuto = () => ls.get("paltong_dk_auto", true);
-async function dkAutoCreate(x){
-  const text = dkPasteText(x), p = parseOrderPaste(text);
-  const items = (p.items || []).filter(l => l.unitPrice > 0 && !l.needPrice);
-  const amount = items.length ? items.reduce((a, l) => a + l.unitPrice * l.qty, 0) : Math.round(+p.amount || 0) || (p.total != null ? Math.max(0, p.total - (p.fee || 0) + (p.points || 0)) : 0);
-  const dkId = dkParse(x).id, dup = dkId && orders.find(o => o.source === "external" && String(o.memo || "").includes(`DK 주문아이디 ${dkId}`));
-  if(dup){ if(await api.dkInboxClaim(x.id)) await api.dkInboxSet(x.id, "done", dup.id).catch(() => {}); return { dup: true }; }   // 같은 DK 주문 두 번 등록 방지
-  if(!(amount > 0) || !(p.name || p.phone) || (p.items || []).some(l => l.needPrice)) return null;   // 확실하지 않으면 사람이 확인
-  if(p.total != null && Math.abs(p.total - (amount + (Math.round(+p.fee || 0)) - Math.round(+p.points || 0))) > 1) return null;   // DK 합계와 안 맞으면 (가격 차이 등) 사람이 확인
-  if(!(await api.dkInboxClaim(x.id))) return null;                                                // 다른 기기가 이미 등록
-  const pickup = /pick\s*-?\s*up|픽업|포장|take\s*-?\s*out|takeout/i.test(text);
-  try{
-    const r = await api.createExternalOrder({ name: p.name || "DK", phone: p.phone || "", addr: pickup ? "매장 픽업 / Store pickup" : (p.addr || (p.coord ? "" : "DK")),
-      lat: !pickup && p.coord ? p.coord.lat : "", lng: !pickup && p.coord ? p.coord.lng : "",
-      amount, fee: pickup ? 0 : Math.round(+p.fee || 0), payment: p.payKey || "cash", memo: [dkId ? `DK 주문아이디 ${dkId}` : "", "📥 DK 자동 등록"].filter(Boolean).join(" · "), channel: "DK", rider_id: "",
-      ...(items.length ? { items: items.map(({ pasted, needPrice, ...l }) => l) } : {}) });
-    if(items.length) await api.setItems(r.id, items.map(({ pasted, needPrice, ...l }) => l)).catch(() => {});
-    if(pickup) await api.updateOrder(r.id, { order_type: "pickup", fee_source: "pickup" }).catch(() => {});
-    const pts = Math.min(amount, Math.max(0, Math.round(+p.points || 0)));
-    if(pts) await api.updateOrder(r.id, { store_discount: pts, store_discount_label: "포인트 공제" }).catch(() => {});
-    await api.dkInboxSet(x.id, "done", r.id).catch(() => {});
-    if(dkId) for(const y of dkInbox.filter(y => y.id !== x.id && dkParse(y).id === dkId)) await api.dkInboxSet(y.id, "done", r.id).catch(() => {});   // 같은 DK 주문의 알림도 정리
-    await loadOrders();
-    return { code: `DK-${r.order_no}`, name: p.name || p.phone, total: amount - pts + (pickup ? 0 : Math.round(+p.fee || 0)) };
-  }catch(e){
-    await api.dkInboxSet(x.id, "new").catch(() => {});                                           // 실패하면 목록으로 되돌림
-    toast(L("DK 자동 등록 실패 — 📥 DK에서 직접 등록해 주세요: ", "DK auto-add failed — add it from 📥 DK: ") + PT.errMsg(e), 6000);
-    return null;
-  }
-}
 /* DK 사장님 앱 알림 모양: "빨통 업소에 주문이 접수 되었습니다" / "배달주문 / 주문하신분 이민영 / 주문아이디 14266348"
    → 메뉴·금액은 알림에 없어서 이름 · 배달/픽업 · DK 주문아이디만 읽음 */
 function dkParse(x){
@@ -3361,68 +3307,6 @@ function dkParse(x){
   const isDk = !!(id || name) && /주문|order/i.test(t);
   return { id, name, pickup, isDk, kind: pickup ? L("픽업", "Pickup") : L("배달", "Delivery") };
 }
-/* DK 알림 → 외부 주문 창에 넣을 글 (이름 · 픽업 · 요청사항에 DK 주문아이디) */
-function dkPasteText(x){
-  const d = dkParse(x), full = x.body || x.title || "";
-  // 📤 DK 주문 화면을 통째로 보낸 경우 (메뉴가 읽힘) → 전체 글 + DK 주문아이디
-  if((parseOrderPaste(full).items || []).length) return full + (d.id && !/요청:\s*DK 주문아이디/.test(full) ? `\n요청: DK 주문아이디 ${d.id}` : "");
-  if(!d.isDk) return full;
-  return [d.name, d.pickup ? "픽업" : "", d.id ? `요청: DK 주문아이디 ${d.id}` : ""].filter(Boolean).join("\n");
-}
-const DK_URL = key => `${CFG.SUPABASE_URL}/functions/v1/dk-inbox?k=${key}`;
-async function dkInboxModal(){
-  let key = "";
-  const ago = t => { const m = Math.round((Date.now() - new Date(t)) / 60000); return m < 1 ? L("방금", "just now") : m < 60 ? L(`${m}분 전`, `${m} min ago`) : L(`${Math.round(m / 60)}시간 전`, `${Math.round(m / 60)} h ago`); };
-  const ov = modal(`📥 ${L("DK 자동 접수", "DK auto inbox")}`, `<label class="cp-row" style="margin-bottom:10px"><input type="checkbox" id="dkAutoChk" ${dkAuto() ? "checked" : ""}><span><b>⚡ ${L("읽을 수 있는 주문은 바로 자동 등록", "Auto-create orders that can be read")}</b><br><small>${L("이름·연락처 + 메뉴·금액이 읽히면 DK 외부 주문으로 바로 들어가요 (조리 중). 못 읽은 알림만 아래 목록에 남아요. 이 기기에서만 적용.", "If name/phone + items/amount are found, it's added as a DK order right away. Others stay in the list below. This device only.")}</small></span></label><div id="dkList"></div>
-    <details class="card" id="dkSetup" style="margin-top:10px"><summary><b>⚙ ${L("자동 접수 설정 (안드로이드 MacroDroid · 한 번만)", "Setup (Android MacroDroid · once)")}</b></summary><div id="dkSetupBody" class="hint" style="line-height:1.7;margin-top:8px">…</div></details>`, () => true, L("닫기", "Close"));
-  const paint = () => {
-    const box = ov.querySelector("#dkList");
-    box.innerHTML = dkReady ? (dkInbox.length ? dkInbox.map(x => `<div class="card" style="margin-bottom:8px">
-        <div style="display:flex;justify-content:space-between;gap:8px"><b>${(d => d.isDk ? `${d.pickup ? "🏃" : "🛵"} ${esc(d.name || "DK")} · ${d.kind}${d.id ? ` · DK #${esc(d.id)}` : ""}` : esc(x.title || "DK"))(dkParse(x))}</b><span class="hint" style="margin:0">${ago(x.created_at)}</span></div>
-        <div data-raw style="white-space:pre-wrap;font-size:14px;margin:6px 0">${esc(x.body || "")}</div>
-        <div class="btn-row"><button class="primary-btn sm" data-dkgo="${x.id}">➕ ${L("외부 주문으로 등록", "Create order")}</button><button class="ghost-btn sm" data-dkno="${x.id}">${L("무시", "Ignore")}</button></div></div>`).join("")
-      : `<p class="hint">${L("새로 들어온 DK 알림이 없어요. 아래 설정을 마치면 DK 주문 알림이 여기에 자동으로 떠요.", "No new DK notifications. Finish the setup below and DK orders will appear here automatically.")}</p>`)
-      : `<p class="hint" style="color:#b45309">⚠️ ${L("Supabase에서 50단계 SQL(50-dk-inbox.sql)을 먼저 실행해 주세요.", "Run SQL step 50 (50-dk-inbox.sql) first.")}</p>`;
-    box.querySelectorAll("[data-dkgo]").forEach(b => b.onclick = () => { const x = dkInbox.find(i => i.id === b.dataset.dkgo); if(!x) return;
-      ov.remove(); extOrderModal({ text: dkPasteText(x), ch: "DK", inboxId: x.id }); });   // 알림 제목(예: '새 주문')은 이름으로 잘못 들어가서 본문만
-    box.querySelectorAll("[data-dkno]").forEach(b => b.onclick = async () => { await api.dkInboxSet(b.dataset.dkno, "ignored").catch(e => toast(PT.errMsg(e))); await loadDkInbox(); paint(); });
-  };
-  const paintSetup = () => {
-    const url = DK_URL(key || "…");
-    ov.querySelector("#dkSetupBody").innerHTML = `${L("DK 사장님 앱이 깔린 <b>안드로이드폰</b>에서 (인쇄 스테이션 S9도 OK)", "On the <b>Android phone</b> with the DK merchant app (the print-station S9 is fine)")}:
-      <ol style="padding-left:18px;margin:6px 0">
-        <li>${L("Play 스토어에서 <b>MacroDroid</b> 설치 (무료) → 처음 열 때 '알림 접근' 권한 <b>허용</b>", "Install <b>MacroDroid</b> (free) → allow <b>Notification access</b>")}</li>
-        <li>${L("<b>＋ 매크로 추가</b> → 트리거: <b>기기 이벤트 → 알림 → 알림 수신</b> → 앱 선택: <b>DK 사장님 앱</b> → 모든 내용", "<b>＋ Add macro</b> → Trigger: <b>Notification received</b> → app: <b>the DK app</b> → any content")}</li>
-        <li>${L("동작: <b>연결 → HTTP 요청</b> → 방식 <b>POST</b> → 아래 주소 붙여넣기", "Action: <b>Connectivity → HTTP Request</b> → method <b>POST</b> → paste this URL")}<br>
-          <input readonly value="${esc(url)}" style="width:100%;font-size:12px;padding:6px;margin:4px 0" id="dkUrl"> <button class="chip" id="dkCopy">📋 ${L("주소 복사", "Copy URL")}</button></li>
-        <li>${L("본문(Body) 내용 유형 <b>text/plain</b> → 본문에 아래 두 줄 (매직 텍스트 버튼으로 넣기)", "Body content type <b>text/plain</b> → body (use the magic-text button)")}<br><code>{not_title}<br>{notification}</code></li>
-        <li>${L("매크로 이름 'DK → 빨통' 저장 → DK 테스트 주문이나 알림이 오면 이 창에 떠요", "Save as 'DK → PAL TONG' → a DK notification will appear in this window")}</li>
-      </ol>
-      <b>📤 ${L("메뉴·금액까지 자동으로 (매크로 하나 더)", "Menu & amount too (one more macro)")}</b>
-      <ol style="padding-left:18px;margin:6px 0">
-        <li>${L("새 매크로 → 트리거: <b>플로팅 버튼 (Floating Button)</b> — 화면에 떠 있는 작은 버튼", "New macro → Trigger: <b>Floating Button</b>")}</li>
-        <li>${L("액션 1: <b>화면 내용 읽기 (Read Screen Contents)</b> → 새 문자열 변수 <b>dk_screen</b> 에 저장 (접근성 권한 허용)", "Action 1: <b>Read Screen Contents</b> → save to a new string variable <b>dk_screen</b> (allow accessibility)")}</li>
-        <li>${L("액션 2: <b>HTTP 요청</b> → POST → 위와 같은 주소 → 본문 text/plain 에 매직 텍스트로 <b>dk_screen</b> 변수 넣기", "Action 2: <b>HTTP Request</b> → POST → same URL → body text/plain = the <b>dk_screen</b> variable")}</li>
-        <li>${L("쓰는 법: DK 앱에서 <b>주문 상세 화면</b>을 연 채로 떠 있는 버튼을 한 번 탭 → 메뉴·금액·주소가 읽히면 바로 DK 주문으로 자동 등록 (같은 주문아이디는 한 번만)", "Use: open the <b>order detail</b> in the DK app and tap the floating button → auto-added as a DK order (same order id only once)")}</li>
-      </ol>
-      <div class="btn-row"><button class="ghost-btn sm" id="dkTest">🧪 ${L("테스트 알림 보내기", "Send a test")}</button><button class="ghost-btn sm" id="dkRotate">🔑 ${L("새 키 만들기", "New key")}</button></div>
-      <p class="hint" style="margin:6px 0 0">${L("주소 끝의 k=… 는 가게 전용 비밀 키예요. 다른 사람에게 보내지 마세요. 새 키를 만들면 MacroDroid 주소도 바꿔야 해요.", "The k=… part is your secret key. Don't share it. If you make a new key, update MacroDroid too.")}</p>`;
-    ov.querySelector("#dkCopy").onclick = () => { const i = ov.querySelector("#dkUrl"); i.select(); try{ navigator.clipboard.writeText(i.value); }catch(e){ document.execCommand("copy"); } toast(L("복사했어요", "Copied")); };
-    ov.querySelector("#dkTest").onclick = async () => {
-      try{ const r = await fetch(DK_URL(key), { method: "POST", headers: { "content-type": "text/plain" }, body: "DK 테스트 주문 / Test\nJuan Dela Cruz\n0917 123 4567\n닭도리탕 1\nDelivery fee 80\nPoints used: 50" });
-        const j = await r.json().catch(() => ({})); toast(j.ok ? L("✔ 테스트 알림이 들어왔어요", "✔ Test arrived") : "✖ " + (j.error || r.status), 4000); await loadDkInbox(); paint(); }
-      catch(e){ toast("✖ " + (e.message || e), 4000); }
-    };
-    ov.querySelector("#dkRotate").onclick = async () => { if(!confirm(L("새 키를 만들면 지금 MacroDroid 설정은 더 이상 안 돼요. 계속할까요?", "The current MacroDroid setup will stop working. Continue?"))) return;
-      try{ key = await api.dkInboxKey(true); paintSetup(); toast(L("새 키를 만들었어요 — MacroDroid 주소를 바꿔주세요", "New key — update MacroDroid")); }catch(e){ toast(PT.errMsg(e), 4000); } };
-  };
-  ov.querySelector("#dkAutoChk").onchange = e => { ls.set("paltong_dk_auto", e.target.checked); toast(e.target.checked ? L("⚡ DK 자동 등록 켬", "DK auto-add on") : L("DK 자동 등록 끔 — 목록에서 직접 등록", "DK auto-add off")); };
-  paint();
-  try{ await loadDkInbox(); paint(); key = await api.dkInboxKey(false); paintSetup(); }
-  catch(e){ ov.querySelector("#dkSetupBody").textContent = PT.errMsg(e); }
-  if(!dkInbox.length) ov.querySelector("#dkSetup").open = true;
-}
-
 async function extOrderModal(pre){   // pre = { text, ch, inboxId } — 📥 DK 자동 접수에서 열 때
   if(PT.DEMO){ toast(L("데모 모드에서는 쓸 수 없어요", "Not available in demo mode")); return; }
   const act = riders.filter(r => r.active).sort((a, b) => (b.on_duty - a.on_duty) || a.name.localeCompare(b.name));
@@ -3473,7 +3357,6 @@ async function extOrderModal(pre){   // pre = { text, ch, inboxId } — 📥 DK 
         await api.updateOrder(r.id, patch).catch(e => toast(L("포인트 공제 저장 실패: ", "Points not saved: ") + PT.errMsg(e), 5000));
       }
       if(stf.id) await api.setOrderStaff(r.id, stf.id, stf.pin).catch(e => toast(staffErr(e), 4000));
-      if(pre && pre.inboxId){ await api.dkInboxSet(pre.inboxId, "done", r.id).catch(() => {}); loadDkInbox(); }
       await loadOrders(); loadRiders();
       shareTrack({ id: r.id, order_no: r.order_no, tracking_url: r.tracking_url, cust_phone: f.phone, cust_name: f.name }, true);
     }, L("등록하고 링크 받기", "Create & get link"));
@@ -3635,9 +3518,6 @@ function startApp(){
   api.getSettings().then(st => { PT.setTranslateKey(st && st.google_maps_key); gGeoKey = (st && st.google_maps_key) || null; }).catch(() => {});   // Google 번역 키
   api.onOrdersChange(() => { clearTimeout(window._lt); window._lt = setTimeout(loadOrders, 300); });
   setInterval(loadOrders, 15000);          // 실시간 연결이 끊겨도 15초마다 새로고침
-  loadDkInbox(true);
-  try{ api.onDkInbox(() => loadDkInbox()); }catch(e){}
-  setInterval(() => loadDkInbox(), 20000);
   refreshReviewCount();
   loadThreads();
   try{ api.onChatChange(() => { clearTimeout(window._ct); window._ct = setTimeout(loadThreads, 300); }); }catch(e){}
