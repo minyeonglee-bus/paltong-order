@@ -966,13 +966,13 @@ async function editLinePrice(o, i){
   const ok = await saveSvcItems(o, items, null);
   if(ok && notifyCustomer(o)) api.adminBotPost(o.id, `✏️ 가게에서 ${l.name} 가격을 ₱${n}로 조정했어요. 최종 금액은 ${peso(o.total)}입니다.`, `✏️ The store adjusted the price of ${l.en || l.name} to ₱${n}. New total: ${peso(o.total)}.`).catch(() => {});
 }
-/* ♿ PWD 할인 25% — 모든 주문 카드 · 다이닝 · 외부 주문에 체크박스
-   '매장 할인' 칸에 'PWD 할인 25%'로 저장 → 메뉴를 더 넣거나 빼도 서버가 25%로 다시 계산 */
-const PWD_PCT = 25, PWD_LABEL = "PWD 할인 25%";
+/* ♿ PWD 할인 20% — 모든 주문 카드 · 다이닝 · 외부 주문에 체크박스
+   '매장 할인' 칸에 'PWD 할인 20%'로 저장 → 메뉴를 더 넣거나 빼도 서버가 20%로 다시 계산 */
+const PWD_PCT = 20, PWD_LABEL = "PWD 할인 20%";
 const isPwd = o => /^PWD/.test(o.store_discount_label || "");
 function pwdRowHTML(o){
   if(o.status === "cancelled") return "";
-  return `<label class="cp-row" style="margin:6px 0"><input type="checkbox" data-pwd ${isPwd(o) ? "checked" : ""}><span><b>♿ ${L("PWD 할인 25%", "PWD discount 25%")}</b>${isPwd(o) && o.store_discount ? ` <small style="color:var(--green)">−${peso(o.store_discount)}</small>` : ""}${o.status === "done" ? ` <small class="hint" style="margin:0">🔒</small>` : ""}</span></label>`;
+  return `<label class="cp-row" style="margin:6px 0"><input type="checkbox" data-pwd ${isPwd(o) ? "checked" : ""}><span><b>♿ ${L("PWD 할인 20%", "PWD discount 20%")}</b>${isPwd(o) && o.store_discount ? ` <small style="color:var(--green)">−${peso(o.store_discount)}</small>` : ""}${o.status === "done" ? ` <small class="hint" style="margin:0">🔒</small>` : ""}</span></label>`;
 }
 function bindPwd(el, o){
   const cb = el.querySelector("[data-pwd]"); if(!cb) return;
@@ -983,7 +983,7 @@ async function setPwd(o, on){
   const ptsM = /포인트 공제 ₱(\d+)/.exec(o.store_discount_label || ""), pts = ptsM ? +ptsM[1] : (o.store_discount_label === "포인트 공제" ? (o.store_discount || 0) : 0);
   let patch;
   if(on){
-    if(o.store_discount && !isPwd(o) && !pts && !confirm(L(`이미 '${discText(o.store_discount_label)}' ${peso(o.store_discount)} 할인이 있어요. PWD 할인 25%로 바꿀까요?`, `There's already '${discText(o.store_discount_label)}' ${peso(o.store_discount)}. Replace with PWD 25%?`))) return;
+    if(o.store_discount && !isPwd(o) && !pts && !confirm(L(`이미 '${discText(o.store_discount_label)}' ${peso(o.store_discount)} 할인이 있어요. PWD 할인 20%로 바꿀까요?`, `There's already '${discText(o.store_discount_label)}' ${peso(o.store_discount)}. Replace with PWD 20%?`))) return;
     const amt = Math.floor(Math.max(0, base - pts) * PWD_PCT / 100);
     patch = pts ? { store_discount: pts + amt, store_discount_label: `PWD 할인 + 포인트 공제 ₱${pts}` } : { store_discount: amt, store_discount_label: PWD_LABEL };
   } else {
@@ -3325,7 +3325,7 @@ async function extOrderModal(pre){   // pre = { text, ch, inboxId } — 📥 DK 
       <div style="flex:1;min-width:0"><label class="hint" style="display:block;margin:0 0 3px;font-weight:700">🍽 ${L("음식값", "Food")} ₱</label><input data-f="amount" type="number" inputmode="numeric" min="0" placeholder="0" style="font-size:16px;width:100%"></div>
       <div style="flex:1;min-width:0" class="ex-dlv"><label class="hint" style="display:block;margin:0 0 3px;font-weight:700">🛵 ${L("배달비", "Delivery")} ₱</label><input data-f="fee" type="number" inputmode="numeric" min="0" placeholder="0" style="font-size:16px;width:100%"></div>
       <div style="flex:1;min-width:0" id="exPtsBox" hidden><label class="hint" style="display:block;margin:0 0 3px;font-weight:700;color:#0f766e">⭐ ${L("포인트 공제", "Points used")} ₱</label><input data-f="points" type="number" inputmode="numeric" min="0" placeholder="0" style="font-size:16px;width:100%"></div></div>
-    <label class="cp-row" style="margin:0 0 8px"><input type="checkbox" id="exPwd"><span><b>♿ ${L("PWD 할인 25%", "PWD discount 25%")}</b> <small>${L("(음식값에서)", "(on food)")}</small></span></label>
+    <label class="cp-row" style="margin:0 0 8px"><input type="checkbox" id="exPwd"><span><b>♿ ${L("PWD 할인 20%", "PWD discount 20%")}</b> <small>${L("(음식값에서)", "(on food)")}</small></span></label>
     <div class="sum-row total" id="exTotal" style="margin:0 0 12px"></div>
     <div class="field"><label>${L("결제", "Payment")}</label><select data-f="payment" class="note-in" style="margin:0">
       <option value="cash" data-cashopt>${L("현금 (기사가 받음)", "Cash (rider collects)")}</option><option value="gcash">GCash ${L("결제 완료", "paid")}</option><option value="maya">Maya ${L("결제 완료", "paid")}</option><option value="bank">${L("계좌이체 결제 완료", "Bank transfer paid")}</option></select></div>
