@@ -494,9 +494,11 @@ function renderDaybar(){
     <button class="pill" data-dstep="1" ${!d ? "disabled" : ""} title="${L("다음날", "Next day")}">▶</button>
     <button class="pill" id="cbBtn" style="margin-left:auto;background:#0E6B57;border-color:#0E6B57;color:#fff" title="${L("이 날 완료된 주문을 Paltong Cash Book 매출로 보내기", "Send this day's completed orders to the Paltong Cash Book")}">📒 ${L("캐시북으로", "To Cash Book")}</button>
     <button class="pill" id="dkBtn" style="${dkInbox.length ? "background:#0f766e;border-color:#0f766e;color:#fff;font-weight:800" : ""}">📥 DK${dkInbox.length ? ` <span class="n">${dkInbox.length}</span>` : ""}</button>
+    <button class="pill" id="dkSnapBtn" style="background:#0f766e;border-color:#0f766e;color:#fff">📷 ${L("DK 캡처", "DK screenshot")}</button>
     <button class="pill" id="extBtn" style="background:var(--red);border-color:var(--red);color:#fff">➕ ${L("외부 주문", "Outside order")}</button>`;
   $("extBtn").onclick = () => extOrderModal();
   $("dkBtn").onclick = () => dkInboxModal();
+  $("dkSnapBtn").onclick = () => extOrderModal({ ch: "DK", ocr: true });
   $("cbBtn").onclick = () => cashbookModal(viewDay || today());
   $("daybar").querySelectorAll("[data-day]").forEach(b => b.onclick = () => setViewDay(b.dataset.day));
   $("daybar").querySelectorAll("[data-dstep]").forEach(b => b.onclick = () => setViewDay(shiftDay(viewDay || t, +b.dataset.dstep)));
@@ -3101,7 +3103,7 @@ function parseOrderPaste(raw){
     if(ADDRISH.test(line)){ addr.push(line); continue; }
     loose.push(line);
   }
-  if(addr.length) out.addr = addr.join(", ");
+  if(addr.length) out.addr = addr.map(a => a.replace(/[,\s]+$/, "")).join(", ");
   // 이름표 없는 짧은 줄(숫자 없음) = 이름
   if(!out.name){ const i = loose.findIndex(l => l.length <= 30 && !/\d/.test(l) && !/[?!]/.test(l) && l.split(/\s+/).length <= 4); if(i >= 0) out.name = loose.splice(i, 1)[0]; }
   // 음식값: 메뉴 합계 → '음식값' 표시 → 합계 − 배달비 → ₱ 숫자 중 가장 큰 값(배달비 제외)
@@ -3121,13 +3123,114 @@ function parseOrderPaste(raw){
   if(out.total != null && out.amount != null && out.amount + (out.fee || 0) !== out.total) out.mismatch = true;
   const pay = (out.payment || text).toLowerCase();
   out.payKey = /gcash|지캐시/.test(pay) ? "gcash" : /maya|paymaya/.test(pay) ? "maya" : /bank|metrobank|bdo|bpi|계좌|이체|transfer/.test(pay) ? "bank" : /cash|cod|현금/.test(pay) ? "cash" : null;
+  out.memoLabeled = out.memo.slice(); out.loose = loose;
   out.memo = [...out.memo, ...loose].join(" / ").slice(0, 500);
   if(out.phone) out.phone = out.phone.replace(/^\+?63[\s.-]?/, "0").replace(/[^\d]/g, "").replace(/^(\d{4})(\d{3})(\d{4})$/, "$1 $2 $3");
   return out;
 }
 
+/* 📷 캡처 사진 → 글자 읽기 (Tesseract, 기기 안에서 처리 · 한국어+영어)
+   처음 한 번은 글자 인식 데이터(약 5MB)를 받느라 10~20초 걸려요. 그다음부터는 빨라요. */
+const OCR_JS = "https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js";
+let ocrWorkerP = null;
+function ocrWorker(onPct){
+  ocrWorker._cb = onPct;
+  return ocrWorkerP = ocrWorkerP || (async () => {
+    if(!window.Tesseract) await new Promise((res, rej) => { const sc = document.createElement("script"); sc.src = OCR_JS; sc.onload = res; sc.onerror = () => rej(new Error(L("글자 인식 프로그램을 못 받았어요 — 인터넷 확인", "Couldn't load the text reader — check internet"))); document.head.append(sc); });
+    return Tesseract.createWorker(["kor", "eng"], 1, {
+      workerPath: "https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/worker.min.js",
+      corePath: "https://cdn.jsdelivr.net/npm/tesseract.js-core@5.1.1",
+      logger: m => { if(ocrWorker._cb && m && typeof m.progress === "number") ocrWorker._cb(m.status, m.progress); } });
+  })().catch(e => { ocrWorkerP = null; throw e; });
+}
+/* 캡처를 글자 읽기 좋게: 작은 건 키우고, 흑백 · 다크모드면 뒤집기 */
+async function ocrPrep(file){
+  const bmp = await createImageBitmap(file);
+  const sc = Math.min(4, Math.max(1, (window.OCR_W || 2200) / bmp.width));
+  const c = document.createElement("canvas"); c.width = Math.round(bmp.width * sc); c.height = Math.round(bmp.height * sc);
+  const g = c.getContext("2d"); g.imageSmoothingQuality = "high"; g.drawImage(bmp, 0, 0, c.width, c.height);
+  const d = g.getImageData(0, 0, c.width, c.height), a = d.data; let sum = 0;
+  for(let i = 0; i < a.length; i += 4){ const y = a[i] * .299 + a[i + 1] * .587 + a[i + 2] * .114; a[i] = a[i + 1] = a[i + 2] = y; sum += y; }
+  if(sum / (a.length / 4) < 110) for(let i = 0; i < a.length; i += 4) a[i] = a[i + 1] = a[i + 2] = 255 - a[i];   // 다크모드
+  g.putImageData(d, 0, 0);
+  return c;
+}
+/* 읽은 글 정리: 상태바·버튼 같은 잡글 빼고, 여러 장에서 겹치는 줄은 한 번만 */
+function ocrClean(texts){
+  const seen = new Set(), out = [];
+  const JUNK = /^(?:\d{1,2}:\d{2}(?:\s*[AP]M)?|[<>←→×✕x]|접수|거절|확인|취소|닫기|뒤로|인쇄|전화(?:하기)?|채팅|주문\s*(?:접수|거절|상세|내역)|LTE|5G|4G|\d{1,3}%)$/i;
+  for(const t of texts) for(let l of String(t).split("\n")){
+    l = l.replace(/[|｜]/g, " ").replace(/\s{2,}/g, " ").trim()
+      .replace(/(^|\s)-?\s?[£€¥₩윤원우]\s?(?=\d)/g, "$1₱").replace(/(^|\s)-?\s?P(?=\d[\d,]*(?:\.\d\d)?$)/g, "$1₱")   // ₱를 £·윤·P로 읽는 경우
+      .replace(/(^|\s)=+(?=\S)/g, "$1");
+    if(!l || l.length < 2 && !/\d/.test(l) || JUNK.test(l)) continue;
+    const k = l.replace(/\s/g, ""); if(seen.has(k)) continue; seen.add(k); out.push(l);
+  }
+  return out.join("\n");
+}
+async function ocrImages(files, say){
+  const w = await ocrWorker((st, p) => say(/recogniz/.test(st) ? L(`글자 읽는 중… ${Math.round(p * 100)}%`, `Reading… ${Math.round(p * 100)}%`) : L(`글자 인식 준비 중… (처음 한 번만 오래 걸려요) ${Math.round(p * 100)}%`, `Preparing reader… (slow the first time) ${Math.round(p * 100)}%`)));
+  const texts = [];
+  for(const [i, f] of files.entries()){
+    if(files.length > 1) say(L(`${i + 1}/${files.length}장 읽는 중…`, `Reading ${i + 1}/${files.length}…`));
+    const { data } = await w.recognize(await ocrPrep(f));
+    texts.push(data.text);
+  }
+  return ocrClean(texts);
+}
+/* 캡처 글자 읽기는 숫자를 가끔 틀려요 (₱ → 7·2, 배달비 글자 깨짐) → 'DK 합계'와 맞춰서 바로잡기
+   음식값(메뉴) + 배달비 − 포인트 = 합계 가 되도록: 이상한 이름의 줄 = 배달비 · 앞자리 하나 더 붙은 숫자 = 앞자리 빼기 */
+function ocrFix(p){
+  const good = l => !l.custom || /[가-힣]{2,}/.test(l.name) || /[a-z]{3,}/.test(l.name);
+  const junk = (p.items || []).filter(l => !good(l));
+  let items = (p.items || []).filter(good);
+  const sum = () => items.reduce((a, l) => a + l.unitPrice * l.qty, 0);
+  const sfx = n => { const t = String(n), r = [n]; for(let i = 1; i < t.length; i++) r.push(+t.slice(i)); return r; };   // 7850 → 7850, 850, 50, 0
+  const ok = (f, pt, tot) => sum() + (f || 0) - (pt || 0) === tot;
+  let fee = p.fee, pts = p.points || 0, tot = p.total, fixed = false;
+  if(fee == null && junk.length){   // 배달비 글자가 깨져서 메뉴로 들어간 줄
+    const c = junk.find(l => tot != null ? sfx(pts).some(x => ok(l.unitPrice, x, tot)) || sfx(tot).some(t => ok(l.unitPrice, pts, t)) : l.unitPrice >= 20 && l.unitPrice <= 500);
+    if(c){ fee = c.unitPrice; fixed = true; }
+  }
+  if(tot != null && !ok(fee, pts, tot)){
+    const pf = sfx(pts).find(x => ok(fee, x, tot)); if(pf != null){ pts = pf; fixed = true; }
+    else { const tf = sfx(tot).find(t => ok(fee, pts, t)); if(tf != null){ tot = tf; fixed = true; }
+      else if(fee != null){ const ff = sfx(fee).find(f => ok(f, pts, tot)); if(ff != null){ fee = ff; fixed = true; } } }
+  }
+  if(fee != null && junk.some(l => l.unitPrice === fee)) items = items.filter(l => l.unitPrice !== fee || good(l));
+  p.items = fee != null ? items.concat(junk.filter(l => l.unitPrice !== fee)) : p.items;
+  p.fee = fee; p.points = pts; p.total = tot;
+  p.itemsSum = p.items.reduce((a, l) => a + l.unitPrice * l.qty, 0); p.amount = p.itemsSum || p.amount;
+  p.mismatch = tot != null && p.amount + (fee || 0) - pts !== tot;
+  return fixed;
+}
+/* 외부 주문 창: 📷 버튼 · 사진 붙여넣기 → 글로 바꿔서 붙여넣기 칸에 넣음 (그다음은 붙여넣기와 똑같이 자동으로 칸 채움) */
+function bindOcr(ov, onDone){
+  const btn = ov.querySelector("[data-ocr]"), inp = ov.querySelector("[data-ocrfile]"), ta = ov.querySelector("[data-paste]"), info = ov.querySelector("[data-pasteout]");
+  if(!btn) return;
+  const run = async files => {
+    files = files.filter(f => /^image\//.test(f.type)); if(!files.length) return;
+    btn.disabled = true; const say = t => info.textContent = "📷 " + t;
+    try{
+      say(L("사진 여는 중…", "Opening…"));
+      const text = await ocrImages(files, say);
+      if(!text.trim()){ say(L("글자를 못 읽었어요 — 주문 상세 화면이 잘 보이게 다시 캡처해 주세요", "No text found — take a clearer screenshot of the order detail")); return; }
+      const d = dkParse({ body: text });
+      ta.value = text + (d.id && !/요청:\s*DK 주문아이디/.test(text) ? `\n요청: DK 주문아이디 ${d.id}` : "");
+      onDone && onDone(text, d);
+      ta.dispatchEvent(new Event("input"));
+    }catch(e){ say("⚠️ " + (e.message || e)); }
+    finally{ btn.disabled = false; inp.value = ""; }
+  };
+  btn.onclick = () => inp.click();
+  inp.onchange = () => run([...inp.files]);
+  ta.addEventListener("paste", e => { const fs = [...((e.clipboardData || {}).items || [])].filter(i => i.kind === "file").map(i => i.getAsFile()).filter(Boolean); if(fs.length){ e.preventDefault(); run(fs); } });
+  ov._ocrPick = () => inp.click();
+}
 /* 지도 + 핀 + '통째로 붙여넣기' 상자 (외부 주문 등록 · 손님 위치 수정 공용) */
-const pasteBoxHTML = () => `<div class="field"><label>📋 ${L("손님 메시지 통째로 붙여넣기", "Paste the whole customer message")}</label>
+const pasteBoxHTML = ocr => `<div class="field"><label>📋 ${L("손님 메시지 통째로 붙여넣기", "Paste the whole customer message")}</label>
+  ${ocr ? `<div class="btn-row" style="margin:0 0 6px"><button type="button" class="primary-btn sm" data-ocr style="background:#0f766e;border-color:#0f766e">📷 ${L("DK 캡처 사진으로 채우기", "Fill from a DK screenshot")}</button><input type="file" accept="image/*" multiple data-ocrfile hidden></div>
+  <p class="hint" style="margin:0 0 6px">${L("DK 앱 주문 상세 화면을 캡처해서 고르세요 (길면 여러 장 OK) · 캡처를 복사해서 아래 칸에 붙여넣어도 돼요", "Pick screenshots of the DK order detail (several OK) · or copy a screenshot and paste it below")}</p>` : ""}
   <textarea data-paste rows="4" class="note-in" style="margin:0" placeholder="${L("카톡·문자·페이스북에서 받은 내용을 전부 복사해서 붙여넣으세요\n이름, 연락처, 주소, 구글지도 링크, 금액, 요청사항이 자동으로 들어가요", "Copy everything the customer sent (KakaoTalk, SMS, Facebook) and paste it here.\nName, phone, address, Google Maps link, amount and notes fill in automatically.")}"></textarea>
   <p class="hint" data-pasteout style="margin:6px 0 0"></p></div>`;
 const pinFieldHTML = () => `<div class="field"><label>${L("배달 위치 — 구글지도 링크·좌표를 붙여넣거나, 지도를 눌러 핀 찍기", "Drop-off — paste a Google Maps link / coordinates, or tap the map")}</label>
@@ -3325,7 +3428,7 @@ async function extOrderModal(pre){   // pre = { text, ch, inboxId } — 📥 DK 
   const act = riders.filter(r => r.active).sort((a, b) => (b.on_duty - a.on_duty) || a.name.localeCompare(b.name));
   const ov = modal(`➕ ${L("외부 주문 등록", "New outside order")}`, `
     <p class="hint" style="margin-top:0">${L("주문톡을 거치지 않은 배달(전화·카톡 등)도 기사를 배정하고 손님에게 추적 링크를 보낼 수 있어요. 주문은 바로 '조리 중'으로 들어갑니다.", "Register a delivery that didn't come through the website, assign a rider and send the customer a tracking link. It starts as 'Preparing'.")}</p>
-    ${pasteBoxHTML()}
+    ${pasteBoxHTML(true)}
     <div class="field"><label>${L("주문 경로", "Channel")}</label><div class="chips" id="exCh">${EXT_CHANNELS.map((c, i) => `<button type="button" class="chip ${i === 0 ? "sel" : ""}" data-ch="${c[0]}">${c[0] === "DK" ? "DK" : `${chLabel(c[0])} <span class="en">P</span>`}</button>`).join("")}</div></div>
     <div class="seg" id="exType" style="margin-bottom:12px"><button type="button" data-ot="delivery" class="sel">🛵 ${L("배달", "Delivery")}</button><button type="button" data-ot="pickup">🏃 ${L("픽업", "Pickup")}</button></div>
     <div class="field"><label>${L("손님 이름", "Customer name")}</label><input data-f="name" placeholder="Juan"></div>
@@ -3422,6 +3525,7 @@ async function extOrderModal(pre){   // pre = { text, ch, inboxId } — 📥 DK 
   paintTotal();
   bindPaste(ov, p => {
     const got = [];
+    if(ov._ocr){ p.memo = (p.memoLabeled || []).join(" / "); if(ocrFix(p)) got.push("🔧 " + L("DK 합계에 맞춰 숫자 보정", "numbers matched to DK total")); }
     const put = (k, v, lab) => { if(v == null || v === "") return; F(k).value = v; got.push(lab); };
     put("name", p.name, L("이름", "name")); put("phone", p.phone, L("연락처", "phone")); put("addr", p.addr, L("주소", "address"));
     // 메뉴: 붙여넣기로 넣었던 줄은 바꾸고, 직접 넣은 메뉴는 그대로
@@ -3443,7 +3547,9 @@ async function extOrderModal(pre){   // pre = { text, ch, inboxId } — 📥 DK 
     if(ov._forceCh) pickCh(ov._forceCh);
     return got;
   });
-  if(pre){ ov._forceCh = pre.ch || "DK"; pickCh(ov._forceCh);
+  bindOcr(ov, (text, d) => { ov._ocr = true; if(d.id || /주문\s*하신\s*분|DK/i.test(text)) ov._forceCh = "DK"; });
+  if(pre && pre.ocr){ ov._forceCh = "DK"; pickCh("DK"); ov._ocrPick(); }   // 📷 DK 캡처 버튼으로 열면 바로 사진 고르기
+  else if(pre){ ov._forceCh = pre.ch || "DK"; pickCh(ov._forceCh);
     const ta = ov.querySelector("[data-paste]"); if(ta && pre.text){ ta.value = pre.text; ta.dispatchEvent(new Event("input")); } }
   await setupPinMap(ov, null);
   F("addr").addEventListener("change", async () => {   // 주소를 직접 쓰고 나와도 핀이 없으면 자동으로 찾기
