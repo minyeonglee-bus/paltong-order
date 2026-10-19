@@ -483,6 +483,10 @@ function errMsg(e){
     [/birthday_locked/, ["생일은 한 번만 등록할 수 있어요. 바꾸려면 가게에 문의해주세요", "Birthday can only be set once. Please contact us to change it"]],
     [/birthday_invalid/, ["생일 날짜를 확인해주세요", "Please check the date"]],
     [/price_pin_wrong/, ["가격 비밀번호가 틀렸어요", "Wrong price password"]],
+    [/cancel_req_done/, ["이미 처리된 취소 요청이에요", "This cancel request was already handled"]],
+    [/cancel_req_order_done/, ["배달 완료된 주문은 취소할 수 없어요", "Delivered orders can't be cancelled"]],
+    [/cancel_requests_one_pending/, ["이미 취소 요청 중인 주문이에요 — 관리자 수락을 기다려 주세요", "A cancel request is already waiting for this order"]],
+    [/cancel_requests|admin_cancel_decide/, ["Supabase에서 sql/51-cancel-approval.sql 을 먼저 실행하세요", "Run sql/51-cancel-approval.sql in Supabase first"]],
     [/price_pin_short/, ["비밀번호는 4자리 이상으로 해주세요", "Use at least 4 characters"]],
     [/admin_save_menu|menu_config/, ["Supabase에서 sql/26-menu-editor.sql 을 먼저 실행하세요", "Run sql/26-menu-editor.sql in Supabase first"]],
     [/admin_set_menu_price/, ["Supabase에서 sql/25-menu-price-pin.sql 을 먼저 실행하세요", "Run sql/25-menu-price-pin.sql in Supabase first"]],
@@ -621,6 +625,13 @@ function makeSupabaseApi(){
     async dkInboxClaim(id){ const r = await sb.from("dk_inbox").update({ status: "done", handled_at: new Date().toISOString() }).eq("id", id).eq("status", "new").select("id"); if(r.error) throw r.error; return (r.data || []).length > 0; },   // 여러 기기 중 한 곳만 자동 등록
     async dkInboxKey(rotate){ return unwrap(await sb.rpc("admin_dk_inbox_key", { p_rotate: !!rotate })); },
     onDkInbox(cb){ sb.channel("dk_inbox").on("postgres_changes", { event:"INSERT", schema:"public", table:"dk_inbox" }, p => cb(p)).subscribe(); },
+    /* 🧾 주문 취소 요청 (51단계) */
+    async cancelReqList(days){ const since = new Date(Date.now() - (days || 2) * 864e5).toISOString();
+      return unwrap(await sb.from("cancel_requests").select("*").or(`created_at.gte.${since},status.eq.pending,and(status.eq.rejected,followup.is.null)`).order("created_at", { ascending:false }).limit(200)) || []; },
+    async cancelReqAdd(row){ return unwrap(await sb.from("cancel_requests").insert(row).select().single()); },
+    async cancelReqDecide(id, pin, approve, note){ return unwrap(await sb.rpc("admin_cancel_decide", { p_id: id, p_pin: String(pin || ""), p_approve: !!approve, p_note: note || null })); },
+    async cancelReqSet(id, patch){ unwrap(await sb.from("cancel_requests").update(patch).eq("id", id)); },
+    onCancelReq(cb){ sb.channel("cancel_requests").on("postgres_changes", { event:"*", schema:"public", table:"cancel_requests" }, p => cb(p)).subscribe(); },
     /* ---- 📡 인쇄 스테이션 (49단계) ---- */
     async printJobAdd(order, copies, label){
       unwrap(await sb.from("print_jobs").insert({ order_id: order && order.id && /^[0-9a-f-]{36}$/i.test(order.id) ? order.id : null, label: label || null, payload: order, copies: copies ?? "auto" }));
@@ -1115,6 +1126,15 @@ function makeDemoApi(){
       return { ...k, source:"code", min_order:k.min_order || 0 };
     },
     async dkInboxList(){ return []; }, async dkInboxSet(){}, async dkInboxClaim(){ return false; }, async dkInboxKey(){ return "demo-key"; }, onDkInbox(){},
+    async cancelReqList(){ return ls.get("paltong_demo_cancel_req", []); },
+    async cancelReqAdd(row){ const l = ls.get("paltong_demo_cancel_req", []); if(l.some(x => x.order_id === row.order_id && x.status === "pending")) throw new Error("duplicate key cancel_requests_one_pending");
+      const r = { id: "cr" + Date.now(), status: "pending", created_at: new Date().toISOString(), ...row }; l.unshift(r); ls.set("paltong_demo_cancel_req", l); return r; },
+    async cancelReqDecide(id, pin, approve, note){ if(String(pin) !== ls.get("paltong_demo_price_pin", "1234")) throw new Error("price_pin_wrong");
+      const l = ls.get("paltong_demo_cancel_req", []), r = l.find(x => x.id === id); if(!r || r.status !== "pending") throw new Error("cancel_req_done");
+      if(approve) await this.updateOrder(r.order_id, { status: "cancelled" });
+      r.status = approve ? "approved" : "rejected"; r.decide_note = note || null; r.decided_at = new Date().toISOString(); ls.set("paltong_demo_cancel_req", l); return { ok: true }; },
+    async cancelReqSet(id, patch){ const l = ls.get("paltong_demo_cancel_req", []), r = l.find(x => x.id === id); if(r) Object.assign(r, patch); ls.set("paltong_demo_cancel_req", l); },
+    onCancelReq(){},
     async printJobAdd(order, copies, label){ const q = ls.get("paltong_demo_print_jobs", []); q.push({ id: "pj" + Date.now() + Math.random().toString(36).slice(2, 6), label, payload: order, copies: copies ?? "auto", created_at: new Date().toISOString(), printed_at: null, tries: 0 }); ls.set("paltong_demo_print_jobs", q.slice(-50)); },
     async printJobsPending(){ return ls.get("paltong_demo_print_jobs", []).filter(j => !j.printed_at); },
     async printJobsRecent(){ return ls.get("paltong_demo_print_jobs", []).slice(-15).reverse(); },

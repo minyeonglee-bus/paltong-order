@@ -364,7 +364,7 @@ function playSound(kind){
   try{ navigator.vibrate && navigator.vibrate(kind === "msg" ? [80,60,80] : [300,100,300,100,300]); }catch(e){}
 }
 const beep = () => playSound("order");
-const ALARM_STYLE = { order:["🔔 새 주문","#d33d2a"], add:["➕ 추가 주문","#e07b00"], msg:["💬 새 메시지","#2a6fd3"] };
+const ALARM_STYLE = { order:["🔔 새 주문","#d33d2a"], add:["➕ 추가 주문","#e07b00"], msg:["💬 새 메시지","#2a6fd3"], cancel:["🧾 취소 요청","#b45309"] };
 function alarm(kind, msg, onOpen){
   if(SUB_WIN) return;   // 기사·다이닝 창에서는 알림 안 울림
   playSound(kind);
@@ -493,10 +493,12 @@ function renderDaybar(){
     <input type="date" id="dayPick" value="${d || t}" max="${t}" title="${L("다른 날짜 보기", "Pick another day")}">
     <button class="pill" data-dstep="1" ${!d ? "disabled" : ""} title="${L("다음날", "Next day")}">▶</button>
     <button class="pill" id="cbBtn" style="margin-left:auto;background:#0E6B57;border-color:#0E6B57;color:#fff" title="${L("이 날 완료된 주문을 Paltong Cash Book 매출로 보내기", "Send this day's completed orders to the Paltong Cash Book")}">📒 ${L("캐시북으로", "To Cash Book")}</button>
+    ${cReqs.some(r => r.status === "pending" || crNeedsFollow(r)) ? `<button class="pill" id="crBtn" style="background:#b45309;border-color:#b45309;color:#fff;font-weight:800">🧾 ${L("취소 요청", "Cancels")} <span class="n">${cReqs.filter(r => r.status === "pending" || crNeedsFollow(r)).length}</span></button>` : ""}
     <button class="pill" id="dkSnapBtn" style="background:#0f766e;border-color:#0f766e;color:#fff">📷 ${L("DK 캡처", "DK screenshot")}</button>
     <button class="pill" id="extBtn" style="background:var(--red);border-color:var(--red);color:#fff">➕ ${L("외부 주문", "Outside order")}</button>`;
   $("extBtn").onclick = () => extOrderModal();
   $("dkSnapBtn").onclick = () => extOrderModal({ ch: "DK", ocr: true });
+  if($("crBtn")) $("crBtn").onclick = () => cancelReqListModal();
   $("cbBtn").onclick = () => cashbookModal(viewDay || today());
   $("daybar").querySelectorAll("[data-day]").forEach(b => b.onclick = () => setViewDay(b.dataset.day));
   $("daybar").querySelectorAll("[data-dstep]").forEach(b => b.onclick = () => setViewDay(shiftDay(viewDay || t, +b.dataset.dstep)));
@@ -518,6 +520,7 @@ function dnCard(o){
       ${o.discount || o.store_discount ? `<div class="sum-row"><span>${L("소계", "Subtotal")}</span><span>${peso(o.subtotal)}</span></div>` : ""}
       ${o.store_discount ? `<div class="sum-row"><span>${esc(discText(o.store_discount_label))}</span><span>-${peso(o.store_discount)}</span></div>` : ""}
       <div class="sum-row total"><span>${L("합계", "Total")}</span><b style="font-size:20px">${peso(o.total)}</b></div></div>
+    ${cancelReqHTML(o)}
     ${pwdRowHTML(o)}
     <div class="btn-row"><button class="ghost-btn sm" data-dadd>➕ ${L("메뉴 추가", "Add item")}</button><button class="ghost-btn sm" data-dsvcadd>🎁 ${L("서비스", "Free item")}</button><button class="ghost-btn sm" data-dprint>🖨 ${L("주문서", "Print")}</button><button class="ghost-btn sm" data-dtotal>✏️ ${L("최종 금액", "Final amount")}</button><button class="ghost-btn sm" data-ddisc>🏷 ${L("할인", "Discount")}</button></div>
     <div class="btn-row"><button class="primary-btn sm green" data-dpay>💳 ${L("결제 완료", "Paid")} · ${peso(o.total)}</button></div>
@@ -544,14 +547,12 @@ function renderDining(){
     el.querySelector("[data-dsvcadd]").onclick = () => addItemModal(o, true);
     el.querySelector("[data-dprint]").onclick = () => doPrint(o);
     el.querySelector("[data-dpay]").onclick = () => dinePayModal(o);
-    el.querySelector("[data-dcancel]").onclick = async () => {
-      if(!confirm(L(`${PT.orderCode(o)} 주문을 취소할까요? (매출에 안 들어가요)`, `Cancel ${PT.orderCode(o)}?`))) return;
-      try{ await api.updateOrder(o.id, { status: "cancelled" }); toast(L("취소했어요", "Cancelled")); await loadOrders(); }catch(e){ toast(PT.errMsg(e), 4000); } };
+    el.querySelector("[data-dcancel]").onclick = () => cancelReqModal(o);   // 🧾 사유 + 관리자 수락
     el.querySelectorAll("[data-dsvc]").forEach(b => b.onclick = () => svcLine(o, +b.dataset.dsvc));
     el.querySelectorAll("[data-dprice]").forEach(b => b.onclick = () => editLinePrice(o, +b.dataset.dprice));
     el.querySelector("[data-dtotal]").onclick = () => editTotal(o);
     el.querySelector("[data-ddisc]").onclick = () => editDineDisc(o);
-    bindPwd(el, o);
+    bindPwd(el, o); bindCancelReq(el);
     el.querySelectorAll("[data-dq]").forEach(b => b.onclick = async () => {
       const [i, d] = b.dataset.dq.split("|").map(Number), items = JSON.parse(JSON.stringify(o.items || []));
       items[i].qty += d;
@@ -866,8 +867,10 @@ function cardHTML(o){
           : `<p class="hint" style="margin:6px 0 0">손님이 추가 금액을 송금하고 영수증을 올리면 여기에 표시됩니다. <button class="chip" data-act="extraok">받은 것으로 처리</button></p>`}
       </div>` : ""}
     ${riderRowHTML(o)}
+    ${cancelReqHTML(o)}
     ${pwdRowHTML(o)}
     ${action}
+    ${["confirmed", "receipt_submitted", "delivering"].includes(o.status) && !(cReqOf(o) && (cReqOf(o).status === "pending" || crNeedsFollow(cReqOf(o)))) ? `<div class="btn-row"><button class="ghost-btn sm" data-act="cancel">🧾 ${L("주문 취소 요청", "Request cancel")}</button></div>` : ""}
     ${o.source === "external" ? `<div class="btn-row"><button class="ghost-btn sm" data-delext style="color:var(--red-deep);border-color:var(--red)">🗑 ${L("잘못 올린 외부 주문 삭제", "Delete this outside order")}</button></div>` : ""}
     ${!["done","cancelled"].includes(o.status) ? `<div class="btn-row"><button class="ghost-btn sm" data-chat="${o.id}">💬 채팅${chatUnreadFor(o.id) ? ` <span class="rv-n" style="background:var(--red);color:#fff">${chatUnreadFor(o.id)}</span>` : ""}</button></div>` : ""}
   </div>`;
@@ -925,7 +928,7 @@ function bindCard(o){
     if(await saveSvcItems(o, items, null)) api.adminBotPost(o.id, `➖ ${l.name} ${l.qty}개를 주문에서 뺐어요.${o.total != null ? ` 최종 금액은 ${peso(o.total)}입니다.` : ""}`, `➖ ${l.en || l.name} ×${l.qty} was removed from your order.${o.total != null ? ` New total: ${peso(o.total)}.` : ""}`).catch(() => {});
   });
   el.querySelectorAll("[data-act]").forEach(b => b.onclick = () => act(o, b.dataset.act, b));
-  bindPwd(el, o);
+  bindPwd(el, o); bindCancelReq(el);
   { const rs = el.querySelector("[data-rider]"); if(rs) rs.onchange = () => assignRider(o, rs.value, rs); }
   el.querySelectorAll("[data-share]").forEach(b => b.onclick = () => shareTrack(o));
   el.querySelectorAll("[data-pinedit]").forEach(b => b.onclick = () => orderPinModal(o));
@@ -965,6 +968,151 @@ async function editLinePrice(o, i){
   if(n === orig){ delete l.priceOrig; delete l.priceByAdmin; } else { l.priceOrig = orig; l.priceByAdmin = true; }
   const ok = await saveSvcItems(o, items, null);
   if(ok && notifyCustomer(o)) api.adminBotPost(o.id, `✏️ 가게에서 ${l.name} 가격을 ₱${n}로 조정했어요. 최종 금액은 ${peso(o.total)}입니다.`, `✏️ The store adjusted the price of ${l.en || l.name} to ₱${n}. New total: ${peso(o.total)}.`).catch(() => {});
+}
+/* 🧾 주문 취소 = 사유 + 관리자 수락 (51단계)
+   직원: 사유 적고 '취소 요청' → 주문은 그대로 → 관리자(가격 비밀번호)가 ✅ 수락하면 취소
+   관리자가 ✖ 거절하면 → 직원이 📝 IR(경위서) 제출 또는 💵 그 금액을 포스에 채우기 중 하나 */
+let cReqs = [], cReqReady = true, cReqSeen = null;
+const CR_REASONS = [["손님 요청", "Customer asked"], ["주문 실수", "Order mistake"], ["메뉴 품절", "Sold out"], ["배달 불가", "Can't deliver"], ["결제 안 됨", "Not paid"], ["중복 주문", "Duplicate"], ["기타", "Other"]];
+const crNeedsFollow = r => r.status === "rejected" && !r.followup;
+async function loadCancelReqs(){
+  if(!cReqReady) return;
+  try{
+    const list = await api.cancelReqList(2);
+    const fresh = cReqSeen ? list.filter(r => r.status === "pending" && !cReqSeen.has(r.id)) : [];
+    cReqSeen = new Set(list.map(r => r.id)); cReqs = list;
+    for(const r of fresh) alarm("cancel", `🧾 ${esc(r.order_code || "")} ${L("취소 요청", "cancel request")} — ${esc(r.reason)}${r.staff_name ? ` (${esc(r.staff_name)})` : ""} · ${L("관리자 수락 필요", "needs admin")}`, () => cancelReqListModal());
+    renderDaybar(); renderOrders(); renderDining();
+  }catch(e){ if(/cancel_requests|does not exist|schema cache|404/i.test(String(e.message || e))) cReqReady = false; }
+}
+/* 이 주문의 요청: 대기 중 > 거절됐는데 IR/포스 안 함 > 가장 최근 */
+const cReqOf = o => cReqs.find(r => r.order_id === o.id && r.status === "pending") || cReqs.find(r => r.order_id === o.id && crNeedsFollow(r)) || cReqs.find(r => r.order_id === o.id && r.status !== "withdrawn");
+function cancelReqHTML(o){
+  const r = cReqOf(o); if(!r) return "";
+  const who = r.staff_name ? ` · 🙋 <span data-raw>${esc(r.staff_name)}</span>` : "";
+  const why = `<div style="margin:4px 0" data-raw>📝 ${esc(r.reason)}</div>`;
+  if(r.status === "pending") return `<div class="calc-box" style="background:#fff7e0;border:1.5px solid #f0b429;margin:8px 0">
+      <b style="color:#b45309">⏳ ${L("취소 요청 중 — 관리자 수락을 기다려요", "Cancel requested — waiting for admin")}</b>${why}
+      <div class="hint" style="margin:0 0 6px">${peso(r.amount)}${who} · ${fmtAgo(r.created_at)}</div>
+      <div class="btn-row"><button class="primary-btn sm" data-crok="${r.id}">✅ ${L("취소 수락 (관리자)", "Approve (admin)")}</button><button class="ghost-btn sm" data-crno="${r.id}">✖ ${L("거절 (관리자)", "Reject (admin)")}</button><button class="ghost-btn sm" data-crwd="${r.id}">↩ ${L("요청 철회", "Withdraw")}</button></div></div>`;
+  if(crNeedsFollow(r)) return `<div class="calc-box" style="background:#fdecea;border:1.5px solid #d33d2a;margin:8px 0">
+      <b style="color:#b42318">❌ ${L("취소 거절됨 — IR 제출 또는 포스에 채우기", "Cancel rejected — submit IR or fill the POS")}</b>${why}
+      ${r.decide_note ? `<div style="margin:2px 0" data-raw>👤 ${L("관리자", "Admin")}: ${esc(r.decide_note)}</div>` : ""}
+      <div class="btn-row" style="margin-top:6px"><button class="primary-btn sm" data-crir="${r.id}">📝 ${L("IR 제출", "Submit IR")}</button><button class="ghost-btn sm" data-crpos="${r.id}">💵 ${L(`포스에 ${peso(r.amount)} 채우기`, `Fill ${peso(r.amount)} into POS`)}</button></div></div>`;
+  if(r.status === "rejected") return `<div class="hint" style="margin:6px 0">❌ ${L("취소 거절됨", "Cancel rejected")} → ${r.followup === "ir" ? `📝 ${L("IR 제출됨", "IR submitted")}` : `💵 ${L(`포스에 ${peso(r.pos_amount || 0)} 채움`, `${peso(r.pos_amount || 0)} put in POS`)}`}${r.followup_by ? ` (${esc(r.followup_by)})` : ""}</div>`;
+  if(r.status === "approved") return `<div class="hint" style="margin:6px 0" data-raw>✅ ${L("관리자 수락 후 취소", "Cancelled with admin approval")} · ${esc(r.reason)}${r.staff_name ? ` · 🙋 ${esc(r.staff_name)}` : ""}</div>`;
+  return "";
+}
+function fmtAgo(t){ const m = Math.round((Date.now() - new Date(t)) / 60000); return m < 1 ? L("방금", "just now") : m < 60 ? L(`${m}분 전`, `${m} min ago`) : L(`${Math.floor(m / 60)}시간 전`, `${Math.floor(m / 60)} h ago`); }
+function bindCancelReq(el){
+  const find = id => cReqs.find(r => r.id === id);
+  el.querySelectorAll("[data-crok]").forEach(b => b.onclick = () => crDecide(find(b.dataset.crok), true));
+  el.querySelectorAll("[data-crno]").forEach(b => b.onclick = () => crDecide(find(b.dataset.crno), false));
+  el.querySelectorAll("[data-crwd]").forEach(b => b.onclick = () => crWithdraw(find(b.dataset.crwd)));
+  el.querySelectorAll("[data-crir]").forEach(b => b.onclick = () => crIR(find(b.dataset.crir)));
+  el.querySelectorAll("[data-crpos]").forEach(b => b.onclick = () => crPOS(find(b.dataset.crpos)));
+}
+/* 직원: 취소 요청 창 */
+async function cancelReqModal(o){
+  if(o.status === "done"){ toast(L("배달 완료된 주문은 취소할 수 없어요", "Delivered orders can't be cancelled"), 3500); return; }
+  const cur = cReqOf(o);
+  if(cur && cur.status === "pending"){ toast(L("이미 취소 요청 중이에요 — 관리자 수락을 기다려 주세요", "Already requested — waiting for admin"), 3500); return; }
+  if(!cReqReady){   // 51단계 전: 관리자 비밀번호로 바로 취소
+    const pin = await askPricePin(L(`${PT.orderCode(o)} 취소 — 관리자 비밀번호 (SQL 51단계를 실행하면 '사유 + 관리자 수락' 방식으로 바뀌어요)`, `Cancel ${PT.orderCode(o)} — admin password (run SQL step 51 for the request/approve flow)`)); if(pin == null) return;
+    try{ if(!(await api.checkPricePin(pin))){ toast(PT.errMsg("price_pin_wrong"), 3500); return; } await api.updateOrder(o.id, { status: "cancelled" }); toast(L("취소했어요", "Cancelled")); await loadOrders(); }catch(e){ toast(PT.errMsg(e), 4000); }
+    return;
+  }
+  let pick = "";
+  const ov = modal(`🧾 ${esc(PT.orderCode(o))} ${L("주문 취소 요청", "Cancel request")}`, `
+    <div class="calc-box" style="background:#fff7e0;border:1.5px solid #f0b429;margin:0 0 12px;line-height:1.6">⚠️ <b>${L("관리자가 수락해야 취소돼요.", "The order is cancelled only after an admin approves.")}</b><br>
+      ${L("수락 전까지 주문은 그대로 진행돼요.", "Until then the order stays as it is.")}<br>
+      ${L(`관리자가 허용하지 않으면 <b>IR(경위서)</b>을 제출하거나, 그 금액 <b>${peso(o.total || 0)}</b>을 <b>포스에 채워야</b> 해요.`, `If the admin rejects it, you must submit an <b>IR</b> or <b>put ${peso(o.total || 0)} into the POS</b>.`)}</div>
+    <div class="field"><label>${L("취소 사유", "Reason")} *</label><div class="chips" id="crWhy">${CR_REASONS.map(c => `<button type="button" class="chip" data-why="${c[0]}">${L(c[0], c[1])}</button>`).join("")}</div></div>
+    <div class="field"><label>${L("자세한 사유 (꼭 적어주세요)", "Details (required)")} *</label><textarea data-f="reason" rows="3" class="note-in" style="margin:0" placeholder="${L("예: 손님이 전화로 취소 요청 · 주소가 너무 멀어서 등", "e.g. customer called to cancel")}"></textarea></div>
+    <div class="field"><label>${L("손님에게 보일 안내 (선택)", "Message to the customer (optional)")}</label><input data-f="cust" placeholder="${L("수락되면 손님 화면에 보여요", "Shown to the customer once approved")}"></div>`,
+    async ov => {
+      const f = readFields(ov), txt = (f.reason || "").trim();
+      if(!pick){ toast(L("취소 사유를 골라주세요", "Pick a reason")); return false; }
+      if(txt.length < 2){ toast(L("자세한 사유를 적어주세요", "Write the details")); ov.querySelector('[data-f="reason"]').focus(); return false; }
+      const stf = staffOn() ? await staffPick(L("취소를 요청하는 직원", "Who is requesting the cancel?")) : { none: true }; if(!stf) return false;
+      try{
+        await api.cancelReqAdd({ order_id: o.id, order_code: PT.orderCode(o), amount: Math.round(o.total || 0), reason: `${pick} — ${txt}`, cust_note: (f.cust || "").trim() || null,
+          staff_id: stf.id || null, staff_name: stf.name || null });
+        toast(L("🧾 취소 요청을 보냈어요 — 관리자 수락 후 취소돼요", "🧾 Cancel request sent — cancelled after admin approval"), 4500);
+        await loadCancelReqs();
+      }catch(e){ toast(PT.errMsg(e), 5000); if(/cancel_requests/.test(String(e.message || e))) cReqReady = false; return false; }
+    }, `🧾 ${L("취소 요청 보내기", "Send cancel request")}`);
+  ov.querySelectorAll("[data-why]").forEach(b => b.onclick = () => { pick = b.dataset.why; ov.querySelectorAll("[data-why]").forEach(x => x.classList.toggle("sel", x === b)); ov.querySelector('[data-f="reason"]').focus(); });
+}
+/* 관리자: 수락 / 거절 (가격 비밀번호) */
+async function crDecide(r, ok){
+  if(!r) return;
+  let note = null;
+  if(!ok){ note = prompt(L(`${r.order_code} 취소를 거절해요.\n직원에게 보일 거절 이유 (선택)`, `Reject the cancel of ${r.order_code}.\nReason for the staff (optional)`), ""); if(note === null) return; }
+  const pin = await askPricePin(ok ? L(`${r.order_code} 취소 수락 — ${r.reason}`, `Approve cancel of ${r.order_code} — ${r.reason}`) : L(`${r.order_code} 취소 거절 → 직원이 IR 제출 또는 ${peso(r.amount)} 포스에 채우기`, `Reject cancel of ${r.order_code} → staff submits IR or puts ${peso(r.amount)} in POS`));
+  if(pin == null) return;
+  try{ await api.cancelReqDecide(r.id, pin, ok, note); toast(ok ? L(`✅ ${r.order_code} 취소했어요`, `✅ ${r.order_code} cancelled`) : L(`✖ ${r.order_code} 취소 거절 — 직원이 IR 또는 포스 채우기`, `✖ ${r.order_code} rejected — staff must submit IR or fill POS`), 4000); }
+  catch(e){ toast(PT.errMsg(e), 4000); }
+  await loadCancelReqs(); await loadOrders();
+}
+async function crWithdraw(r){
+  if(!r || !confirm(L(`${r.order_code} 취소 요청을 철회할까요? (주문은 그대로)`, `Withdraw the cancel request for ${r.order_code}?`))) return;
+  try{ await api.cancelReqSet(r.id, { status: "withdrawn", decided_at: new Date().toISOString() }); }catch(e){ toast(PT.errMsg(e), 4000); }
+  await loadCancelReqs();
+}
+/* 거절 후: 📝 IR 제출 */
+function crIR(r){
+  if(!r) return;
+  const ov = modal(`📝 ${esc(r.order_code)} IR ${L("(경위서)", "(incident report)")}`, `
+    <div class="calc-box" style="margin:0 0 10px" data-raw>${L("취소 사유", "Reason")}: ${esc(r.reason)}${r.decide_note ? `<br>${L("관리자", "Admin")}: ${esc(r.decide_note)}` : ""}<br>${L("금액", "Amount")}: ${peso(r.amount)}</div>
+    <div class="field"><label>${L("무슨 일이 있었는지 자세히 (언제 · 누가 · 왜 · 음식은 어떻게 됐는지)", "What happened (when · who · why · what happened to the food)")} *</label><textarea data-f="ir" rows="6" class="note-in" style="margin:0"></textarea></div>`,
+    async ov => {
+      const t = (readFields(ov).ir || "").trim();
+      if(t.length < 10){ toast(L("IR 내용을 10자 이상 적어주세요", "Write at least 10 characters")); return false; }
+      const stf = staffOn() ? await staffPick(L("IR을 제출하는 직원", "Who is submitting the IR?")) : { none: true }; if(!stf) return false;
+      try{ await api.cancelReqSet(r.id, { followup: "ir", ir_text: t, followup_by: stf.name || null, followup_at: new Date().toISOString() }); toast(L("📝 IR을 제출했어요", "📝 IR submitted")); }
+      catch(e){ toast(PT.errMsg(e), 4000); return false; }
+      await loadCancelReqs();
+    }, `📝 ${L("IR 제출", "Submit IR")}`);
+}
+/* 거절 후: 💵 그 금액을 포스에 채우기 */
+function crPOS(r){
+  if(!r) return;
+  const ov = modal(`💵 ${esc(r.order_code)} ${L("포스에 채우기", "Fill the POS")}`, `
+    <p class="hint" style="margin-top:0">${L("IR을 내지 않으면 취소하려던 주문 금액만큼 포스(현금함)에 채워 둬야 해요.", "Without an IR, put the order amount into the POS (cash drawer).")}</p>
+    <div class="field"><label>${L("채운 금액", "Amount put in")} ₱</label><input data-f="amt" type="number" inputmode="numeric" min="0" value="${Math.round(r.amount || 0)}" style="font-size:20px"></div>`,
+    async ov => {
+      const n = Math.round(+readFields(ov).amt || 0);
+      if(!(n > 0)){ toast(L("금액을 넣어주세요", "Enter the amount")); return false; }
+      if(n < r.amount && !confirm(L(`주문 금액 ${peso(r.amount)}보다 적어요. 이대로 저장할까요?`, `Less than ${peso(r.amount)}. Save anyway?`))) return false;
+      const stf = staffOn() ? await staffPick(L("포스에 채운 직원", "Who put the money in?")) : { none: true }; if(!stf) return false;
+      try{ await api.cancelReqSet(r.id, { followup: "pos", pos_amount: n, followup_by: stf.name || null, followup_at: new Date().toISOString() }); toast(L(`💵 포스에 ${peso(n)} 채움으로 기록했어요`, `💵 Recorded ${peso(n)} put in the POS`)); }
+      catch(e){ toast(PT.errMsg(e), 4000); return false; }
+      await loadCancelReqs();
+    }, `💵 ${L("채웠어요", "Done")}`);
+}
+/* 🧾 취소 요청 목록 (위쪽 버튼) — 대기 · 거절(IR/포스 필요) · 최근 7일 기록 */
+async function cancelReqListModal(){
+  const ov = modal(`🧾 ${L("주문 취소 요청", "Cancel requests")}`, `<div id="crList"><p class="hint">${L("불러오는 중…", "Loading…")}</p></div>`, () => true, L("닫기", "Close"));
+  const paint = async () => {
+    let list = []; try{ list = await api.cancelReqList(7); }catch(e){ ov.querySelector("#crList").innerHTML = `<p class="hint" style="color:#b45309">${esc(PT.errMsg(e))}</p>`; return; }
+    const st = r => r.status === "pending" ? `<b style="color:#b45309">⏳ ${L("수락 대기", "Waiting")}</b>` : r.status === "approved" ? `<b style="color:var(--green)">✅ ${L("취소됨", "Cancelled")}</b>`
+      : r.status === "withdrawn" ? `<span class="hint" style="margin:0">↩ ${L("철회", "Withdrawn")}</span>` : !r.followup ? `<b style="color:#b42318">❌ ${L("거절 — IR/포스 필요", "Rejected — IR/POS needed")}</b>`
+      : `❌ ${L("거절", "Rejected")} → ${r.followup === "ir" ? "📝 IR" : `💵 ${L("포스", "POS")} ${peso(r.pos_amount || 0)}`}`;
+    const row = r => `<div class="card" style="margin-bottom:8px">
+      <div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap"><b>${esc(r.order_code || "")} · ${peso(r.amount)}</b><span>${st(r)}</span></div>
+      <div data-raw style="margin:4px 0">📝 ${esc(r.reason)}</div>
+      <div class="hint" style="margin:0">${new Date(r.created_at).toLocaleString(EN() ? "en-PH" : "ko-KR", { month:"numeric", day:"numeric", hour:"2-digit", minute:"2-digit" })}${r.staff_name ? ` · 🙋 ${esc(r.staff_name)}` : ""}${r.decide_note ? ` · 👤 ${esc(r.decide_note)}` : ""}</div>
+      ${r.ir_text ? `<div class="calc-box" style="margin:6px 0 0;white-space:pre-wrap" data-raw>📝 IR${r.followup_by ? ` (${esc(r.followup_by)})` : ""}: ${esc(r.ir_text)}</div>` : ""}
+      ${r.status === "pending" ? `<div class="btn-row" style="margin-top:6px"><button class="primary-btn sm" data-crok="${r.id}">✅ ${L("취소 수락", "Approve")}</button><button class="ghost-btn sm" data-crno="${r.id}">✖ ${L("거절", "Reject")}</button></div>`
+        : crNeedsFollow(r) ? `<div class="btn-row" style="margin-top:6px"><button class="primary-btn sm" data-crir="${r.id}">📝 ${L("IR 제출", "Submit IR")}</button><button class="ghost-btn sm" data-crpos="${r.id}">💵 ${L(`포스에 ${peso(r.amount)} 채우기`, `Fill ${peso(r.amount)} into POS`)}</button></div>` : ""}</div>`;
+    const open = list.filter(r => r.status === "pending" || crNeedsFollow(r)), rest = list.filter(r => !open.includes(r));
+    ov.querySelector("#crList").innerHTML = (open.length ? open.map(row).join("") : `<p class="hint">${L("처리할 취소 요청이 없어요 ✔", "Nothing to handle ✔")}</p>`)
+      + (rest.length ? `<details style="margin-top:10px"><summary><b>${L("최근 7일 기록", "Last 7 days")} (${rest.length})</b></summary><div style="margin-top:8px">${rest.map(row).join("")}</div></details>` : "");
+    const keep = cReqs; cReqs = list; bindCancelReq(ov); cReqs = keep;
+    ov.querySelectorAll("[data-crok],[data-crno],[data-crir],[data-crpos]").forEach(b => { const f = b.onclick; b.onclick = async () => { cReqs = list; await f(); setTimeout(paint, 600); }; });
+  };
+  paint();
 }
 /* ♿ PWD 할인 20% — 모든 주문 카드 · 다이닝 · 외부 주문에 체크박스
    '매장 할인' 칸에 'PWD 할인 20%'로 저장 → 메뉴를 더 넣거나 빼도 서버가 20%로 다시 계산 */
@@ -1216,7 +1364,8 @@ async function act(o, a, btn){
     await run({ store_discount: sd, store_discount_label: sd ? discLabel(dd.dtype) : null, total: calcTotal(o, o.delivery_fee || 0, sd) }, sd ? L(`할인 ${peso(sd)} 적용`, `Discount ${peso(sd)} applied`) : L("할인을 없앴습니다", "Discount removed"));
   }
   if((a === "reject" || a === "cancel") && o.status === "done"){ toast(L("배달 완료된 주문은 취소할 수 없어요", "Delivered orders can't be cancelled"), 3500); return; }
-  if(a === "reject" || a === "cancel"){
+  if(a === "cancel"){ cancelReqModal(o); return; }   // 🧾 주문 취소 = 사유 + 관리자 수락
+  if(a === "reject"){
     const why = prompt(L(`#${o.order_no} 주문을 취소합니다. 손님에게 보일 사유 (선택)`, `Cancel #${o.order_no}. Reason shown to the customer (optional)`), a === "reject" ? "배달 가능 지역이 아닙니다 / Sorry, outside our delivery area" : "");
     if(why === null) return;
     await run({ status: "cancelled", admin_note: why.trim() || null }, "주문을 취소했습니다");
@@ -3522,6 +3671,7 @@ function startApp(){
   loadThreads();
   try{ api.onChatChange(() => { clearTimeout(window._ct); window._ct = setTimeout(loadThreads, 300); }); }catch(e){}
   setInterval(loadThreads, 20000);
+  loadCancelReqs(); try{ api.onCancelReq(() => { clearTimeout(window._crt); window._crt = setTimeout(loadCancelReqs, 300); }); }catch(e){} setInterval(loadCancelReqs, 30000);   // 🧾 취소 요청
   try{ api.onReviewsChange(() => { clearTimeout(window._rt); window._rt = setTimeout(() => { refreshReviewCount(); if(rvView) loadReviews(); }, 400); }); }catch(e){}
   setInterval(() => { refreshReviewCount(); if(rvView) loadReviews(); }, 60000);
   setInterval(() => { if(!document.activeElement || !document.activeElement.dataset || !document.activeElement.dataset.draft) renderOrders(); }, 60000); // '몇 분 전' 갱신
@@ -3552,6 +3702,7 @@ function startDiningWindow(){
   loadOrders();
   api.onOrdersChange(() => { clearTimeout(window._lt); window._lt = setTimeout(loadOrders, 300); });
   setInterval(loadOrders, 15000);
+  loadCancelReqs(); try{ api.onCancelReq(() => { clearTimeout(window._crt); window._crt = setTimeout(loadCancelReqs, 300); }); }catch(e){} setInterval(loadCancelReqs, 30000);
   setInterval(() => { if(!document.querySelector(".overlay")) renderDining(); }, 60000);   // '몇 분째' 갱신
   window.SUB_WIN_READY = "dining";
 }
