@@ -1129,17 +1129,50 @@ async function cancelReqListModal(){
   };
   paint();
 }
-/* ♿ PWD 할인 20% — 모든 주문 카드 · 다이닝 · 외부 주문에 체크박스
-   '매장 할인' 칸에 'PWD 할인 20%'로 저장 → 메뉴를 더 넣거나 빼도 서버가 20%로 다시 계산 */
+/* ♿ PWD 할인 — 모든 주문 카드 · 다이닝 · 외부 주문에 체크박스 → 체크하면 인원 계산 창
+   '매장 할인' 칸에 'PWD 할인 (PWD인원/총인원 pax)' 금액으로 저장 (메뉴가 바뀌면 체크를 풀었다 다시 체크) */
 const PWD_PCT = 20, PWD_LABEL = "PWD 할인 20%";
 const isPwd = o => /^PWD/.test(o.store_discount_label || "");
 function pwdRowHTML(o){
   if(o.status === "cancelled") return "";
-  return `<label class="cp-row" style="margin:6px 0"><input type="checkbox" data-pwd ${isPwd(o) ? "checked" : ""}><span><b>♿ ${L("PWD 할인 20%", "PWD discount 20%")}</b>${isPwd(o) && o.store_discount ? ` <small style="color:var(--green)">−${peso(o.store_discount)}</small>` : ""}${o.status === "done" ? ` <small class="hint" style="margin:0">🔒</small>` : ""}</span></label>`;
+  return `<label class="cp-row" style="margin:6px 0"><input type="checkbox" data-pwd ${isPwd(o) ? "checked" : ""}><span><b>♿ ${L("PWD 할인 20%", "PWD discount 20%")}</b>${isPwd(o) && pwdCount(o.store_discount_label) ? ` <small>(${pwdCount(o.store_discount_label).k}/${pwdCount(o.store_discount_label).n}${L("명", " pax")})</small>` : ""}${isPwd(o) && o.store_discount ? ` <small style="color:var(--green)">−${peso(o.store_discount)}</small>` : ""}${o.status === "done" ? ` <small class="hint" style="margin:0">🔒</small>` : ""}</span></label>`;
 }
 function bindPwd(el, o){
   const cb = el.querySelector("[data-pwd]"); if(!cb) return;
   cb.onchange = async () => { const on = cb.checked; cb.checked = !on; await setPwd(o, on); };
+}
+/* ♿ PWD 계산 (종이 공식 그대로): 금액 ÷ 인원 = 1인분 → PWD 손님 몫만 × 0.8 → 나머지 인원 몫과 더하기
+   예) 980 ÷ 2 = 490 · 490 × 0.8 = 392 · 392 + 490 = 882 → 할인 ₱98 */
+const pwdAmt = (base, n, k) => n > 0 && k > 0 ? Math.round(base / n * Math.min(k, n) * PWD_PCT / 100) : 0;
+const pwdLabel = (n, k) => `PWD 할인 (${k}/${n} pax)`;
+const pwdCount = lbl => { const m = /\((\d+)\/(\d+) pax\)/.exec(lbl || ""); return m ? { k: +m[1], n: +m[2] } : null; };
+function pwdCalcModal(base, title, pre){
+  return new Promise(resolve => {
+    let done = false, n = (pre && pre.n) || 2, k = (pre && pre.k) || 1;
+    const ov = modal(`♿ ${L("PWD 할인 계산", "PWD discount")}${title ? ` · ${esc(title)}` : ""}`, `
+      <div class="field"><label>${L("금액 (음식값)", "Amount (food)")} ₱</label><input data-f="base" type="number" inputmode="numeric" min="0" value="${Math.round(base)}" style="font-size:20px"></div>
+      <div class="fee-row" style="margin:0 0 10px;align-items:flex-end">
+        <div style="flex:1"><label class="hint" style="display:block;margin:0 0 3px;font-weight:700">👥 ${L("총 인원", "People")}</label>
+          <div style="display:flex;gap:6px;align-items:center"><button type="button" class="chip" data-st="n|-1">−</button><b data-v="n" style="font-size:22px;min-width:28px;text-align:center">${n}</b><button type="button" class="chip" data-st="n|1">＋</button></div></div>
+        <div style="flex:1"><label class="hint" style="display:block;margin:0 0 3px;font-weight:700">♿ ${L("PWD·시니어 인원", "PWD / senior")}</label>
+          <div style="display:flex;gap:6px;align-items:center"><button type="button" class="chip" data-st="k|-1">−</button><b data-v="k" style="font-size:22px;min-width:28px;text-align:center">${k}</b><button type="button" class="chip" data-st="k|1">＋</button></div></div></div>
+      <div class="calc-box" id="pwdCalc" style="font-size:18px;line-height:1.9;font-variant-numeric:tabular-nums"></div>`,
+      async ov => { const b = Math.round(+ov.querySelector('[data-f="base"]').value || 0); done = true; resolve({ n, k, base: b, amt: pwdAmt(b, n, k) }); }, `♿ ${L("적용", "Apply")}`);
+    const paint = () => {
+      const b = Math.round(+ov.querySelector('[data-f="base"]').value || 0), sh = b / n, f = x => Number.isInteger(x) ? x.toLocaleString() : x.toLocaleString(undefined, { maximumFractionDigits: 2 });
+      const pw = sh * k * (100 - PWD_PCT) / 100, rest = sh * (n - k), amt = pwdAmt(b, n, k);
+      ov.querySelector('[data-v="n"]').textContent = n; ov.querySelector('[data-v="k"]').textContent = k;
+      ov.querySelector("#pwdCalc").innerHTML = `${f(b)} ÷ ${n} = <b>${f(sh)}</b><br>
+        ${f(sh)}${k > 1 ? ` × ${k}` : ""} × ${(100 - PWD_PCT) / 100} = <b>${f(pw)}</b><br>
+        ${n > k ? `${f(pw)} + ${f(rest)} = <b>${f(pw + rest)}</b><br>` : ""}
+        <div class="sum-row total" style="margin-top:6px"><span>♿ ${L("할인", "Discount")}</span><b style="color:var(--green)">−${peso(amt)}</b></div>
+        <div class="sum-row"><span>${L("할인 후 음식값", "Food after discount")}</span><b>${peso(b - amt)}</b></div>`;
+    };
+    ov.querySelectorAll("[data-st]").forEach(bt => bt.onclick = () => { const [w, d] = bt.dataset.st.split("|");
+      if(w === "n") n = Math.max(1, Math.min(50, n + +d)); else k = Math.max(1, Math.min(50, k + +d)); if(k > n) w === "k" ? n = k : k = n; paint(); });
+    ov.querySelector('[data-f="base"]').oninput = paint; paint();
+    new MutationObserver((m, obs) => { if(!ov.isConnected){ obs.disconnect(); if(!done) resolve(null); } }).observe(document.body, { childList:true });
+  });
 }
 async function setPwd(o, on){
   const base = Math.max(0, (o.subtotal || 0) - (o.discount || 0));
@@ -1147,8 +1180,9 @@ async function setPwd(o, on){
   let patch;
   if(on){
     if(o.store_discount && !isPwd(o) && !pts && !confirm(L(`이미 '${discText(o.store_discount_label)}' ${peso(o.store_discount)} 할인이 있어요. PWD 할인 20%로 바꿀까요?`, `There's already '${discText(o.store_discount_label)}' ${peso(o.store_discount)}. Replace with PWD 20%?`))) return;
-    const amt = Math.floor(Math.max(0, base - pts) * PWD_PCT / 100);
-    patch = pts ? { store_discount: pts + amt, store_discount_label: `PWD 할인 + 포인트 공제 ₱${pts}` } : { store_discount: amt, store_discount_label: PWD_LABEL };
+    const c = await pwdCalcModal(Math.max(0, base - pts), PT.orderCode(o), pwdCount(o.store_discount_label)); if(!c) return;
+    const amt = Math.min(c.amt, Math.max(0, base - pts));
+    patch = pts ? { store_discount: pts + amt, store_discount_label: `${pwdLabel(c.n, c.k)} + 포인트 공제 ₱${pts}` } : { store_discount: amt, store_discount_label: pwdLabel(c.n, c.k) };
   } else {
     patch = pts ? { store_discount: pts, store_discount_label: "포인트 공제" } : { store_discount: 0, store_discount_label: null };
   }
@@ -3515,10 +3549,10 @@ async function extOrderModal(pre){   // pre = { text, ch, inboxId } — 📥 DK 
       if(ov._items.length) await api.setItems(r.id, ov._items.map(({ pasted, needPrice, ...l }) => l)).catch(e => toast(L("메뉴 저장 실패 — SQL 44단계(44-external-menu.sql)를 실행해 주세요", "Items not saved — run SQL step 44") + " · " + PT.errMsg(e), 6000));
       if(pickup) await api.updateOrder(r.id, { order_type: "pickup", fee_source: "pickup" }).catch(e => toast(L("픽업 저장 실패: ", "Pickup not saved: ") + PT.errMsg(e), 5000));   // 🏃 픽업 (배달비 0 · 기사 없음)
       const pts = ov._ch === "DK" ? Math.min(Math.round(+f.amount || 0), Math.max(0, Math.round(+f.points || 0))) : 0;
-      const pwdOn = ov.querySelector("#exPwd").checked, pwdAmt = pwdOn ? Math.floor(Math.max(0, Math.round(+f.amount || 0) - pts) * PWD_PCT / 100) : 0;
+      const pwdOn = ov.querySelector("#exPwd").checked && !!ov._pwd, pwdD = pwdOn ? pwdAmt(Math.max(0, Math.round(+f.amount || 0) - pts), ov._pwd.n, ov._pwd.k) : 0;
       if(pts || pwdOn){   // ⭐ 포인트 공제 (DK) · ♿ PWD — 매장 할인 칸에 저장 → 합계에서 빠짐
-        const patch = pts && pwdOn ? { store_discount: pts + pwdAmt, store_discount_label: `PWD 할인 + 포인트 공제 ₱${pts}` }
-          : pwdOn ? { store_discount: pwdAmt, store_discount_label: PWD_LABEL } : { store_discount: pts, store_discount_label: "포인트 공제" };
+        const patch = pts && pwdOn ? { store_discount: pts + pwdD, store_discount_label: `${pwdLabel(ov._pwd.n, ov._pwd.k)} + 포인트 공제 ₱${pts}` }
+          : pwdOn ? { store_discount: pwdD, store_discount_label: pwdLabel(ov._pwd.n, ov._pwd.k) } : { store_discount: pts, store_discount_label: "포인트 공제" };
         if(f.payment !== "cash") patch.paid_total = Math.max(0, Math.round(+f.amount || 0) - patch.store_discount) + (pickup ? 0 : Math.round(+f.fee || 0));
         await api.updateOrder(r.id, patch).catch(e => toast(L("포인트 공제 저장 실패: ", "Points not saved: ") + PT.errMsg(e), 5000));
       }
@@ -3534,7 +3568,7 @@ async function extOrderModal(pre){   // pre = { text, ch, inboxId } — 📥 DK 
     const a = Math.round(+F("amount").value || 0), fe = ov._ot === "pickup" ? 0 : Math.round(+F("fee").value || 0), el = ov.querySelector("#exTotal");
     const pt = ov._ch === "DK" ? Math.min(a, Math.max(0, Math.round(+F("points").value || 0))) : 0;
     const bad = ov._pastedTotal != null && a + fe - pt !== ov._pastedTotal && a + fe !== ov._pastedTotal;
-    const pw = ov.querySelector("#exPwd") && ov.querySelector("#exPwd").checked ? Math.floor(Math.max(0, a - pt) * PWD_PCT / 100) : 0;
+    const pw = ov._pwd && ov.querySelector("#exPwd").checked ? pwdAmt(Math.max(0, a - pt), ov._pwd.n, ov._pwd.k) : 0;
     el.innerHTML = `<span>${L("합계", "Total")} <span class="hint" style="margin:0;font-weight:400">${peso(a)} + ${peso(fe)}${pt ? ` − ⭐${peso(pt)}` : ""}${pw ? ` − ♿${peso(pw)}` : ""}</span></span><b>${peso(a + fe - pt - pw)}</b>`
       + (bad ? `<div class="hint" style="flex-basis:100%;margin:2px 0 0;color:#b45309">⚠️ ${L(`손님 메시지 합계는 ${peso(ov._pastedTotal)} — 메뉴·배달비를 확인하세요`, `Message says ${peso(ov._pastedTotal)} — please check items / delivery`)}</div>` : "");
     el.style.flexWrap = "wrap";
@@ -3570,7 +3604,10 @@ async function extOrderModal(pre){   // pre = { text, ch, inboxId } — 📥 DK 
     paintTotal(); };
   ov.querySelectorAll("[data-ot]").forEach(b => b.onclick = () => pickOt(b.dataset.ot));
   ["amount", "fee", "points"].forEach(k => F(k).addEventListener("input", paintTotal));
-  ov.querySelector("#exPwd").onchange = paintTotal;
+  ov.querySelector("#exPwd").onchange = async e => {
+    if(!e.target.checked){ ov._pwd = null; paintTotal(); return; }
+    const a = Math.round(+F("amount").value || 0), pt = ov._ch === "DK" ? Math.min(a, Math.max(0, Math.round(+F("points").value || 0))) : 0;
+    const c = await pwdCalcModal(Math.max(0, a - pt), "", ov._pwd); if(!c){ e.target.checked = false; ov._pwd = null; } else ov._pwd = { n: c.n, k: c.k }; paintTotal(); };
   paintTotal();
   bindPaste(ov, p => {
     const got = [];
