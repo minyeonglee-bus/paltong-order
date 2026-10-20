@@ -1368,7 +1368,7 @@ function receiptDoc(orders, copies = "auto"){
       ${svcValue(o) ? `<div class="row b"><span>서비스 Service</span><span>${peso(svcValue(o))} FREE</span></div>` : (o.items || []).some(isSvc) ? `<div class="row b"><span>서비스 Service</span><span>FREE</span></div>` : ""}
       <div class="row"><span>소계 Subtotal</span><span>${peso(o.subtotal)}</span></div>
       ${o.order_type === "pickup" ? "" : `<div class="row"><span>배달비 Delivery</span><span>${peso(o.delivery_fee)}</span></div>`}
-      ${o.discount ? `<div class="row"><span>쿠폰할인 Coupon</span><span>-${peso(o.discount)}</span></div>` : ""}
+      ${o.discount ? `<div class="row"><span>${/^DC\b/.test(o.coupon_title || "") ? esc(o.coupon_title) : "쿠폰할인 Coupon"}</span><span>-${peso(o.discount)}</span></div>` : ""}
       ${o.store_discount ? `<div class="row"><span>${esc(o.store_discount_label || "매장 할인")} Discount</span><span>-${peso(o.store_discount)}</span></div>` : ""}
       ${o.order_type === "pickup" && o.delivery_fee > 0 ? `<div class="row"><span>팁 Tip</span><span>+${peso(o.delivery_fee)}</span></div>` : ""}
       <div class="row b lg"><span>합계 TOTAL</span><span>${peso(o.total)}</span></div>

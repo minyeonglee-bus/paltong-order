@@ -518,6 +518,7 @@ function dnCard(o){
         <span style="min-width:64px;text-align:right">${PT.isSvc(l) ? "₱0" : peso(l.unitPrice * l.qty)}</span>${PT.isSvc(l) ? "" : `<button class="chip" data-dprice="${i}" title="${L("가격 수정", "Edit price")}">✏️</button><button class="chip" data-dsvc="${i}" title="${L("서비스로", "Make free")}">🎁</button>`}</span></div>`).join("")}</div>
     <div class="calc-box">
       ${o.discount || o.store_discount || o.delivery_fee > 0 ? `<div class="sum-row"><span>${L("소계", "Subtotal")}</span><span>${peso(o.subtotal)}</span></div>` : ""}
+      ${o.discount ? `<div class="sum-row"><span>🏷 ${esc(o.coupon_title || "DC")}</span><span>-${peso(o.discount)}</span></div>` : ""}
       ${o.store_discount ? `<div class="sum-row"><span>${esc(discText(o.store_discount_label))}</span><span>-${peso(o.store_discount)}</span></div>` : ""}
       ${o.delivery_fee > 0 ? `<div class="sum-row" style="color:#0f766e;font-weight:700"><span>💝 ${L("팁", "Tip")}</span><span>+${peso(o.delivery_fee)}</span></div>` : ""}
       <div class="sum-row total"><span>${L("합계", "Total")}</span><b style="font-size:20px">${peso(o.total)}</b></div></div>
@@ -1198,39 +1199,45 @@ async function setPwd(o, on){
   }catch(e){ toast(L("저장 실패: ", "Save failed: ") + PT.errMsg(e), 5000); }
 }
 /* 🍽 다이닝 Add/DC — 💝 팁(+) · 🏷 DC(−, % 또는 금액) 한 창에서
-   팁은 다이닝(매장 픽업 주문)의 '배달비' 칸에 저장 → 합계 = 음식값 − DC + 팁 (매출·Cash Book 에 포함) */
+   · DC = 쿠폰 같은 할인 → '쿠폰 할인' 칸(discount)에 저장해서 PWD 할인(매장 할인 칸)과 같이 쓸 수 있어요
+   · 순서: 소계 − DC → 남은 금액으로 PWD 계산 → + 팁
+   · 팁은 다이닝(매장 픽업 주문)의 '배달비' 칸에 저장 → 합계 = 음식값 − DC − PWD + 팁 (매출·Cash Book 에 포함) */
+const isDcTitle = t => /^DC\b/.test(t || "");
 function dineAddDc(o){
-  const base = Math.max(0, (o.subtotal || 0) - (o.discount || 0));
-  const curPct = /다이닝 할인 (\d+)%/.exec(o.store_discount_label || ""), curDc = /^다이닝 할인/.test(o.store_discount_label || "") ? (curPct ? curPct[1] + "%" : String(o.store_discount || "")) : "";
-  const other = o.store_discount && !/^다이닝 할인/.test(o.store_discount_label || "") ? o.store_discount_label : "";
+  const sub = o.subtotal || 0;
+  const curDc = isDcTitle(o.coupon_title) ? (/(\d+(?:\.\d+)?)%/.exec(o.coupon_title) || [])[1] ? /(\d+(?:\.\d+)?)%/.exec(o.coupon_title)[1] + "%" : String(o.discount || "") : "";
+  const pc = pwdCount(o.store_discount_label), ptsM = /포인트 공제 ₱(\d+)/.exec(o.store_discount_label || ""), pts = ptsM ? +ptsM[1] : 0;
   const ov = modal(`🏷 ${esc(PT.orderCode(o))} Add/DC`, `
     <div class="fee-row" style="margin:0 0 10px;align-items:flex-end">
       <div style="flex:1;min-width:0"><label class="hint" style="display:block;margin:0 0 3px;font-weight:800;color:#0f766e">💝 ${L("팁", "Tip")} ＋ ₱</label><input data-f="tip" type="number" inputmode="numeric" min="0" value="${o.delivery_fee > 0 ? o.delivery_fee : ""}" placeholder="0" style="font-size:20px;width:100%"></div>
       <div style="flex:1;min-width:0"><label class="hint" style="display:block;margin:0 0 3px;font-weight:800;color:var(--red-deep)">🏷 DC − (₱ / %)</label><input data-f="dc" value="${esc(curDc)}" placeholder="${L("예: 100 · 10%", "e.g. 100 · 10%")}" style="font-size:20px;width:100%"></div></div>
     <div class="chips" style="margin:0 0 10px">${["5%", "10%", "15%", "20%"].map(x => `<button type="button" class="chip" data-dcq="${x}">DC ${x}</button>`).join("")}<button type="button" class="chip" data-dcq="">DC ✕</button></div>
-    ${other ? `<p class="hint" style="margin:0 0 8px;color:#b45309">⚠️ ${L(`지금 '${esc(discText(other))}' ${peso(o.store_discount)} 이 있어요. DC를 넣으면 그 할인 대신 들어가요.`, `'${esc(discText(other))}' ${peso(o.store_discount)} is applied. A DC replaces it.`)}</p>` : ""}
+    <p class="hint" style="margin:0 0 8px">${L("DC는 쿠폰처럼 따로 빠져서 PWD 할인과 같이 쓸 수 있어요 (DC 먼저 빼고, 남은 금액으로 PWD 계산).", "DC stacks with the PWD discount (DC first, then PWD on the rest).")}</p>
     <div class="calc-box" id="adPrev" style="font-size:17px"></div>`,
     async ov => {
       const r = calc(); if(r.err){ toast(r.err); return false; }
-      if(other && r.sd !== o.store_discount && !r.keepOther && !confirm(L(`'${discText(other)}' 할인을 DC로 바꿀까요?`, `Replace '${discText(other)}' with the DC?`))) return false;
-      const patch = { delivery_fee: r.tip };
-      if(!r.keepOther){ patch.store_discount = r.sd; patch.store_discount_label = r.sd ? r.label : null; }
+      const patch = { delivery_fee: r.tip, discount: r.dc, coupon_title: r.dc ? r.title : null };
+      if(r.pwd != null) patch.store_discount = r.pwd + pts;   // ♿ PWD 는 DC 뺀 금액으로 다시 계산
       try{ await api.updateOrder(o.id, patch); toast(L(`🏷 ${PT.orderCode(o)} 저장 · 합계 ${peso(r.total)}`, `🏷 ${PT.orderCode(o)} saved · total ${peso(r.total)}`), 3000); await loadOrders(); }
       catch(e){ toast(L("저장 실패: ", "Save failed: ") + PT.errMsg(e), 5000); return false; }
     }, `✔ ${L("저장", "Save")}`);
   const F = k => ov.querySelector(`[data-f="${k}"]`);
   function calc(){
     const tip = Math.max(0, Math.round(+F("tip").value || 0)), t = String(F("dc").value || "").trim().replace(/\s/g, "");
-    let sd = 0, label = null, keepOther = false;
-    if(t === ""){ if(other){ keepOther = true; sd = o.store_discount; } }
-    else if(/^\d+(\.\d+)?%$/.test(t)){ const p = +t.slice(0, -1); if(!(p >= 0 && p <= 100)) return { err: L("0~100% 로 넣어주세요", "0–100%") }; sd = Math.floor(base * p / 100); label = `다이닝 할인 ${p}%`; }
-    else if(/^\d+$/.test(t)){ sd = Math.min(base, +t); label = "다이닝 할인"; }
+    let dc = 0, title = null;
+    if(t === "");
+    else if(/^\d+(\.\d+)?%$/.test(t)){ const p = +t.slice(0, -1); if(!(p >= 0 && p <= 100)) return { err: L("0~100% 로 넣어주세요", "0–100%") }; dc = Math.floor(sub * p / 100); title = `DC ${p}%`; }
+    else if(/^\d+$/.test(t)){ dc = Math.min(sub, +t); title = "DC"; }
     else return { err: L("DC는 100 이나 10% 처럼 넣어주세요", "DC: enter 100 or 10%") };
-    return { tip, sd, label, keepOther, total: base - sd + tip };
+    const after = Math.max(0, sub - dc);
+    const pwd = pc ? Math.min(pwdAmt(Math.max(0, after - pts), pc.n, pc.k), Math.max(0, after - pts)) : null;
+    const sd = pwd != null ? pwd + pts : Math.min(o.store_discount || 0, after);
+    return { tip, dc, title, pwd, sd, total: Math.max(0, after - sd) + tip };
   }
   const paint = () => { const r = calc(); ov.querySelector("#adPrev").innerHTML = r.err ? `<span style="color:var(--red)">${esc(r.err)}</span>` :
-    `<div class="sum-row"><span>${L("소계", "Subtotal")}</span><span>${peso(base)}</span></div>
-     ${r.sd ? `<div class="sum-row" style="color:var(--red-deep)"><span>🏷 ${r.keepOther ? esc(discText(other)) : "DC"}</span><span>−${peso(r.sd)}</span></div>` : ""}
+    `<div class="sum-row"><span>${L("소계", "Subtotal")}</span><span>${peso(sub)}</span></div>
+     ${r.dc ? `<div class="sum-row" style="color:var(--red-deep)"><span>🏷 ${esc(r.title)}</span><span>−${peso(r.dc)}</span></div>` : ""}
+     ${r.sd ? `<div class="sum-row" style="color:var(--red-deep)"><span>${r.pwd != null ? "♿ " : "🏷 "}${esc(discText(o.store_discount_label))}</span><span>−${peso(r.sd)}</span></div>` : ""}
      ${r.tip ? `<div class="sum-row" style="color:#0f766e"><span>💝 ${L("팁", "Tip")}</span><span>+${peso(r.tip)}</span></div>` : ""}
      <div class="sum-row total"><span>${L("합계", "Total")}</span><b style="font-size:22px">${peso(r.total)}</b></div>`; };
   ov.querySelectorAll("[data-dcq]").forEach(b => b.onclick = () => { F("dc").value = b.dataset.dcq; paint(); });
