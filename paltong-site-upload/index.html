@@ -954,7 +954,7 @@ function openTracker(id, opts = {}){
       : [["주문","Order"],["접수","Accepted"],["조리","Cook"],pick ? ["픽업","Pickup"] : ["배달","Deliver"],["완료","Done"]];
     const estCard = () => o.delivery_fee == null ? "" : `<div class="card">
           <div class="sum-row"><span>${L("메뉴 합계","Subtotal")}</span><span>${peso(o.subtotal)}</span></div>
-          ${o.discount ? `<div class="sum-row" style="color:var(--green);font-weight:700"><span>${L("쿠폰 할인","Coupon")}</span><span>-${peso(o.discount)}</span></div>` : ""}
+          ${o.discount ? `<div class="sum-row" style="color:var(--green);font-weight:700"><span>${/^DC\b/.test(o.coupon_title || "") ? esc(o.coupon_title) : L("쿠폰 할인","Coupon")}</span><span>-${peso(o.discount)}</span></div>` : ""}
           ${pick ? "" : `<div class="sum-row"><span>${L("배달비","Delivery fee")}</span><span>${o.delivery_fee === 0 ? L("무료","FREE") : peso(o.delivery_fee)}</span></div>`}
           <div class="sum-row total"><span>${L("예상 금액","Estimated total")}</span><b>${peso(o.total)}</b></div>
           <p class="hint" style="margin:6px 0 0">${L("금액이 바뀌면 이 화면과 채팅으로 안내드려요","We'll notify you here and in chat if anything changes")}</p></div>`;
@@ -976,9 +976,10 @@ function openTracker(id, opts = {}){
         ${o.admin_note ? `<div class="notice">📢 ${esc(o.admin_note)}</div>` : ""}
         <div class="card">
           <div class="sum-row"><span>${L("메뉴 합계","Subtotal")}</span><span>${peso(o.subtotal)}</span></div>
-          ${o.discount ? `<div class="sum-row" style="color:var(--green);font-weight:700"><span>${L("쿠폰 할인","Coupon")}</span><span>-${peso(o.discount)}</span></div>` : ""}
+          ${o.discount ? `<div class="sum-row" style="color:var(--green);font-weight:700"><span>${/^DC\b/.test(o.coupon_title || "") ? esc(o.coupon_title) : L("쿠폰 할인","Coupon")}</span><span>-${peso(o.discount)}</span></div>` : ""}
           ${o.store_discount ? `<div class="sum-row" style="color:var(--green);font-weight:700"><span>🎁 ${L(o.store_discount_label || "매장 할인", (o.store_discount_label || "").replace("매장 할인", "Store discount") || "Store discount")}</span><span>-${peso(o.store_discount)}</span></div>` : ""}
           <div class="sum-row"><span>${L("배달비","Delivery fee")}</span><span>${peso(o.delivery_fee)}</span></div>
+          ${o.tip > 0 ? `<div class="sum-row"><span>💝 ${L("팁","Tip")}</span><span>+${peso(o.tip)}</span></div>` : ""}
           <div class="sum-row total"><span>${L("최종 결제 금액","Total amount due")}</span><b>${peso(o.total)}</b></div>
           ${o.eta_min ? `<p class="hint" style="margin:8px 0 0">${L(`예상 배달 시간: 결제 확인 후 약 ${o.eta_min}분`, `Estimated delivery: about ${o.eta_min} min after confirmation`)}</p>` : ""}
         </div>`;
@@ -1063,8 +1064,9 @@ function openTracker(id, opts = {}){
         <div style="margin-top:8px">
         ${(o.items||[]).map(l => `<div class="sum-row"><span>${PT.isSvc(l) ? `<b style="color:var(--red-deep)">🎁 ${L("서비스","Service")}</b> ` : l.added ? "➕ " : ""}${PT.lineName(l,"html")}${l.opts && l.opts.length ? ` <span class="en">(${esc(PT.lineOpt(l))})</span>` : ''} ×${l.qty}</span><span>${PT.isSvc(l) ? `${l.origUnit ? `<s class="hint">${peso(l.origUnit*l.qty)}</s> ` : ""}<b style="color:var(--red-deep)">${L("무료","FREE")}</b>` : peso(l.unitPrice*l.qty)}</span></div>`).join('')}
         ${PT.svcValue(o) ? `<div class="sum-row" style="color:var(--red-deep);font-weight:700"><span>🎁 ${L("가게 서비스","On the house")}</span><span>${peso(PT.svcValue(o))} ${L("상당","value")}</span></div>` : ""}
-        ${o.discount ? `<div class="sum-row"><span>${L("쿠폰 할인","Coupon")}</span><span>-${peso(o.discount)}</span></div>` : ""}
+        ${o.discount ? `<div class="sum-row"><span>${/^DC\b/.test(o.coupon_title || "") ? esc(o.coupon_title) : L("쿠폰 할인","Coupon")}</span><span>-${peso(o.discount)}</span></div>` : ""}
         ${o.store_discount ? `<div class="sum-row"><span>${L("매장 할인","Store discount")}</span><span>-${peso(o.store_discount)}</span></div>` : ""}
+        ${o.tip > 0 ? `<div class="sum-row"><span>💝 ${L("팁","Tip")}</span><span>+${peso(o.tip)}</span></div>` : ""}
         ${pick ? `<div class="sum-row"><span>🏃 ${L("픽업","Pickup")}</span><span>${esc(storeAddr())}</span></div>` : ""}<div class="sum-row" ${pick ? "hidden" : ""}><span>${L("배달비","Delivery")}${o.zone_name && o.fee_source === "zone" ? ` <span class="en">${esc(o.zone_name)}</span>` : ""}</span><span>${o.delivery_fee == null ? "—" : o.delivery_fee === 0 ? L("무료","FREE") : peso(o.delivery_fee)}</span></div>
         <div class="hint" style="margin-top:8px">${esc(o.cust_name)} · ${esc(o.cust_phone)}<br>${esc(o.cust_addr)}<br>${L("결제","Payment")}: ${L(p.label, p.labelEn)}${o.memo ? `<br>${esc(o.memo)}` : ""}</div>
         </div></details>

@@ -98,7 +98,7 @@ function drawReceipt(o, copyLabel, kitchen){
   if(o.order_type !== "pickup") row(B("배달비", "Delivery"), peso(o.delivery_fee));
   if(o.discount) row(/^DC\b/.test(o.coupon_title || "") ? o.coupon_title : B("쿠폰할인", "Coupon"), "-" + peso(o.discount));   // 🍽 다이닝 DC
   if(o.store_discount) row(en ? discEn(o.store_discount_label) : `${o.store_discount_label || "매장 할인"} Disc.`, "-" + peso(o.store_discount));
-  if(o.order_type === "pickup" && o.delivery_fee > 0) row(B("팁", "Tip"), "+" + peso(o.delivery_fee));   // 🍽 다이닝 Add/DC 의 팁
+  if(o.tip > 0) row(B("팁", "Tip"), "+" + peso(o.tip));   // 💝 Add/DC 팁 (53단계)
   row(B("합계", "TOTAL"), peso(o.total), { size:30, bold:true });
   hr();
   row(B("결제", "Payment"), isDine && o.payment === "cash" ? "Cash" : (p.labelEn || p.label), { bold:true });

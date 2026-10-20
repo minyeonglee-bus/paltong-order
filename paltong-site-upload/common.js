@@ -822,7 +822,7 @@ function makeDemoApi(){
     id:o.id, order_no:o.order_no, created_at:o.created_at, status:o.status, items:o.items, subtotal:o.subtotal,
     delivery_fee:o.delivery_fee, total:o.total, cust_name:o.cust_name, cust_phone:o.cust_phone, cust_addr:o.cust_addr,
     memo:o.memo, payment:o.payment, eta_min:o.eta_min, admin_note:o.admin_note, has_receipt:!!o.receipt_path,
-    receipt_at:o.receipt_at, confirmed_at:o.confirmed_at, lat:o.lat??null, lng:o.lng??null, discount:o.discount||0, store_discount:o.store_discount||0, store_discount_label:o.store_discount_label||null, coupon_title:o.coupon_title||null, user_id:o.user_id||null,
+    receipt_at:o.receipt_at, confirmed_at:o.confirmed_at, lat:o.lat??null, lng:o.lng??null, discount:o.discount||0, tip:o.tip||0, store_discount:o.store_discount||0, store_discount_label:o.store_discount_label||null, coupon_title:o.coupon_title||null, user_id:o.user_id||null,
     memo_en:o.memo_en||null, tracking_url:o.tracking_url||null, paid_total:o.paid_total ?? null, extra_receipt_at:o.extra_receipt_at||null,
     fee_source:o.fee_source||null, distance_km:o.distance_km ?? null, items_added_at:o.items_added_at||null,
     order_type:o.order_type||"delivery", scheduled_at:o.scheduled_at||null, zone_name:o.zone_name||null, zone_fee:o.zone_fee ?? null, zone_free_over:o.zone_free_over ?? null, fee_adjusted_at:o.fee_adjusted_at||null,
@@ -875,7 +875,7 @@ function makeDemoApi(){
     const f = s.fee_base + Math.min(Math.max(0, km - s.fee_base_km), Math.max(0, s.fee_tier_km - s.fee_base_km)) * s.fee_per_km
       + Math.max(0, km - Math.max(s.fee_tier_km, s.fee_base_km)) * s.fee_per_km2 + (s.fee_markup || 0);
     return Math.ceil(f / r) * r; };
-  const totalOf = o => o.delivery_fee == null ? null : Math.max(0, o.subtotal - (o.discount || 0) - (o.store_discount || 0)) + o.delivery_fee;
+  const totalOf = o => o.delivery_fee == null ? null : Math.max(0, o.subtotal - (o.discount || 0) - (o.store_discount || 0)) + o.delivery_fee + (o.tip || 0);
   const demoQuotes = {};
   const RV = () => ls.get("paltong_demo_reviews", []), setRV = v => { ls.set("paltong_demo_reviews", v); ping("reviews"); fire("reviews"); };
   const SESSION_KEY = "paltong_demo_member_" + (window.PT_AUTH_KEY || "admin");
@@ -1370,7 +1370,7 @@ function receiptDoc(orders, copies = "auto"){
       ${o.order_type === "pickup" ? "" : `<div class="row"><span>배달비 Delivery</span><span>${peso(o.delivery_fee)}</span></div>`}
       ${o.discount ? `<div class="row"><span>${/^DC\b/.test(o.coupon_title || "") ? esc(o.coupon_title) : "쿠폰할인 Coupon"}</span><span>-${peso(o.discount)}</span></div>` : ""}
       ${o.store_discount ? `<div class="row"><span>${esc(o.store_discount_label || "매장 할인")} Discount</span><span>-${peso(o.store_discount)}</span></div>` : ""}
-      ${o.order_type === "pickup" && o.delivery_fee > 0 ? `<div class="row"><span>팁 Tip</span><span>+${peso(o.delivery_fee)}</span></div>` : ""}
+      ${o.tip > 0 ? `<div class="row"><span>팁 Tip</span><span>+${peso(o.tip)}</span></div>` : ""}
       <div class="row b lg"><span>합계 TOTAL</span><span>${peso(o.total)}</span></div>
       <div class="hr"></div>
       <div class="row"><span>결제 Payment</span><span class="b">${esc(p.labelEn)}</span></div>
