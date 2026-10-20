@@ -768,7 +768,7 @@ function cardHTML(o){
   const dine = PT.isDine(o);   // 결제 끝난 다이닝(T)도 목록에 보임 (R17)
   const st = dine && o.status === "done" ? { ...STATUS.done, ko:"결제 완료", en:"Paid" } : pick && o.status === "delivering" ? { ...STATUS.delivering, ko:"픽업 대기", en:"Waiting for pickup" } : STATUS[o.status], p = payInfo(o.payment), d = drafts[o.id] || {};
   const warns = dine ? [] : priceWarnings(o);
-  const svcOk = !["done","cancelled"].includes(o.status);
+  const svcOk = !["done","cancelled"].includes(o.status) || priceUnlocked(o);   // 완료된 주문은 🔓 관리자 비밀번호로 열었을 때만
   const itemsHTML = (o.items||[]).map((l, li) => `<div class="sum-row"${PT.isSvc(l) ? ' style="background:#fde8e4;border-radius:6px"' : l.added ? ' style="background:#fff1c9;border-radius:6px"' : ""}><span>${PT.isSvc(l) ? (l.couponFree ? '<b style="color:var(--green)">🎟쿠폰 무료</b> ' : '<b style="color:var(--red-deep)">🎁서비스</b> ') : l.added ? '<b style="color:var(--red-deep)">➕추가</b> ' : ""}<span data-raw>${EN()
       ? `<b>${esc(l.en || l.name)}</b>${l.opts&&l.opts.length ? ` <span class="en">· ${esc(l.opts.map(x => x.en || x.ko).join(", "))}</span>` : ""}`
       : `<b>${esc(l.name)}</b> <span class="en">${esc(l.en||"")}${l.opts&&l.opts.length ? " · " + esc(l.opts.map(x=>x.ko).join(", ")) : ""}</span>`}</span> ×${l.qty}</span><span style="white-space:nowrap">${PT.isSvc(l) ? `${l.origUnit ? `<s class="hint">${peso(l.origUnit*l.qty)}</s> ` : ""}<b style="color:var(--red-deep)">${L("무료", "FREE")}</b>` : `${l.priceOrig != null ? `<s class="hint">${peso(l.priceOrig*l.qty)}</s> ` : ""}${peso(l.unitPrice*l.qty)}`}${svcOk && !l.ext
@@ -830,6 +830,9 @@ function cardHTML(o){
   }
   if(o.status === "done" || o.status === "cancelled"){
     action = `${o.total != null ? `<div class="sum-row total"><span>합계</span><b>${peso(o.total)}</b></div>` : ""}
+      ${o.status === "done" ? (priceUnlocked(o)
+        ? `<div class="btn-row"><span class="hint" style="margin:0;align-self:center;color:#b45309">🔓 ${L(`가격 수정 중 · ${Math.max(1, Math.ceil((unlockUntil[o.id] - Date.now()) / 60000))}분 뒤 자동 잠김`, `Editing prices · locks in ${Math.max(1, Math.ceil((unlockUntil[o.id] - Date.now()) / 60000))} min`)}</span><button class="ghost-btn sm" data-act="lockprice" style="width:auto">🔒 ${L("잠그기", "Lock")}</button></div>`
+        : `<div class="btn-row"><button class="ghost-btn sm" data-act="unlockprice">🔒 ${L("가격 수정 (관리자 비밀번호)", "Edit prices (admin password)")}</button></div>`) : ""}
       ${o.admin_note && o.status === "cancelled" ? `<p class="hint">사유: <span data-raw>${esc(o.admin_note)}</span></p>` : ""}
       <div class="btn-row">${o.total != null ? `<button class="ghost-btn sm" data-act="print">🖨 인쇄</button>` : ""}${o.receipt_path ? `<button class="ghost-btn sm" data-act="showrc">영수증 사진</button>` : ""}</div>`;
   }
@@ -946,7 +949,7 @@ async function saveSvcItems(o, items, chat){
   try{
     const n = await api.setItems(o.id, items);
     if(n) Object.assign(o, n);
-    if(chat) api.adminBotPost(o.id, chat[0], chat[1]).catch(() => {});
+    if(chat && o.status !== "done") api.adminBotPost(o.id, chat[0], chat[1]).catch(() => {});
     toast((PT.isDine(o) ? "🍽 " : "🎁 ") + L(`${PT.orderCode(o)} 저장 · 최종 ${o.total == null ? "—" : peso(o.total)}`, `${PT.orderCode(o)} saved · total ${o.total == null ? "—" : peso(o.total)}`), 3500);
     await loadOrders(); return true;
   }catch(e){ toast(L("저장 실패: ", "Save failed: ") + PT.errMsg(e), 5000); return false; }
@@ -955,7 +958,19 @@ const paidNote = o => o.paid_total != null && isOnlinePay(o.payment) ? L("\n※ 
 /* ✏️ 메뉴 가격 · 최종 금액 수정 (관리자) — 결제 완료(완료) 전까지
    · 메뉴 한 줄 가격을 바꾸면 합계·쿠폰·% 할인이 다시 계산돼요 (원래 가격은 줄에 취소선으로 보임)
    · 최종 금액을 낮추면 '가격 조정' 할인으로, 높이면 '가격 조정' 메뉴 줄로 들어가요 (영수증 계산이 맞게) */
-const notifyCustomer = o => !PT.isDine(o) && o.source !== "external";
+const notifyCustomer = o => !PT.isDine(o) && o.source !== "external" && o.status !== "done";   // 완료된 주문은 손님 채팅 안내 안 함
+/* 🔓 완료된 주문 가격 수정 (52단계): 관리자 비밀번호가 맞으면 10분 동안 그 주문의 ✏️·🎁·메뉴 추가·최종 금액이 열려요 */
+const unlockUntil = {};
+const priceUnlocked = o => o.status === "done" && api.priceUnlock && api.priceUnlock[o.id] != null && (unlockUntil[o.id] || 0) > Date.now();
+async function unlockDonePrice(o){
+  const pin = await askPricePin(L(`${PT.orderCode(o)} 완료된 주문 가격 수정 — 매출이 바뀌어요`, `${PT.orderCode(o)} edit a completed order — sales will change`)); if(pin == null) return;
+  try{ if(!(await api.checkPricePin(pin))){ toast(PT.errMsg("price_pin_wrong"), 3500); return; } }catch(e){ toast(PT.errMsg(e), 4000); return; }
+  api.priceUnlock[o.id] = pin; unlockUntil[o.id] = Date.now() + 10 * 60000;
+  setTimeout(() => { if((unlockUntil[o.id] || 0) <= Date.now()){ lockDonePrice(o.id); } }, 10 * 60000 + 500);
+  toast(L("🔓 10분 동안 이 주문의 가격을 바꿀 수 있어요 (✏️ 메뉴 가격 · 🎁 서비스 · 메뉴 추가 · 최종 금액)", "🔓 Prices unlocked for 10 min"), 4500);
+  renderOrders();
+}
+function lockDonePrice(id){ delete api.priceUnlock[id]; delete unlockUntil[id]; renderOrders(); }
 async function editLinePrice(o, i){
   const items = JSON.parse(JSON.stringify(o.items || [])), l = items[i]; if(!l || PT.isSvc(l)) return;
   const orig = l.priceOrig != null ? l.priceOrig : l.unitPrice;
@@ -1364,6 +1379,8 @@ async function act(o, a, btn){
     await run({ store_discount: sd, store_discount_label: sd ? discLabel(dd.dtype) : null, total: calcTotal(o, o.delivery_fee || 0, sd) }, sd ? L(`할인 ${peso(sd)} 적용`, `Discount ${peso(sd)} applied`) : L("할인을 없앴습니다", "Discount removed"));
   }
   if((a === "reject" || a === "cancel") && o.status === "done"){ toast(L("배달 완료된 주문은 취소할 수 없어요", "Delivered orders can't be cancelled"), 3500); return; }
+  if(a === "unlockprice"){ unlockDonePrice(o); return; }
+  if(a === "lockprice"){ lockDonePrice(o.id); return; }
   if(a === "cancel"){ cancelReqModal(o); return; }   // 🧾 주문 취소 = 사유 + 관리자 수락
   if(a === "reject"){
     const why = prompt(L(`#${o.order_no} 주문을 취소합니다. 손님에게 보일 사유 (선택)`, `Cancel #${o.order_no}. Reason shown to the customer (optional)`), a === "reject" ? "배달 가능 지역이 아닙니다 / Sorry, outside our delivery area" : "");

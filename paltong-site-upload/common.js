@@ -483,6 +483,7 @@ function errMsg(e){
     [/birthday_locked/, ["생일은 한 번만 등록할 수 있어요. 바꾸려면 가게에 문의해주세요", "Birthday can only be set once. Please contact us to change it"]],
     [/birthday_invalid/, ["생일 날짜를 확인해주세요", "Please check the date"]],
     [/price_pin_wrong/, ["가격 비밀번호가 틀렸어요", "Wrong price password"]],
+    [/admin_set_items_done/, ["Supabase에서 sql/52-done-price-edit.sql 을 먼저 실행하세요", "Run sql/52-done-price-edit.sql in Supabase first"]],
     [/cancel_req_done/, ["이미 처리된 취소 요청이에요", "This cancel request was already handled"]],
     [/cancel_req_order_done/, ["배달 완료된 주문은 취소할 수 없어요", "Delivered orders can't be cancelled"]],
     [/cancel_requests_one_pending/, ["이미 취소 요청 중인 주문이에요 — 관리자 수락을 기다려 주세요", "A cancel request is already waiting for this order"]],
@@ -543,7 +544,9 @@ function makeSupabaseApi(){
     },
     async quoteDelivery(lat, lng, addr){ return unwrap(await sb.rpc("quote_delivery", { p_lat: lat, p_lng: lng, p_addr: addr || "" })); },
     async addItems(id, items, sub){ return unwrap(await sb.rpc("add_items", { p_id: id, p_items: items, p_sub: sub })); },
-    async setItems(id, items){ return unwrap(await sb.rpc("admin_set_items", { p_id: id, p_items: items })); },   // 37단계: 관리자 서비스
+    priceUnlock: {},   // 🔓 완료된 주문 가격 수정: { 주문id: 가격 비밀번호 } (52단계)
+    async setItems(id, items){ const pin = this.priceUnlock[id];
+      return pin ? unwrap(await sb.rpc("admin_set_items_done", { p_id: id, p_items: items, p_pin: String(pin) })) : unwrap(await sb.rpc("admin_set_items", { p_id: id, p_items: items })); },   // 37단계: 관리자 서비스
     /* ---- 채팅 (손님) ---- */
     async chatOrderThread(orderId){ return unwrap(await sb.rpc("chat_order_thread", { p_order: orderId })); },
     async chatNewInquiry(name, phone){ return unwrap(await sb.rpc("chat_new_inquiry", { p_name: name, p_phone: phone })); },
@@ -1007,9 +1010,11 @@ function makeDemoApi(){
         o.items_added_at = new Date().toISOString(); });
       return { total:o.total, subtotal:o.subtotal, delivery_fee:o.delivery_fee };
     },
+    priceUnlock: {},
     async setItems(id, items){   // 37단계 SQL admin_set_items 와 같은 계산
+      const unl = this.priceUnlock[id] != null;
       return mut(id, o => {
-        if(["done","cancelled"].includes(o.status)) throw new Error("service_not_allowed");
+        if(o.status === "cancelled" || o.status === "done" && !unl) throw new Error("service_not_allowed");
         o.items = JSON.parse(JSON.stringify(items)); o.subtotal = o.items.reduce((s, l) => s + Math.round(l.unitPrice) * Math.round(l.qty), 0);
         const cs = CP().filter(x => x.order_id === o.id); o.discount = cs.length ? couponsDiscount(cs, o.subtotal) : Math.min(o.discount || 0, o.subtotal);
         const pm = /(\d+)%/.exec(o.store_discount_label || "");
