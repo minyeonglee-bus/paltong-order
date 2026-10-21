@@ -840,7 +840,7 @@ function cardHTML(o){
   return `<div class="ocard ${needsAction(o) ? "urgent" : ""}" data-id="${o.id}">
     <div class="ohead"><span class="no">${esc(PT.orderCode(o))}</span>
       <span class="status-pill" style="background:${st.color}">${L(st.ko, st.en)}</span>
-      <button type="button" class="status-pill" data-act="editpay" title="${L("결제 방법 바꾸기 (가격 비밀번호)", "Change payment method (price password)")}" style="border:0;cursor:pointer;background:${o.received_method === "split" ? "#7a5cd3" : isOnlinePay(o.payment) ? "#2a6fd3" : "#6b6b6b"}">${o.received_method === "split" ? `🔀 ${L("나눠 받음", "Split")}` : dine && o.payment === "cash" ? L("현금", "Cash") : esc(L(p.label, p.labelEn || p.label))} ✎</button>
+      <button type="button" class="status-pill" data-act="editpay" title="${L("결제 방법 바꾸기 (완료 전: 받은 직원 비밀번호 · 완료 후: 관리자 비밀번호)", "Change payment method (before done: staff password · after: admin password)")}" style="border:0;cursor:pointer;background:${o.received_method === "split" ? "#7a5cd3" : isOnlinePay(o.payment) ? "#2a6fd3" : "#6b6b6b"}">${o.received_method === "split" ? `🔀 ${L("나눠 받음", "Split")}` : dine && o.payment === "cash" ? L("현금", "Cash") : esc(L(p.label, p.labelEn || p.label))} ✎</button>
       ${dine ? `<span class="status-pill" style="background:#e5a731">🍽 ${L("다이닝", "Dining")}</span>` : ""}
       ${o.scheduled_at ? `<span class="status-pill" style="background:#c2410c">⏰ ${L("예약", "Scheduled")} ${schedText(o.scheduled_at)}</span>` : ""}
       ${pick && !dine ? `<span class="status-pill" style="background:#7a5cd3">🏃 픽업</span>` : ""}
@@ -2024,10 +2024,15 @@ function editPayModal(o){
         patch = { payment: way, split_pay: null, ...(done || o.received_method ? { received_method: way } : {}) };
         if(done && way !== "cash" && o.paid_total == null) patch.paid_total = total;
       }
-      const pin = await askPricePin(L(`${PT.orderCode(o)} 결제 방법을 ${way === "split" ? "나눠 받음" : PAY_NAME(way)}(으)로 바꿉니다`, `Change ${PT.orderCode(o)} payment to ${way === "split" ? "Split" : PAY_NAME(way)}`));
-      if(pin == null) return false;
-      try{ if(!(await api.checkPricePin(pin))){ toast(PT.errMsg("price_pin_wrong"), 3500); return false; } }
-      catch(e){ toast(PT.errMsg(e), 4000); return false; }
+      // 완료 전 + 받은 직원 있음 → 그 직원 본인 비밀번호 (또는 관리자 비밀번호) · 완료 후 → 관리자(가격) 비밀번호만
+      const what = L(`${PT.orderCode(o)} 결제 방법을 ${way === "split" ? "나눠 받음" : PAY_NAME(way)}(으)로 바꿉니다`, `Change ${PT.orderCode(o)} payment to ${way === "split" ? "Split" : PAY_NAME(way)}`);
+      if(o.status !== "done" && o.staff_id){ if(!(await askTakerPin(o, what))) return false; }
+      else {
+        const pin = await askPricePin(what);
+        if(pin == null) return false;
+        try{ if(!(await api.checkPricePin(pin))){ toast(PT.errMsg("price_pin_wrong"), 3500); return false; } }
+        catch(e){ toast(PT.errMsg(e), 4000); return false; }
+      }
       try{ await api.updateOrder(o.id, patch); toast(L(`💳 ${PT.orderCode(o)} 결제 방법을 바꿨어요`, `💳 ${PT.orderCode(o)} payment updated`), 3000); await loadOrders(); }
       catch(e){ toast(L("저장 실패: ", "Save failed: ") + PT.errMsg(e), 5000); return false; }
     }, L("저장", "Save"));
@@ -2036,6 +2041,29 @@ function editPayModal(o){
     ov.querySelector("#epSum b").innerHTML = `${peso(sum)}${sum ? (d === 0 ? ` <span style="color:var(--green)">✔</span>` : ` <span style="color:var(--red)">${d > 0 ? "+" : "−"}${peso(Math.abs(d))}</span>`) : ""}`; };
   ov.querySelectorAll("[data-pw]").forEach(b => b.onclick = () => { ov._way = b.dataset.pw; ov.querySelectorAll("[data-pw]").forEach(x => x.classList.toggle("sel", x === b)); ov.querySelector("#epSplit").hidden = ov._way !== "split"; paintSum(); });
   ov.querySelectorAll("[data-sp]").forEach(i => i.oninput = paintSum); paintSum();
+}
+/* 🙋 주문 받은 직원 본인 비밀번호 확인 (관리자 비밀번호도 OK) → true / false */
+function askTakerPin(o, what){
+  return new Promise(resolve => {
+    let done = false, admin = false;
+    const ov = modal(`🔑 ${L("비밀번호 확인", "Password")}`, `<p class="hint" style="margin-top:0" data-raw>${esc(what)}</p>
+      <p style="margin:0 0 8px"><b data-who>🙋 <span data-raw>${esc(o.staff_name || "")}</span> ${L("본인 비밀번호", "— your password")}</b></p>
+      <div class="field"><input data-f="pin" type="password" autocomplete="off" placeholder="${L("비밀번호", "Password")}" style="font-size:22px;letter-spacing:6px;text-align:center"></div>
+      <button type="button" class="chip" data-adm>🔒 ${L("관리자 비밀번호로", "Use admin password")}</button>`,
+      async ov => {
+        const pin = readFields(ov).pin; if(!pin){ toast(L("비밀번호를 넣어주세요", "Enter the password")); return false; }
+        try{
+          const ok = admin ? await api.checkPricePin(pin) : await api.staffCheck(o.staff_id, pin).then(() => true, () => false);
+          if(!ok){ toast(admin ? PT.errMsg("price_pin_wrong") : L(`${o.staff_name || ""} 비밀번호가 맞지 않아요`, "Wrong password"), 3500); const i = ov.querySelector('[data-f="pin"]'); i.value = ""; i.focus(); return false; }
+          done = true; resolve(true);
+        }catch(e){ toast(PT.errMsg(e), 4000); return false; }
+      }, L("확인", "OK"));
+    const inp = ov.querySelector('[data-f="pin"]'); setTimeout(() => inp.focus(), 50);
+    inp.addEventListener("keydown", e => { if(e.key === "Enter") ov.querySelector("[data-ok]").click(); });
+    ov.querySelector("[data-adm]").onclick = () => { admin = !admin; ov.querySelector("[data-who]").textContent = admin ? "🔒 " + L("관리자(가격) 비밀번호", "Admin (price) password") : `🙋 ${o.staff_name || ""} ${L("본인 비밀번호", "— your password")}`;
+      ov.querySelector("[data-adm]").textContent = admin ? `🙋 ${L("받은 직원 비밀번호로", "Use staff password")}` : `🔒 ${L("관리자 비밀번호로", "Use admin password")}`; inp.value = ""; inp.focus(); };
+    new MutationObserver((m, obs) => { if(!ov.isConnected){ obs.disconnect(); if(!done) resolve(false); } }).observe(document.body, { childList:true });
+  });
 }
 /* 가격을 바꿀 때마다 가격 비밀번호 확인 */
 function askPricePin(what){
