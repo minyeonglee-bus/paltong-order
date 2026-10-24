@@ -3320,6 +3320,31 @@ function parseMenuLine(raw, ADDRISH){
   }
 }
 /* 카톡·문자·페이스북 메시지를 통째로 붙여넣으면 이름·연락처·주소·위치·금액·요청사항을 나눠 줌 */
+/* DK 메뉴 줄: "쭈꾸미 삼겹 1,320 ₱ ( 한국공수 쭈꾸미 +200 ₱ / 셀프 치즈 볶음밥 +250 ₱ ) x 1"
+   → 메뉴 1줄 + 괄호 안 '+금액' 옵션은 각각 따로 메뉴 줄 (수량 = 본 메뉴 수량) · 금액 없는 옵션은 본 메뉴 메모로 */
+const DK_ITEM_RE = /^(.+?)\s+([\d,]+(?:\.\d+)?)\s*₱\s*(?:\((.*)\))?\s*[x×]\s*(\d{1,2})\s*$/;
+function dkMenuFind(name){   // 이름이 거의 같은 메뉴만 (쭈꾸미 삼겹 → 쭈꾸미삼겹살 O · 한국공수 쭈꾸미 → 쭈꾸미 X)
+  const n = MN(name); if(n.length < 2) return null;
+  let best = null;
+  for(const a of menuAliases()){ if(a.low) continue;
+    const k = a.k; if(!(k === n || (k.length >= 3 && (k.startsWith(n) || n.startsWith(k)) && Math.abs(k.length - n.length) <= 2))) continue;
+    if(!best || (k === n && best.k !== n) || Math.abs(k.length - n.length) < Math.abs(best.k.length - n.length)) best = a; }
+  return best ? best.it : null;
+}
+function dkItemLines(line){
+  const m = DK_ITEM_RE.exec(line); if(!m) return null;
+  const qty = Math.max(1, Math.min(50, +m[4])), price = Math.round(+m[2].replace(/,/g, "")), name = m[1].trim();
+  const mk = (nm, unit, opts) => { const it = dkMenuFind(nm);
+    return it ? { id: it.id, name: it.name, en: it.en || it.name, opts: opts || [], qty, unitPrice: unit, pasted: true }
+              : { id: "ext_" + Math.random().toString(36).slice(2, 9), name: nm, en: nm, opts: opts || [], qty, unitPrice: unit, custom: true, pasted: true }; };
+  const notes = [], extra = [];
+  for(const part of String(m[3] || "").split("/").map(x => x.trim()).filter(Boolean)){
+    const om = /^(.*?)\s*\+\s*([\d,]+(?:\.\d+)?)\s*₱?\s*$/.exec(part);
+    if(om && +om[2].replace(/,/g, "") > 0) extra.push(mk(om[1].trim(), Math.round(+om[2].replace(/,/g, ""))));
+    else notes.push({ ko: part.replace(/\s*\+\s*0\s*₱?$/, ""), en: part.replace(/\s*\+\s*0\s*₱?$/, ""), note: true });
+  }
+  return [mk(name, price, notes), ...extra];
+}
 function parseOrderPaste(raw){
   const out = { memo: [] }, text = String(raw || "").replace(/\r/g, "").replace(/\b(?:selected|saved|pinned|chosen)\s+(?:address|location)\b\s*[:：\-]?\s*/gi, "\n\u0001").replace(/선택(?:한|된)\s*(?:주소|위치)\s*[:：\-]?\s*/g, "\n\u0001");   // "Selected address" 같은 앱 문구는 지워요
   const link = text.match(MAP_LINK_RE); if(link) out.link = link[0];
@@ -3327,10 +3352,10 @@ function parseOrderPaste(raw){
   const LBL = [
     ["name",    /^(?:주문\s*하신\s*분|이름|성함|성명|고객명?|손님|받는\s*(?:분|사람)|수령인|주문자|name|customer|recipient|receiver)\s*[:：=\-]?\s*/i],
     ["phone",   /^(?:연락처|전화(?:번호)?|휴대폰|핸드폰|폰|번호|phone|mobile|contact(?:\s*no\.?)?|tel|cp|number|viber|whatsapp)\s*[:：=\-]?\s*/i],
-    ["addr",    /^(?:(?:selected|saved|pinned|chosen|current|my)\s+(?:address|location)|선택(?:한|된)\s*(?:주소|위치)|주소|배달\s*주소|배송지|도착지|위치|장소|호텔|콘도|address|addr|location|drop[\s-]?off|deliver(?:y)?\s*(?:to|address)|hotel|condo)\s*[:：=\-]?\s*/i],
+    ["addr",    /^(?:(?:selected|saved|pinned|chosen|current|my)\s+(?:address|location)|선택(?:한|된)?\s*(?:주소|위치)|입력\s*주소|상세\s*주소|주소|배달\s*주소|배송지|도착지|위치|장소|호텔|콘도|address|addr|location|drop[\s-]?off|deliver(?:y)?\s*(?:to|address)|hotel|condo)\s*[:：=\-]?\s*/i],
     ["fee",     /^(?:배달\s*(?:비|료|팁)|배송비|delivery(?:\s*(?:fee|charge))?|del\.?\s*fee|rider\s*fee|fee|df)\s*[:：=\-]?\s*/i],
     ["amount",  /^(?:음식\s*(?:값|비|금액)|메뉴\s*(?:합계|금액)|food(?:\s*(?:total|amount))?|subtotal|sub-total)\s*[:：=\-]?\s*/i],
-    ["total",   /^(?:=\s*)?(?:금액|합계|총\s*(?:액|금액|합계)?|결제\s*금액|가격|grand\s*total|total(?:\s*amount)?|amount(?:\s*due)?|price)\s*[:：=\-]?\s*/i],
+    ["total",   /^(?:=\s*)?(?:최종\s*결제\s*금액|최종\s*금액|금액|합계|총\s*(?:액|금액|합계)?|결제\s*금액|가격|grand\s*total|total(?:\s*amount)?|amount(?:\s*due)?|price)\s*[:：=\-]?\s*/i],
     ["payment", /^(?:결제(?:\s*방법)?|지불|payment|pay(?:ment)?\s*method|mop)\s*[:：=\-]?\s*/i],
     ["points",  /^(?:포인트\s*(?:공제|사용|차감|할인)?|적립금\s*(?:사용)?|points?\s*(?:used|deduct(?:ed|ion)?|redeemed|discount)?|pts)\s*[:：=\-]?\s*/i],
     ["memo",    /^(?:요청(?:사항)?|메모|비고|참고|기사님께|note|notes|remarks?|request|instructions?|landmark)\s*[:：=\-]?\s*/i],
@@ -3343,8 +3368,9 @@ function parseOrderPaste(raw){
   const addr = [], loose = [], feeNums = [], aliases = menuAliases(); let addrNext = false;
   out.items = [];
   for(let line of text.split("\n")){
-    line = line.replace(/^[\s•·\-*+▶►✔✅📍📞☎️🏠👤💰💵📝🛵🍽🍱🍜🍚🥘]+/u, "").trim();
+    line = line.replace(/^[\s•·\-*+▶►✔✅📍📞☎️🏠👤💰💵📝🛵🍽🍱🍜🍚🥘\p{Extended_Pictographic}\uFE0F\u200D]+/u, "").trim();
     if(!line) continue;
+    { const dk = dkItemLines(line); if(dk){ out.items.push(...dk); continue; } }   // 🥘 DK 메뉴 줄 (괄호 옵션은 따로)
     if(out.link && line.includes(out.link)){ line = line.replace(out.link, "").trim(); if(!line) continue; }
     line = line.replace(/^(?:메뉴|주문\s*(?:내역|메뉴)?|order(?:s)?|menu|items?)\s*[:：]\s*/i, "").trim(); if(!line) continue;
     if(line[0] === "\u0001"){ line = line.slice(1).trim(); if(line) addr.push(line); else addrNext = true; continue; }   // "Selected address" 다음 = 주소
@@ -3353,7 +3379,7 @@ function parseOrderPaste(raw){
     for(const [k, re] of LBL){
       if(!re.test(line)) continue;
       const v = line.replace(re, "").trim(); if(!v) { hit = true; break; }
-      if(k === "addr") addr.push(v);
+      if(k === "addr"){ if(/^입력\s*주소|^상세\s*주소/.test(line)) addr.unshift(v); else addr.push(v); }
       else if(k === "memo") out.memo.push(v);
       else if(k === "points"){ const n = money(v); if(n != null) out.points = n; else continue; }
       else if(k === "amount" || k === "fee" || k === "total"){ const n = money(v); if(n != null){ out[k] = n; if(k === "fee") feeNums.push(n);
@@ -3387,7 +3413,7 @@ function parseOrderPaste(raw){
   }
   if(addr.length) out.addr = addr.map(a => a.replace(/[,\s]+$/, "")).join(", ");
   // 이름표 없는 짧은 줄(숫자 없음) = 이름
-  if(!out.name){ const i = loose.findIndex(l => l.length <= 30 && !/\d/.test(l) && !/[?!]/.test(l) && l.split(/\s+/).length <= 4); if(i >= 0) out.name = loose.splice(i, 1)[0]; }
+  if(!out.name){ const i = loose.findIndex(l => l.length <= 30 && !/\d/.test(l) && !/[?!]/.test(l) && l.split(/\s+/).length <= 4 && !/(주세요|해줘|해 줘|부탁|감사|please|thank|pls|asap|빨리|문\s*앞|벨|노크)/i.test(l)); if(i >= 0) out.name = loose.splice(i, 1)[0]; }
   // 음식값: 메뉴 합계 → '음식값' 표시 → 합계 − 배달비 → ₱ 숫자 중 가장 큰 값(배달비 제외)
   // 가격 없는 메뉴가 하나뿐이고 합계가 있으면 → 남는 금액을 그 메뉴 가격으로
   const np = out.items.filter(l => l.needPrice);
