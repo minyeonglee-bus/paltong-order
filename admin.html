@@ -528,9 +528,10 @@ function renderDining(){
     <div class="grid">${open.length ? open.map(dnCard).join("") : `<div class="empty-box">${L("열린 다이닝 주문이 없어요", "No open dine-in orders")}</div>`}</div>
     <div class="dayhead" style="margin:0 0 8px"><b>💳 ${L("오늘 결제 완료", "Paid today")} · ${paid.length}${L("건", "")} · ${peso(total)}</b>
       <span class="hint">${Object.keys(by).map(k => `${k === "cash" ? L("현금", "Cash") : PT.payInfo(k).labelEn} ${peso(by[k])}`).join(" · ")}</span></div>
-    <div class="so-grid">${paid.map(o => `<div class="so-item"><span><b>${esc(PT.orderCode(o))}</b> · ${esc(o.payment === "cash" ? L("현금", "Cash") : PT.payInfo(o.payment).labelEn)} · ${new Date(o.updated_at).toLocaleTimeString(EN() ? "en-US" : "ko-KR", { hour:"numeric", minute:"2-digit", timeZone:"Asia/Manila" })}</span><span><b>${peso(o.total)}</b> <button class="chip" data-dreprint="${o.id}">🖨</button></span></div>`).join("")}</div>`;
+    <div class="so-grid">${paid.map(o => `<div class="so-item"><span><b>${esc(PT.orderCode(o))}</b> · ${esc(o.payment === "cash" ? L("현금", "Cash") : PT.payInfo(o.payment).labelEn)} · ${new Date(o.updated_at).toLocaleTimeString(EN() ? "en-US" : "ko-KR", { hour:"numeric", minute:"2-digit", timeZone:"Asia/Manila" })}</span><span><b>${peso(o.total)}</b> <button class="chip" data-dreprint="${o.id}">🖨</button> <button class="chip" data-dunpay="${o.id}" title="${L("결제 취소 → 다시 다이닝", "Undo payment → back to dining")}">↩ ${L("결제 취소", "Undo")}</button></span></div>`).join("")}</div>`;
   V.querySelector("#dnNew").onclick = () => addItemModal({ dineNew: true, items: [] }, false);
   V.querySelectorAll("[data-dreprint]").forEach(b => b.onclick = () => doPrint(dine.find(o => o.id === b.dataset.dreprint)));
+  V.querySelectorAll("[data-dunpay]").forEach(b => b.onclick = () => dineUnpay(dine.find(o => o.id === b.dataset.dunpay)));
   V.querySelectorAll("[data-dn]").forEach(el => {
     const o = dine.find(x => x.id === el.dataset.dn); if(!o) return;
     el.querySelector("[data-dadd]").onclick = () => addItemModal(o, false);
@@ -555,6 +556,14 @@ function renderDining(){
       b.disabled = true; await saveSvcItems(o, items, null);
     });
   });
+}
+/* ↩ 다이닝 결제 취소 — 결제 완료를 되돌려 다시 열린 다이닝으로 (Cash Book 매출에서도 빠짐) */
+async function dineUnpay(o){
+  if(!o || o.status !== "done") return;
+  if(!confirm(L(`${PT.orderCode(o)} ${peso(o.total)} 결제를 취소할까요?\n다시 다이닝(미결제)으로 돌아가고, Cash Book 매출에서도 빠져요.`, `Undo the ${peso(o.total)} payment for ${PT.orderCode(o)}?\nIt goes back to open dining and is removed from the Cash Book.`))) return;
+  try{ const n = await api.dineUnpay(o.id); Object.assign(o, n || {});
+    toast(L(`↩ ${PT.orderCode(o)} 결제 취소 · 다시 다이닝으로`, `↩ ${PT.orderCode(o)} back to dining`), 3500); await loadOrders(); }
+  catch(e){ toast(PT.errMsg(e), 5000); }
 }
 /* 💵 현금 거스름돈 계산 — 받은 돈을 누르거나 입력하면 거스름돈이 크게 보임 */
 function cashBoxHTML(total){
@@ -862,7 +871,7 @@ function cardHTML(o){
   if(o.status === "done" || o.status === "cancelled"){
     action = `${o.total != null ? `<div class="sum-row total"><span>합계</span><b>${peso(o.total)}</b></div>` : ""}
       ${o.admin_note && o.status === "cancelled" ? `<p class="hint">사유: <span data-raw>${esc(o.admin_note)}</span></p>` : ""}
-      <div class="btn-row">${o.total != null ? `<button class="ghost-btn sm" data-act="print">🖨 인쇄</button>` : ""}${o.receipt_path ? `<button class="ghost-btn sm" data-act="showrc">영수증 사진</button>` : ""}</div>`;
+      <div class="btn-row">${o.total != null ? `<button class="ghost-btn sm" data-act="print">🖨 인쇄</button>` : ""}${dine && o.status === "done" ? `<button class="ghost-btn sm" data-act="dineunpay">↩ ${L("결제 취소", "Undo payment")}</button>` : ""}${o.receipt_path ? `<button class="ghost-btn sm" data-act="showrc">영수증 사진</button>` : ""}</div>`;
   }
 
   return `<div class="ocard ${needsAction(o) ? "urgent" : ""}" data-id="${o.id}">
@@ -1292,6 +1301,7 @@ async function act(o, a, btn){
     // 손님 채팅 안내는 서버(20단계 SQL)가 자동으로 보냄 — 배달 출발·도착도 같음
   }
   if(a === "print")   doPrint(o);
+  if(a === "dineunpay") await dineUnpay(o);
   if(a === "showrc"){
     try{ const u = receiptUrls[o.id] || await api.receiptUrl(o.receipt_path); receiptUrls[o.id] = u; openViewer(u); }catch(e){ toast("영수증을 불러오지 못했습니다"); }
   }

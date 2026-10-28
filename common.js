@@ -483,6 +483,7 @@ function errMsg(e){
     [/not_delivering/, ["먼저 '픽업·출발'을 눌러주세요", "Tap 'Picked up' first"]],
     [/not_your_order/, ["다른 기사에게 배정된 주문이에요", "This order is assigned to another rider"]],
     [/rider_inactive/, ["사용 중지된 기사예요", "This rider is deactivated"]],
+    [/unpay_not_today/, ["오늘 영업일에 결제한 다이닝만 결제 취소할 수 있어요", "Only today's dine-in payments can be undone"]],
     [/order_closed/, ["완료·취소된 주문은 기사를 바꿀 수 없어요", "Closed orders can't be reassigned"]],
     [/pickup_order/, ["픽업 주문에는 기사를 배정하지 않아요", "Pickup orders don't need a rider"]],
     [/rider_account_missing/, ["기사 계정을 만들지 못했어요. 다시 시도해주세요", "Couldn't create the rider account. Please try again"]],
@@ -724,6 +725,8 @@ function makeSupabaseApi(){
     async staffResetPin(id, ownerPin, newPin){ unwrap(await sb.rpc("admin_staff_reset_pin", { p_staff: id, p_owner: String(ownerPin || ""), p_new: String(newPin || "") })); },
     async staffRemove(id, pin){ unwrap(await sb.rpc("admin_staff_remove", { p_staff: id, p_pin: String(pin || "") })); },
     async dinePay(id, payment){ return unwrap(await sb.rpc("admin_dine_pay", { p_id: id, p_payment: payment })); },
+    /* ↩ 다이닝 결제 취소 → 다시 열린 다이닝 (오늘 영업일만, Cash Book 매출에서도 빠짐) */
+    async dineUnpay(id){ return unwrap(await sb.rpc("admin_dine_unpay", { p_id: id })); },
     /* 📒 Cash Book(MONEY TRACKER)으로 그날 결제 완료 매출 보내기 (42단계 SQL) */
     async cashbookPush(day){ return unwrap(await sb.rpc("cashbook_push", { p_day: day })); },
     /* ---- 기사 상세 · 심부름 (38단계) ---- */
@@ -1180,7 +1183,7 @@ const api = DEMO ? makeDemoApi() : makeSupabaseApi();
 if(DEMO){   // 데모 모드에서는 기사 기능 없음 (실제 Supabase 연결 필요)
   const no = async () => { throw new Error(T("데모 모드에서는 기사 기능을 쓸 수 없어요 (Supabase 연결 필요)", "Riders need a real Supabase connection")); };
   Object.assign(api, { listRiders: async () => [], createExternalOrder: no, addRider: no, updateRider: no, riderPassword: no, assignRider: no, riderTrail: async () => [], onRidersChange(){},
-    createDineOrder: no, dinePay: no, cashbookPush: no, deleteExternal: no,
+    createDineOrder: no, dinePay: no, dineUnpay: no, cashbookPush: no, deleteExternal: no,
     riderDetail: no, saveErrand: no, errandStatus: no, deleteErrand: no, errandTrail: async () => [], onRiderDetailChange(){} });
 }
 
