@@ -792,6 +792,8 @@ function renderOrders(){
   if(focused){ const el = document.querySelector(`[data-draft="${focused}"]`); if(el){ el.focus(); const v = el.value; el.value = ""; el.value = v; } }
 }
 
+// 한글 이름이 따로 없는 메뉴(이름 = 영어 이름)는 영어를 한 번만 보여 줌
+const sameName = (a, b) => !a || String(a).trim().toLowerCase() === String(b || "").trim().toLowerCase();
 function cardHTML(o){
   const pick = o.order_type === "pickup";
   const dine = PT.isDine(o);   // 결제 끝난 다이닝(T)도 목록에 보임 (R17)
@@ -800,7 +802,7 @@ function cardHTML(o){
   const svcOk = !["done","cancelled"].includes(o.status);
   const itemsHTML = (o.items||[]).map((l, li) => `<div class="sum-row"${PT.isSvc(l) ? ' style="background:#fde8e4;border-radius:6px"' : l.added ? ' style="background:#fff1c9;border-radius:6px"' : ""}><span>${PT.isSvc(l) ? '<b style="color:var(--red-deep)">🎁서비스</b> ' : l.added ? '<b style="color:var(--red-deep)">➕추가</b> ' : ""}<span data-raw>${EN()
       ? `<b>${esc(l.en || l.name)}</b>${l.opts&&l.opts.length ? ` <span class="en">· ${esc(l.opts.map(x => x.en || x.ko).join(", "))}</span>` : ""}`
-      : `<b>${esc(l.name)}</b> <span class="en">${esc(l.en||"")}${l.opts&&l.opts.length ? " · " + esc(l.opts.map(x=>x.ko).join(", ")) : ""}</span>`}</span> ×${l.qty}</span><span style="white-space:nowrap">${PT.isSvc(l) ? `${l.origUnit ? `<s class="hint">${peso(l.origUnit*l.qty)}</s> ` : ""}<b style="color:var(--red-deep)">${L("무료", "FREE")}</b>` : `${l.priceOrig != null ? `<s class="hint">${peso(l.priceOrig*l.qty)}</s> ` : ""}${peso(l.unitPrice*l.qty)}`}${svcOk && !l.ext
+      : `<b>${esc(l.name)}</b> <span class="en">${[sameName(l.en, l.name) ? "" : esc(l.en), l.opts&&l.opts.length ? esc(l.opts.map(x=>x.ko).join(", ")) : ""].filter(Boolean).join(" · ")}</span>`}</span> ×${l.qty}</span><span style="white-space:nowrap">${PT.isSvc(l) ? `${l.origUnit ? `<s class="hint">${peso(l.origUnit*l.qty)}</s> ` : ""}<b style="color:var(--red-deep)">${L("무료", "FREE")}</b>` : `${l.priceOrig != null ? `<s class="hint">${peso(l.priceOrig*l.qty)}</s> ` : ""}${peso(l.unitPrice*l.qty)}`}${svcOk && !l.ext
       ? (PT.isSvc(l) ? ` <button class="chip" data-unsvc="${li}" title="${L("서비스 취소", "Undo service")}">↩</button>` : ` <button class="chip" data-lprice="${li}" title="${L("가격 수정", "Edit price")}">✏️</button> <button class="chip" data-svc="${li}" title="${L("서비스로 처리", "Make it free")}">🎁</button>${l.byAdmin ? ` <button class="chip" data-rmadm="${li}" title="${L("관리자가 추가한 메뉴 빼기", "Remove (added by admin)")}">✕</button>` : ""}`) : ""}</span></div>`).join("")
     + (PT.svcValue(o) ? `<div class="sum-row" style="color:var(--red-deep);font-weight:800"><span>🎁 ${L("서비스", "Service")}</span><span>${peso(PT.svcValue(o))} ${L("상당 · 무료", "value · free")}</span></div>` : "")
     + (svcOk ? `<div class="btn-row" style="margin:4px 0"><button class="ghost-btn sm" data-itemadd>➕ ${L("메뉴 추가", "Add item")}</button><button class="ghost-btn sm" data-svcadd>🎁 ${L("서비스 추가", "Add free item")}</button><button class="ghost-btn sm" data-totaledit>✏️ ${L("최종 금액", "Final amount")}</button></div>` : "");
