@@ -870,7 +870,7 @@ function cardHTML(o){
       ${dine ? `<span class="status-pill" style="background:#e5a731">🍽 ${L("다이닝", "Dining")}</span>` : ""}
       ${o.scheduled_at ? `<span class="status-pill" style="background:#c2410c">⏰ ${L("예약", "Scheduled")} ${schedText(o.scheduled_at)}</span>` : ""}
       ${pick && !dine ? `<span class="status-pill" style="background:#7a5cd3">🏃 픽업</span>` : ""}
-      ${o.source === "external" ? `<span class="status-pill" style="background:#0f766e">📞 ${L("외부 주문", "Outside")}${o.channel ? ` · <span data-raw>${esc(o.channel)}</span>` : ""}</span>` : ""}
+      ${o.source === "external" ? `<button type="button" class="status-pill" data-chedit style="background:#0f766e;border:0;cursor:pointer;font-family:inherit" title="${L("주문 경로 바꾸기 (P / DK)", "Change channel (P / DK)")}">📞 ${L("외부 주문", "Outside")}${o.channel ? ` · <span data-raw>${esc(o.channel)}</span>` : ""} ✎</button>` : ""}
       ${o.rider_id ? `<span class="status-pill" style="background:#d33d2a">🛵 <span data-raw>${esc(riderName(o.rider_id))}</span></span>` : ""}
       ${staffPill(o)}
       ${dine ? "" : o.user_id ? `<span class="status-pill member-badge">👤 회원</span>` : `<span class="status-pill" style="background:#b8a898">비회원</span>`}
@@ -941,6 +941,7 @@ function bindCard(o){
   el.querySelectorAll("[data-chat]").forEach(b => b.onclick = () => openOrderChat(o));
   el.querySelectorAll("[data-delext]").forEach(b => b.onclick = () => deleteExternalOrder(o));
   el.querySelectorAll("[data-staffset]").forEach(b => b.onclick = () => changeOrderStaff(o));
+  el.querySelectorAll("[data-chedit]").forEach(b => b.onclick = () => changeOrderChannel(o));
   el.querySelectorAll("[data-svc]").forEach(b => b.onclick = () => svcLine(o, +b.dataset.svc));
   el.querySelectorAll("[data-unsvc]").forEach(b => b.onclick = () => unsvcLine(o, +b.dataset.unsvc));
   el.querySelectorAll("[data-svcadd]").forEach(b => b.onclick = () => addSvcItem(o));
@@ -2575,6 +2576,26 @@ async function takeStaff(o, why){
   catch(e){ toast(staffErr(e), 4000); return false; }
 }
 /* 카드의 🙋 눌러서 받은 직원 지정·바꾸기 (바뀌는 직원이 본인 비밀번호 입력) */
+/* 📞 외부 주문 경로 바꾸기 — 완료된 주문도 가능 (P ↔ DK, 번호는 그대로, 캐시북 자동 반영) */
+function changeOrderChannel(o){
+  const code = PT.orderCode(o);
+  const CH = EXT_CHANNELS.map(c => c[0] === "기타" ? ["DK", "DK"] : c);   // DK 앱 주문은 channel 'DK' 로 저장됨
+  let pick = o.channel === "기타" ? "DK" : (o.channel || "");
+  const ov = modal(`📞 ${L(`${code} 주문 경로`, `${code} channel`)}`, `
+    <p class="hint" style="margin-top:0">${L("전화·카카오톡·메세지·바이버 = <b>P</b>, 기타(DK) = <b>DK</b>. 주문 번호 숫자는 그대로고, 완료된 주문은 캐시북에도 바로 반영돼요.", "Phone · KakaoTalk · Message · Viber = <b>P</b>, Other (DK) = <b>DK</b>. The number stays the same; completed orders update in the cash book too.")}</p>
+    <div class="chips" id="chEditList">${CH.map(c => `<button type="button" class="chip ${c[0] === pick ? "sel" : ""}" data-ch="${c[0]}">${L(c[0], c[1])} <span class="en">${c[0] === "DK" ? "DK" : "P"}</span></button>`).join("")}</div>`,
+    async () => {
+      if(!pick){ toast(L("경로를 골라주세요", "Pick a channel")); return false; }
+      if(pick === o.channel || (pick === "DK" && o.channel === "기타")) return true;
+      const n = await api.updateOrder(o.id, { channel: pick });
+      toast(L(`${code} → ${PT.orderCode(n || { ...o, channel: pick, order_prefix: null })}`, `${code} → ${PT.orderCode(n || { ...o, channel: pick, order_prefix: null })}`), 3500);
+      await loadOrders();
+    });
+  ov.querySelectorAll("[data-ch]").forEach(b => b.onclick = () => {
+    pick = b.dataset.ch;
+    ov.querySelectorAll("[data-ch]").forEach(x => x.classList.toggle("sel", x === b));
+  });
+}
 async function changeOrderStaff(o){
   const code = PT.orderCode(o);
   const s = await staffPick(o.staff_name ? L(`${code} 받은 직원을 바꿔요 (지금: ${o.staff_name}) — 새로 맡는 직원이 본인 비밀번호를 넣어주세요`, `Change who took ${code} (now: ${o.staff_name})`) : L(`${code} 주문을 받은 직원`, `Who took ${code}?`));
