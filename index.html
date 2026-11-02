@@ -200,8 +200,10 @@ function renderMenu(){
     items.forEach(item => {
       const out = !!soldOut[item.id] || closed;
       const row = document.createElement("div");
-      row.className = "item" + (soldOut[item.id] ? " sold-out" : "") + (closed ? " store-closed" : "");
+      const img = itemImg(item);
+      row.className = "item" + (soldOut[item.id] ? " sold-out" : "") + (closed ? " store-closed" : "") + (out ? "" : " tappable");
       row.innerHTML = `
+        ${img ? `<img class="item-thumb" src="${esc(img)}" alt="" loading="lazy" onerror="this.remove()">` : ""}
         <div class="item-main">
           <div class="item-name">${item.isLimited ? `<span class="tag tag-limited">${esc(T("한정","LIMITED"))}</span>` : ''}${item.isNew ? '<span class="tag tag-new">NEW</span>' : ''}${item.isHot ? `<span class="tag tag-hot">🔥 ${esc(T("인기","BEST"))}</span>` : ''}${soldOut[item.id] ? `<span class="tag tag-out">${esc(T("품절","SOLD OUT"))}</span>` : ''}<span>${L(item.name, item.en)}</span>${item.onSale && !out ? `<span class="tag tag-sale">${esc(T("할인","SALE"))}</span>` : ""}</div>
           ${item.options && !out ? `<div class="item-note">${L("옵션 선택","Options available")}</div>` : ''}
@@ -209,7 +211,9 @@ function renderMenu(){
           <div class="item-price">${item.onSale ? `<s class="was">${peso(item.listPrice)}</s> ` : ''}${peso(item.price)}${hasRange(item) ? ' ~' : ''}${item.onSale ? ` <span class="tag tag-sale">-${Math.round((1 - item.price / item.listPrice) * 100)}%</span>` : ''}</div>
         </div>
         <button class="add-btn" aria-label="${esc(T("담기","Add"))}" ${out ? "disabled" : ""}>+</button>`;
-      if(!out) row.querySelector(".add-btn").onclick = () => openItem(item);
+      /* 메뉴 줄 아무 데나 눌러도 상세 창(사진·옵션·수량)이 열림 */
+      if(!out){ row.onclick = () => openItem(item); row.setAttribute("role", "button"); row.tabIndex = 0;
+        row.onkeydown = e => { if(e.key === "Enter" || e.key === " "){ e.preventDefault(); openItem(item); } }; }
       sec.appendChild(row);
     });
     rootEl.appendChild(sec);
@@ -286,6 +290,9 @@ window.addEventListener("popstate", () => {
   }
   history.back();
 });
+/* 메뉴 사진 (menu.js 의 PALTONG_MENU_IMG — 메뉴 id 기준) */
+function itemImg(item){ const m = window.PALTONG_MENU_IMG || {}; return item.img || m[item.id] || ""; }
+
 function sheet(opts = {}){
   const overlay = document.createElement("div"); overlay.className = "overlay";
   const el = document.createElement("div"); el.className = "sheet" + (opts.full ? " full" : ""); overlay.appendChild(el);
@@ -321,6 +328,8 @@ function openItem(item){
   s.setRender(function render(){
     s.el.innerHTML = `
       <div class="sheet-head"><h3>${L(item.name, item.en)}</h3><button class="close-x" aria-label="close">✕</button></div>
+      ${itemImg(item) ? `<div class="item-photo"><img src="${esc(itemImg(item))}" alt="${esc(item.name)}" onerror="this.parentNode.remove()"></div>` : ""}
+      <div class="item-price detail-price">${item.onSale ? `<s class="was">${peso(item.listPrice)}</s> ` : ''}${peso(item.price)}${hasRange(item) ? ' ~' : ''}</div>
       ${groups.map((g,gi) => `
         <div class="opt-group"><div class="opt-title">${L(g.title, g.titleEn)}${tagHtml(g)}${isMulti(g) ? ` <span class="en">(${esc(T(`최대 ${g.max}개`, `up to ${g.max}`))})</span>` : ''}</div>
           ${isCount(g) ? g.choices.map((c,ci) => `

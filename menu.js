@@ -118,3 +118,16 @@ window.PALTONG_MENU.forEach(c => {
   if(!SPICY_CATS.includes(c.cat)) return;
   c.items.forEach(it => { if(!(it.options || []).some(g => g.title === "맵기")) it.options = [...(it.options || []), OPT_SPICE]; });
 });
+
+/* =====================================================================
+   메뉴 사진 — 메뉴 id : 사진 파일 경로 (images/menu/ 폴더)
+   관리자가 저장한 메뉴판을 써도 id 가 같으면 사진이 그대로 보입니다.
+   사진을 추가하려면 images/menu/ 에 파일을 넣고 여기에 한 줄 추가하세요.
+   ===================================================================== */
+window.PALTONG_MENU_IMG = {
+  fried_boneless:     "images/menu/fried_boneless.jpg",      // 순살 프라이드
+  garlic_boneless:    "images/menu/garlic_boneless.jpg",     // 순살 마늘
+  spicysoy_boneless:  "images/menu/spicysoy_boneless.jpg",   // 순살 매운간장 (땡초간장)
+  soy_boneless:       "images/menu/soy_boneless.jpg",        // 순살 간장
+  yangnyeom_boneless: "images/menu/yangnyeom_boneless.jpg",  // 순살 양념
+};
