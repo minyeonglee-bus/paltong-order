@@ -142,7 +142,8 @@ window.PALTONG_MENU_IMG = {
   spicysoy_boneless:  BONELESS_IMG["땡초간장"],
 
   /* 메인 안주류 */
-  jikhwa_dakbal:      { option:"부위", by:{ "뼈":"images/menu/dakbal_bone.jpg", "무뼈":"images/menu/dakbal_boneless.jpg" } },  // 직화 닭발 (뼈/무뼈 고르면 사진 바뀜)
+  jikhwa_dakbal:      "images/menu/jikhwa_dakbal.jpg",       // 직화 닭발 (무뼈 사진)
+  gukmuldakbal:       "images/menu/gukmul_dakbal.jpg",       // 국물닭발 (뼈 사진)
   gomjangeo:          "images/menu/gomjangeo.jpg",           // 꼼장어
   redwing:            "images/menu/redwing.jpg",             // 빨간 날개
   dakdoritang:        "images/menu/dakdoritang.jpg",         // 닭도리탕
