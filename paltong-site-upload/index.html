@@ -200,10 +200,8 @@ function renderMenu(){
     items.forEach(item => {
       const out = !!soldOut[item.id] || closed;
       const row = document.createElement("div");
-      const img = itemImg(item);
       row.className = "item" + (soldOut[item.id] ? " sold-out" : "") + (closed ? " store-closed" : "") + (out ? "" : " tappable");
       row.innerHTML = `
-        ${img ? `<img class="item-thumb" src="${esc(img)}" alt="" loading="lazy" onerror="this.remove()">` : ""}
         <div class="item-main">
           <div class="item-name">${item.isLimited ? `<span class="tag tag-limited">${esc(T("한정","LIMITED"))}</span>` : ''}${item.isNew ? '<span class="tag tag-new">NEW</span>' : ''}${item.isHot ? `<span class="tag tag-hot">🔥 ${esc(T("인기","BEST"))}</span>` : ''}${soldOut[item.id] ? `<span class="tag tag-out">${esc(T("품절","SOLD OUT"))}</span>` : ''}<span>${L(item.name, item.en)}</span>${item.onSale && !out ? `<span class="tag tag-sale">${esc(T("할인","SALE"))}</span>` : ""}</div>
           ${item.options && !out ? `<div class="item-note">${L("옵션 선택","Options available")}</div>` : ''}
