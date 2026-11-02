@@ -140,4 +140,15 @@ window.PALTONG_MENU_IMG = {
   garlic_boneless:    BONELESS_IMG["마늘"],
   soy_boneless:       BONELESS_IMG["간장"],
   spicysoy_boneless:  BONELESS_IMG["땡초간장"],
+
+  /* 메인 안주류 */
+  jikhwa_dakbal:      { option:"부위", by:{ "뼈":"images/menu/dakbal_bone.jpg", "무뼈":"images/menu/dakbal_boneless.jpg" } },  // 직화 닭발 (뼈/무뼈 고르면 사진 바뀜)
+  gomjangeo:          "images/menu/gomjangeo.jpg",           // 꼼장어
+  redwing:            "images/menu/redwing.jpg",             // 빨간 날개
+  dakdoritang:        "images/menu/dakdoritang.jpg",         // 닭도리탕
+  redsamgyeop:        "images/menu/redsamgyeop.jpg",         // 빨간 삼겹
+  odolppyeo:          "images/menu/odolppyeo.jpg",           // 오돌뼈
+  jjukkumi_samgyeop:  "images/menu/jjukkumi_samgyeop.jpg",   // 쭈꾸미삼겹살
+  jjukkumi:           "images/menu/jjukkumi.jpg",            // 로컬 쭈꾸미 볶음
+  m_mvg4m5sf:         "images/menu/jjukkumi.jpg",            // 한국에서온 쭈꾸미
 };
