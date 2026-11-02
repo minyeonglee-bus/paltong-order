@@ -179,4 +179,14 @@ window.PALTONG_MENU_IMG = {
   nurungji:           "images/menu/nurungji.jpg",         // 누룽지탕
   butterodari:        "images/menu/butterodari.jpg",      // 버터오다리
   gyeranjjim:         "images/menu/gyeranjjim.jpg",       // 계란찜
+
+  /* 주류 및 음료 — 종류/맛 고르면 사진 바뀜 */
+  draftbeer:   { option:"종류", by:{ "라이트":"images/menu/draft_light.jpg" } },                                   // 생맥주
+  jinro:       { option:"종류", by:{ "진로":"images/menu/jinro.jpg", "막걸리":"images/menu/makgeolli.jpg", "새로":"images/menu/saero.jpg" } },
+  chamisul:    { option:"종류", by:{ "참이슬":"images/menu/chamisul.jpg", "처음처럼":"images/menu/chumchurum.jpg" } },
+  sanmiguel:   { option:"맛",   by:{ "라이트":"images/menu/sanmig_light.jpg", "필센":"images/menu/sanmig_pilsen.jpg", "애플":"images/menu/sanmig_apple.jpg" } },
+  coolpis:     { option:"맛",   by:{ "복숭아":"images/menu/coolpis_peach.jpg", "파인":"images/menu/coolpis_pine.jpg" } },
+  soda:        { option:"종류", by:{ "콜라":"images/menu/coke.jpg", "사이다":"images/menu/sprite.jpg", "로얄":"images/menu/royal.jpg" } },
+  m_mv89ezhd:  "images/menu/bokbunja.jpg",   // 복분자
+  m_mv9gh9bn:  "images/menu/water.jpg",      // 생수
 };
