@@ -133,8 +133,24 @@ const BONELESS_IMG = {
   "간장":     "images/menu/soy_boneless.jpg",
   "땡초간장": "images/menu/spicysoy_boneless.jpg",   // 매운간장
 };
+const BONE_IMG = {
+  "후라이드": "images/menu/fried_bone.jpg",
+  "양념":     "images/menu/yangnyeom_bone.jpg",
+  "마늘":     "images/menu/garlic_bone.jpg",
+  "간장":     "images/menu/soy_bone.jpg",
+  "땡초간장": "images/menu/spicysoy_bone.jpg",
+};
 window.PALTONG_MENU_IMG = {
   chicken_boneless:   { option:"맛", by: BONELESS_IMG },     // 지금 메뉴판의 '순살 치킨' (맛 선택)
+  chicken_bone:       { option:"맛", by: BONE_IMG },         // 지금 메뉴판의 '뼈 치킨' (맛 선택)
+  fried_bone:         BONE_IMG["후라이드"],
+  yangnyeom_bone:     BONE_IMG["양념"],
+  garlic_bone:        BONE_IMG["마늘"],
+  soy_bone:           BONE_IMG["간장"],
+  spicysoy_bone:      BONE_IMG["땡초간장"],
+  tonggu:             "images/menu/tonggu.jpg",              // 영계통구이
+  tongjipfried:       "images/menu/tongjipfried.jpg",        // 똥집 후라이드
+  tongjipbokkeum:     "images/menu/tongjipbokkeum.jpg",      // 똥집볶음
   fried_boneless:     BONELESS_IMG["후라이드"],
   yangnyeom_boneless: BONELESS_IMG["양념"],
   garlic_boneless:    BONELESS_IMG["마늘"],
@@ -152,4 +168,15 @@ window.PALTONG_MENU_IMG = {
   jjukkumi_samgyeop:  "images/menu/jjukkumi_samgyeop.jpg",   // 쭈꾸미삼겹살
   jjukkumi:           "images/menu/jjukkumi.jpg",            // 로컬 쭈꾸미 볶음
   m_mvg4m5sf:         "images/menu/jjukkumi.jpg",            // 한국에서온 쭈꾸미
+
+  /* 사이드 & 안주류 */
+  meoktae:            "images/menu/meoktae.jpg",          // 먹태
+  tteokbokki:         "images/menu/tteokbokki.jpg",       // 떡볶이
+  odeng:              "images/menu/odeng.jpg",            // 오뎅탕
+  sausage:            "images/menu/sausage.jpg",          // 모듬소세지
+  jwipo:              "images/menu/jwipo.jpg",            // 쥐포
+  cheeseball:         "images/menu/cheeseball.jpg",       // 치즈볼
+  nurungji:           "images/menu/nurungji.jpg",         // 누룽지탕
+  butterodari:        "images/menu/butterodari.jpg",      // 버터오다리
+  gyeranjjim:         "images/menu/gyeranjjim.jpg",       // 계란찜
 };
