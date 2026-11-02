@@ -120,14 +120,36 @@ window.PALTONG_MENU.forEach(c => {
 });
 
 /* =====================================================================
-   메뉴 사진 — 메뉴 id : 사진 파일 경로 (images/menu/ 폴더)
+   메뉴 사진 — 메뉴 id : 사진 (images/menu/ 폴더)
    관리자가 저장한 메뉴판을 써도 id 가 같으면 사진이 그대로 보입니다.
-   사진을 추가하려면 images/menu/ 에 파일을 넣고 여기에 한 줄 추가하세요.
+   · 사진 한 장:  메뉴id: "images/menu/파일.jpg"
+   · 옵션마다 다른 사진: 메뉴id: { option:"옵션 제목", by:{ "선택지 이름":"사진", ... } }
+     → 손님이 그 옵션을 고르면 상세 창 사진이 바뀌고, 목록에는 첫 번째 사진이 보입니다.
    ===================================================================== */
+const BONELESS_IMG = {
+  "후라이드": "images/menu/fried_boneless.jpg",
+  "양념":     "images/menu/yangnyeom_boneless.jpg",
+  "마늘":     "images/menu/garlic_boneless.jpg",
+  "간장":     "images/menu/soy_boneless.jpg",
+  "땡초간장": "images/menu/spicysoy_boneless.jpg",   // 매운간장
+};
 window.PALTONG_MENU_IMG = {
-  fried_boneless:     "images/menu/fried_boneless.jpg",      // 순살 프라이드
-  garlic_boneless:    "images/menu/garlic_boneless.jpg",     // 순살 마늘
-  spicysoy_boneless:  "images/menu/spicysoy_boneless.jpg",   // 순살 매운간장 (땡초간장)
-  soy_boneless:       "images/menu/soy_boneless.jpg",        // 순살 간장
-  yangnyeom_boneless: "images/menu/yangnyeom_boneless.jpg",  // 순살 양념
+  chicken_boneless:   { option:"맛", by: BONELESS_IMG },     // 지금 메뉴판의 '순살 치킨' (맛 선택)
+  fried_boneless:     BONELESS_IMG["후라이드"],
+  yangnyeom_boneless: BONELESS_IMG["양념"],
+  garlic_boneless:    BONELESS_IMG["마늘"],
+  soy_boneless:       BONELESS_IMG["간장"],
+  spicysoy_boneless:  BONELESS_IMG["땡초간장"],
+
+  /* 메인 안주류 */
+  jikhwa_dakbal:      "images/menu/jikhwa_dakbal.jpg",       // 직화 닭발 (무뼈 사진)
+  gukmuldakbal:       "images/menu/gukmul_dakbal.jpg",       // 국물닭발 (뼈 사진)
+  gomjangeo:          "images/menu/gomjangeo.jpg",           // 꼼장어
+  redwing:            "images/menu/redwing.jpg",             // 빨간 날개
+  dakdoritang:        "images/menu/dakdoritang.jpg",         // 닭도리탕
+  redsamgyeop:        "images/menu/redsamgyeop.jpg",         // 빨간 삼겹
+  odolppyeo:          "images/menu/odolppyeo.jpg",           // 오돌뼈
+  jjukkumi_samgyeop:  "images/menu/jjukkumi_samgyeop.jpg",   // 쭈꾸미삼겹살
+  jjukkumi:           "images/menu/jjukkumi.jpg",            // 로컬 쭈꾸미 볶음
+  m_mvg4m5sf:         "images/menu/jjukkumi.jpg",            // 한국에서온 쭈꾸미
 };
