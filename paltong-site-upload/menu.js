@@ -189,4 +189,11 @@ window.PALTONG_MENU_IMG = {
   soda:        { option:"종류", by:{ "콜라":"images/menu/coke.jpg", "사이다":"images/menu/sprite.jpg", "로얄":"images/menu/royal.jpg" } },
   m_mv89ezhd:  "images/menu/bokbunja.jpg",   // 복분자
   m_mv9gh9bn:  "images/menu/water.jpg",      // 생수
+
+  /* 주먹밥류 */
+  tunamayo:    "images/menu/tunamayo.jpg",  // 참치 마요
+  selfball:    "images/menu/selfball.jpg",  // 셀프 주먹밥
+  redtuna:     "images/menu/redtuna.jpg",   // 빨간 참치 (매운참치)
+  nalchial:    "images/menu/nalchial.jpg",  // 날치알
+  rice:        "images/menu/rice.jpg",      // 공기밥
 };
