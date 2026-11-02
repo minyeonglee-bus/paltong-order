@@ -271,12 +271,3 @@ a.track-btn{display:block;text-align:center;text-decoration:none;margin-top:10px
 .closed-banner small{display:block;opacity:.85;font-size:13px;line-height:1.5;}
 .item.store-closed{opacity:.5;}
 .item.store-closed .add-btn{background:var(--line);color:var(--muted);}
-
-/* 메뉴 줄 눌러서 상세 창 열기 · 메뉴 사진 */
-.item.tappable{cursor:pointer;transition:transform .08s ease, box-shadow .15s ease;}
-.item.tappable:active{transform:scale(.985);}
-.item.tappable:focus-visible{outline:2px solid var(--red);outline-offset:2px;}
-.item-thumb{flex-shrink:0;width:64px;height:64px;border-radius:12px;object-fit:cover;background:var(--line);}
-.item-photo{margin:-4px 0 12px;border-radius:16px;overflow:hidden;background:var(--line);aspect-ratio:1/1;max-height:46vh;display:flex;align-items:center;justify-content:center;}
-.item-photo img{width:100%;height:100%;object-fit:cover;display:block;}
-.detail-price{font-size:18px;margin:0 0 6px;}
