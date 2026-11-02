@@ -133,8 +133,24 @@ const BONELESS_IMG = {
   "간장":     "images/menu/soy_boneless.jpg",
   "땡초간장": "images/menu/spicysoy_boneless.jpg",   // 매운간장
 };
+const BONE_IMG = {
+  "후라이드": "images/menu/fried_bone.jpg",
+  "양념":     "images/menu/yangnyeom_bone.jpg",
+  "마늘":     "images/menu/garlic_bone.jpg",
+  "간장":     "images/menu/soy_bone.jpg",
+  "땡초간장": "images/menu/spicysoy_bone.jpg",
+};
 window.PALTONG_MENU_IMG = {
   chicken_boneless:   { option:"맛", by: BONELESS_IMG },     // 지금 메뉴판의 '순살 치킨' (맛 선택)
+  chicken_bone:       { option:"맛", by: BONE_IMG },         // 지금 메뉴판의 '뼈 치킨' (맛 선택)
+  fried_bone:         BONE_IMG["후라이드"],
+  yangnyeom_bone:     BONE_IMG["양념"],
+  garlic_bone:        BONE_IMG["마늘"],
+  soy_bone:           BONE_IMG["간장"],
+  spicysoy_bone:      BONE_IMG["땡초간장"],
+  tonggu:             "images/menu/tonggu.jpg",              // 영계통구이
+  tongjipfried:       "images/menu/tongjipfried.jpg",        // 똥집 후라이드
+  tongjipbokkeum:     "images/menu/tongjipbokkeum.jpg",      // 똥집볶음
   fried_boneless:     BONELESS_IMG["후라이드"],
   yangnyeom_boneless: BONELESS_IMG["양념"],
   garlic_boneless:    BONELESS_IMG["마늘"],
