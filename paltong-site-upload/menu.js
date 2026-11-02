@@ -152,4 +152,15 @@ window.PALTONG_MENU_IMG = {
   jjukkumi_samgyeop:  "images/menu/jjukkumi_samgyeop.jpg",   // 쭈꾸미삼겹살
   jjukkumi:           "images/menu/jjukkumi.jpg",            // 로컬 쭈꾸미 볶음
   m_mvg4m5sf:         "images/menu/jjukkumi.jpg",            // 한국에서온 쭈꾸미
+
+  /* 사이드 & 안주류 */
+  meoktae:            "images/menu/meoktae.jpg",          // 먹태
+  tteokbokki:         "images/menu/tteokbokki.jpg",       // 떡볶이
+  odeng:              "images/menu/odeng.jpg",            // 오뎅탕
+  sausage:            "images/menu/sausage.jpg",          // 모듬소세지
+  jwipo:              "images/menu/jwipo.jpg",            // 쥐포
+  cheeseball:         "images/menu/cheeseball.jpg",       // 치즈볼
+  nurungji:           "images/menu/nurungji.jpg",         // 누룽지탕
+  butterodari:        "images/menu/butterodari.jpg",      // 버터오다리
+  gyeranjjim:         "images/menu/gyeranjjim.jpg",       // 계란찜
 };
