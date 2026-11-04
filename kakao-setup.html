@@ -1,0 +1,154 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>카톡 주문알림 설정 · 빨통</title>
+<link rel="icon" href="/admin-icon-192.png">
+<style>
+  :root{ --bg:#F2EDE5; --card:#fff; --ink:#111; --sub:#6b645c; --red:#E42B17; --ok:#0E6B57; --line:#e3dcd2; }
+  *{ box-sizing:border-box }
+  body{ margin:0; background:var(--bg); color:var(--ink); font:16px/1.5 -apple-system, "Noto Sans KR", system-ui, sans-serif; }
+  main{ max-width:520px; margin:0 auto; padding:20px 16px 60px; }
+  h1{ font-size:22px; margin:4px 0 4px; } h1 b{ color:var(--red) }
+  .lead{ color:var(--sub); margin:0 0 18px; font-size:14px }
+  .step{ background:var(--card); border:1px solid var(--line); border-radius:14px; padding:16px; margin-bottom:12px; }
+  .step h2{ font-size:16px; margin:0 0 8px; display:flex; gap:8px; align-items:center }
+  .n{ width:24px; height:24px; border-radius:50%; background:var(--ink); color:#fff; font-size:13px; display:inline-grid; place-items:center; flex:none }
+  .done .n{ background:var(--ok) } .done h2::after{ content:"완료"; margin-left:auto; color:var(--ok); font-size:13px }
+  p,li{ font-size:14px; color:#333 } ol{ padding-left:18px; margin:6px 0 } li{ margin:3px 0 }
+  code{ background:#f4f0ea; padding:1px 5px; border-radius:5px; font-size:13px; word-break:break-all }
+  input{ width:100%; padding:11px 12px; border:1px solid var(--line); border-radius:10px; font-size:15px; margin:4px 0 8px }
+  button{ width:100%; padding:13px; border:0; border-radius:10px; font-size:15px; font-weight:700; background:var(--ink); color:#fff; cursor:pointer }
+  button.kakao{ background:#FEE500; color:#191919 } button.ghost{ background:#f4f0ea; color:var(--ink) }
+  button:disabled{ opacity:.5 }
+  .row{ display:flex; gap:8px } .row > *{ flex:1 }
+  .friend{ display:flex; justify-content:space-between; align-items:center; padding:10px 0; border-bottom:1px solid var(--line) }
+  .friend button{ width:auto; padding:8px 14px; font-size:14px }
+  .msg{ font-size:14px; margin-top:8px; white-space:pre-wrap } .err{ color:var(--red) } .good{ color:var(--ok) }
+  .log div{ font-size:13px; padding:4px 0; border-bottom:1px dashed var(--line) }
+  .copy{ display:flex; gap:6px; align-items:center } .copy code{ flex:1 }
+  .copy button{ width:auto; padding:8px 12px; font-size:13px }
+</style>
+</head>
+<body>
+<main>
+  <h1>🔔 <b>카톡</b> 주문알림 설정</h1>
+  <p class="lead">웹 주문이 들어오면 사장님 카톡 → 주문톡(매장 공용 카톡)으로 알림이 가요. 3분 안에 처리 안 되면 한 번 더 보내고, 사장님 "나와의 채팅"에도 알려요.</p>
+  <div id="app"><p>불러오는 중…</p></div>
+</main>
+<script>
+const FN = "https://yzdhcumibflxtqkqvbul.supabase.co/functions/v1/kakao-alert";
+const REDIRECT = location.origin + "/kakao-setup";
+const qs = new URLSearchParams(location.search);
+let KEY = qs.get("k") || "";
+const stateParam = qs.get("state") || "";
+if(!KEY && stateParam.includes(".")) KEY = stateParam.split(".").slice(1).join(".");
+try{ if(KEY) localStorage.setItem("kakaoSetupKey", KEY); else KEY = localStorage.getItem("kakaoSetupKey") || ""; }catch(e){}
+
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;" }[c]));
+async function call(action, extra = {}){
+  const r = await fetch(FN, { method:"POST", headers:{ "Content-Type":"application/json" }, body: JSON.stringify({ action, key: KEY, ...extra }) });
+  const d = await r.json().catch(() => ({ error: "응답 오류 " + r.status }));
+  if(!r.ok || d.error) throw new Error(d.error || ("오류 " + r.status));
+  return d;
+}
+function kakaoLogin(st, who){
+  const u = new URL("https://kauth.kakao.com/oauth/authorize");
+  u.search = new URLSearchParams({ client_id: st.rest_key, redirect_uri: REDIRECT, response_type: "code",
+    scope: "talk_message,friends", state: who + "." + KEY, prompt: "select_account" });
+  location.href = u.toString();
+}
+const setupLink = () => location.origin + "/kakao-setup?k=" + KEY;
+
+let ST = null, FRIENDS = null, NOTE = "";
+function render(){
+  const s = ST;
+  const s1 = !!s.rest_key, s2 = !!s.store, s3 = s.owner_login, s4 = !!s.receiver;
+  const exp = s.refresh_exp ? new Date(s.refresh_exp).toLocaleDateString("ko-KR") : "";
+  $("#app").innerHTML = `
+  <div class="step ${s1 ? "done" : ""}">
+    <h2><span class="n">1</span>카카오 앱 만들기 (처음 한 번)</h2>
+    <ol>
+      <li><a href="https://developers.kakao.com/console/app" target="_blank">developers.kakao.com</a> → 사장님 카카오로 로그인 → <b>애플리케이션 추가</b> (이름: 빨통 주문알림)</li>
+      <li><b>앱 키</b>에서 <b>REST API 키</b> 복사 → 아래 칸에 붙여넣기</li>
+      <li><b>플랫폼 → Web</b> → 사이트 도메인 <code>${esc(location.origin)}</code> 등록</li>
+      <li><b>카카오 로그인</b> → 활성화 ON → Redirect URI <div class="copy"><code>${esc(REDIRECT)}</code><button class="ghost" data-copy="${esc(REDIRECT)}">복사</button></div></li>
+      <li><b>카카오 로그인 → 동의항목</b>: 닉네임, <b>카카오톡 메시지 전송</b>, <b>카카오 서비스 내 친구목록</b> 모두 사용(선택 동의)</li>
+      <li><b>팀 관리(멤버)</b> → 주문톡 카톡 계정의 이메일로 초대 → 주문톡 폰에서 초대 메일 수락</li>
+    </ol>
+    <input id="rk" placeholder="REST API 키" value="${esc(s.rest_key || "")}" autocomplete="off">
+    <input id="cs" placeholder="Client Secret (보안 → 사용 중일 때만, 아니면 비워두기)" autocomplete="off">
+    <button id="saveKeys">${s1 ? "키 다시 저장" : "저장"}</button>
+  </div>
+
+  <div class="step ${s2 ? "done" : ""}">
+    <h2><span class="n">2</span>주문톡 폰에서 로그인</h2>
+    <p>${s2 ? `연결됨: <b>${esc(s.store)}</b>` : "주문톡(매장 공용 카톡)이 깔린 폰에서 이 페이지를 열고 아래 버튼을 눌러 주세요. 동의 화면에서 모두 동의."}</p>
+    <div class="copy"><code>${esc(setupLink())}</code><button class="ghost" data-copy="${esc(setupLink())}">링크 복사</button></div>
+    <p style="font-size:12px;color:var(--sub)">이 링크는 사장님만 아는 설정 링크예요. 주문톡 폰에서 쓰고 나면 그 채팅은 지워주세요.</p>
+    <button class="kakao" id="loginStore" ${s1 ? "" : "disabled"}>주문톡 카카오로 로그인</button>
+  </div>
+
+  <div class="step ${s3 ? "done" : ""}">
+    <h2><span class="n">3</span>사장님 폰에서 로그인</h2>
+    <p>${s3 ? `연결됨: <b>${esc(s.owner)}</b> · 로그인 유효 ~${esc(exp)} (만료 7일 전 나와의 채팅으로 알려드려요)` : "알림은 사장님 카톡 이름으로 나가요. 사장님 폰에서 눌러주세요."}</p>
+    <button class="kakao" id="loginOwner" ${s1 ? "" : "disabled"}>${s3 ? "사장님 카카오 다시 로그인" : "사장님 카카오로 로그인"}</button>
+  </div>
+
+  <div class="step ${s4 ? "done" : ""}">
+    <h2><span class="n">4</span>알림 받을 카톡 고르기</h2>
+    <p>${s4 ? `받는 곳: <b>${esc(s.receiver)}</b>` : "사장님 카톡 친구 중 주문톡 계정을 골라주세요. (1·2번을 마친 친구만 보여요)"}</p>
+    <div id="friends">${FRIENDS ? (FRIENDS.length ? FRIENDS.map(f => `<div class="friend"><span>${esc(f.name)}</span><button data-pick="${esc(f.uuid)}" data-name="${esc(f.name)}">선택</button></div>`).join("") : `<p class="err">보이는 친구가 없어요. 주문톡이 팀원 초대를 수락하고 2번 로그인을 했는지, 사장님과 서로 카톡 친구인지 확인해 주세요.</p>`) : ""}</div>
+    <button class="ghost" id="loadFriends" ${s3 ? "" : "disabled"}>친구 목록 불러오기</button>
+  </div>
+
+  <div class="step">
+    <h2><span class="n">5</span>테스트 · 설정</h2>
+    <button id="test" ${s4 ? "" : "disabled"}>테스트 메시지 보내기</button>
+    <div class="row" style="margin-top:10px">
+      <label style="font-size:14px">재알림 (분)<input id="rm" type="number" min="1" max="30" value="${esc(s.remind_min)}"></label>
+      <label style="font-size:14px">알림<select id="en" style="width:100%;padding:11px;border-radius:10px;border:1px solid var(--line);margin:4px 0 8px;font-size:15px"><option value="1" ${s.enabled ? "selected" : ""}>켜기</option><option value="0" ${s.enabled ? "" : "selected"}>끄기</option></select></label>
+    </div>
+    <button class="ghost" id="saveSet">설정 저장</button>
+    <div class="log" id="log"></div>
+  </div>
+  <div class="msg" id="msg">${NOTE}</div>`;
+
+  document.querySelectorAll("[data-copy]").forEach(b => b.onclick = async () => { try{ await navigator.clipboard.writeText(b.dataset.copy); b.textContent = "복사됨"; }catch(e){ prompt("복사하세요", b.dataset.copy); } });
+  $("#saveKeys").onclick = () => act(async () => { ST = await call("save_keys", { rest_key: $("#rk").value, client_secret: $("#cs").value }); return "✅ 저장했어요. 이제 2번(주문톡 폰)으로."; });
+  $("#loginStore").onclick = () => kakaoLogin(ST, "store");
+  $("#loginOwner").onclick = () => kakaoLogin(ST, "owner");
+  $("#loadFriends").onclick = () => act(async () => { FRIENDS = (await call("friends")).friends; return ""; });
+  document.querySelectorAll("[data-pick]").forEach(b => b.onclick = () => act(async () => { ST = await call("pick", { uuid: b.dataset.pick, name: b.dataset.name }); FRIENDS = null; return `✅ ${b.dataset.name} 으로 알림이 가요. 5번에서 테스트해 보세요.`; }));
+  $("#test").onclick = () => act(async () => { await call("test"); return "✅ 보냈어요. 주문톡 폰과 사장님 '나와의 채팅'을 확인하세요."; });
+  $("#saveSet").onclick = () => act(async () => { ST = await call("settings", { enabled: $("#en").value === "1", remind_min: $("#rm").value }); return "✅ 저장했어요."; });
+  if(s4) call("log").then(d => { const L = d.log || []; $("#log").innerHTML = L.length ? "<p style='margin:12px 0 4px'><b>최근 알림</b></p>" + L.map(x => `<div>${new Date(x.created_at).toLocaleString("ko-KR",{month:"numeric",day:"numeric",hour:"2-digit",minute:"2-digit"})} · #${esc(x.order_no)} · ${x.kind === "remind_sent" ? "재알림" : "알림"} ${x.ok ? "✅" : "❌ " + esc((x.error || "").slice(0, 60))}</div>`).join("") : ""; }).catch(() => {});
+}
+async function act(fn){
+  document.querySelectorAll("button").forEach(b => b.disabled = true);
+  try{ NOTE = `<span class="good">${await fn()}</span>`; }
+  catch(e){ NOTE = `<span class="err">❌ ${esc(e.message)}</span>`; }
+  render();
+}
+
+(async () => {
+  if(!KEY){ $("#app").innerHTML = `<p class="err">설정 링크로 열어주세요 (끝에 ?k=… 가 붙은 주소).</p>`; return; }
+  try{
+    const code = qs.get("code"), err = qs.get("error_description") || qs.get("error");
+    if(err) NOTE = `<span class="err">❌ 카카오 로그인 취소/오류: ${esc(err)}</span>`;
+    if(code){
+      const who = stateParam.split(".")[0] === "store" ? "store" : "owner";
+      history.replaceState(null, "", "/kakao-setup?k=" + KEY);
+      const d = await call("exchange", { code, who });
+      ST = d;
+      NOTE = `<span class="good">✅ ${who === "store" ? "주문톡" : "사장님"} 카카오 연결: ${esc(d.name)}${who === "owner" ? " — 4번에서 받을 카톡을 골라주세요." : " — 이제 사장님 폰에서 3번."}</span>`;
+    } else ST = await call("status");
+    render();
+  }catch(e){ $("#app").innerHTML = `<p class="err">❌ ${esc(e.message)}</p>`; }
+})();
+</script>
+</body>
+</html>
