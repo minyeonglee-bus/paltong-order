@@ -1,0 +1,7 @@
+-- 카톡 웹주문 알림 (2026-11-04, Supabase에 이미 적용됨 — 기록용)
+-- 테이블: kakao_alert_cfg(설정 1줄), kakao_alert_log(발송 기록)
+-- 트리거 orders_kakao_notify: 웹주문이 new / receipt_submitted 가 되면 엣지함수 kakao-alert 호출
+-- 크론 paltong-kakao-sweep(매분): remind_min(기본 3)분 넘게 처리 안 되면 주문톡 재알림 + 사장님 나와의 채팅
+-- 크론 paltong-kakao-check(매일 11:00 마닐라): 카카오 로그인 만료 7일 전 사장님께 경고
+-- 설정 페이지: https://paltong-order.com/kakao-setup?k=<kakao_alert_cfg.setup_key>
+-- 끄기: update kakao_alert_cfg set enabled=false;
