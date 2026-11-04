@@ -55,17 +55,19 @@ async function kapi(token: string, path: string, form?: Record<string, string>) 
   return d;
 }
 
-const tpl = (text: string) => JSON.stringify({
+const PAYROLL_URL = "https://paltong-payroll.vercel.app";
+const tpl = (text: string, url = ADMIN_URL, button = "주문 확인 Open orders") => JSON.stringify({
   object_type: "text",
   text: text.slice(0, 200),
-  link: { web_url: ADMIN_URL, mobile_web_url: ADMIN_URL },
-  button_title: "주문 확인 Open orders",
+  link: { web_url: url, mobile_web_url: url },
+  button_title: button,
 });
 const sendFriend = async (t: string, uuid: string, text: string) => {
   const d = await kapi(t, "/v1/api/talk/friends/message/default/send", { receiver_uuids: JSON.stringify([uuid]), template_object: tpl(text) });
   if (d.failure_info?.length) throw new Error("친구 발송 실패: " + JSON.stringify(d.failure_info));
 };
-const sendMemo = (t: string, text: string) => kapi(t, "/v2/api/talk/memo/default/send", { template_object: tpl(text) });
+const sendMemo = (t: string, text: string, url?: string, button?: string) =>
+  kapi(t, "/v2/api/talk/memo/default/send", { template_object: tpl(text, url, button) });
 
 const peso = (n: number | null) => "₱" + Number(n || 0).toLocaleString("en-US");
 function orderLine(o: Cfg) {
@@ -136,6 +138,17 @@ Deno.serve(async (req) => {
   if (b.action === "alert" || b.action === "check") {
     if (b.key !== c.internal_key) return json({ error: "forbidden" }, 403);
     return json(b.action === "check" ? await dailyCheck() : await alert(b.order_id, b.kind));
+  }
+
+  // 급여 앱(다른 Supabase 프로젝트)에서 오는 사장님 알림 → 나와의 채팅
+  if (b.action === "memo") {
+    if (!c.notify_key || b.key !== c.notify_key) return json({ error: "forbidden" }, 403);
+    if (!c.refresh_token) return json({ ok: false, error: "카카오 로그인 전" });
+    try {
+      const t = await accessToken(c);
+      await sendMemo(t, String(b.text || ""), PAYROLL_URL, "급여 앱 열기");
+      return json({ ok: true });
+    } catch (e) { return json({ ok: false, error: String((e as Error).message || e) }); }
   }
 
   // 설정 페이지 호출 (설정 키 필요)
