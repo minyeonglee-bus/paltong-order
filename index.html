@@ -203,7 +203,7 @@ function renderMenu(){
       row.className = "item" + (soldOut[item.id] ? " sold-out" : "") + (closed ? " store-closed" : "");
       row.innerHTML = `
         <div class="item-main">
-          <div class="item-name">${item.isLimited ? `<span class="tag tag-limited">${esc(T("한정","LIMITED"))}</span>` : ''}${item.isNew ? '<span class="tag tag-new">NEW</span>' : ''}${item.isHot ? `<span class="tag tag-hot">🔥 ${esc(T("인기","BEST"))}</span>` : ''}${soldOut[item.id] ? `<span class="tag tag-out">${esc(T("품절","SOLD OUT"))}</span>` : ''}<span>${L(item.name, item.en)}</span>${item.onSale && !out ? `<span class="tag tag-sale">${esc(T("할인","SALE"))}</span>` : ""}</div>
+          <div class="item-name">${item.isLimited ? `<span class="tag tag-limited">${esc(T("한정","LIMITED"))}</span>` : ''}${item.isNew ? '<span class="tag tag-new">NEW</span>' : ''}${item.isHot ? `<span class="tag tag-hot">🔥 ${esc(T("인기","BEST"))}</span>` : ''}${soldOut[item.id] ? `<span class="tag tag-out">${esc(T("품절","SOLD OUT"))}</span>` : ''}<span>${L(item.name, item.en)}</span></div>
           ${item.options && !out ? `<div class="item-note">${L("옵션 선택","Options available")}</div>` : ''}
           ${item.requires ? `<div class="item-note req-note">⚠ ${requireShort(item)}</div>` : ''}
           <div class="item-price">${item.onSale ? `<s class="was">${peso(item.listPrice)}</s> ` : ''}${peso(item.price)}${hasRange(item) ? ' ~' : ''}${item.onSale ? ` <span class="tag tag-sale">-${Math.round((1 - item.price / item.listPrice) * 100)}%</span>` : ''}</div>
