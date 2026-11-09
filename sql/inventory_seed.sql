@@ -84,6 +84,11 @@ select * from (values
  ('c156','nalchial',null,null,null,null,false,1,'rice ball'),
  ('c156','selfball',null,null,null,null,false,1,'rice ball'),
  ('c156',null,'rice ?ball|주먹밥',null,null,null,false,1,'external rice ball'),
+ -- 155: 밥 메뉴 — 볶음밥 · 공기밥 (사장님 11/9)
+ ('c155','selfbokkeum',null,null,null,null,false,1,'fried rice'),
+ ('c155','selfcheesebokkeum',null,null,null,null,false,1,'cheese fried rice'),
+ ('c155','rice',null,null,null,null,false,1,'steamed rice'),
+ ('c155',null,'(fried|plain|steamed|white) ?rice|볶음밥|공기밥|공깃밥','rice ?ball|rice ?cake|주먹밥',null,null,false,1,'external rice'),
  -- 쭈꾸미삼겹살: 쭈꾸미 250 g + 삼겹 250 g (쭈꾸미 Local / From Korea)
  ('pusit_local','jjukkumi_samgyeop',null,null,null,'From Korea',false,250,'jjusam local pusit 250g'),
  ('pusit_kr','jjukkumi_samgyeop',null,null,'From Korea',null,false,250,'jjusam korean pusit 250g'),
