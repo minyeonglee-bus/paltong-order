@@ -202,3 +202,35 @@ begin
   end if;
   return null;
 end $$;
+
+-- 대체 품목 (2026-11-09): 재고 0 이하면 sub_id 에서 대신 뺌 (156 없는 동안 157)
+alter table public.inv_items add column if not exists sub_id text references public.inv_items(id) on delete set null;
+create or replace function public.inv_sync_order(p_order uuid) returns void language plpgsql security definer set search_path = public as $$
+declare o record; s record;
+begin
+  select * into s from inv_settings where id = 1;
+  if s is null or not s.enabled then return; end if;
+  select id, status, items, created_at, coalesce(order_prefix,'') || coalesce(order_no::text,'') as ref into o from orders where id = p_order;
+  if o.id is null then return; end if;
+  if o.created_at < s.start_at and not exists (select 1 from inv_moves where order_id = p_order) then return; end if;
+  insert into inv_moves(item_id, delta, kind, order_id, order_ref, note)
+  select coalesce(w.item_id, h.item_id), -coalesce(w.need, 0) - coalesce(h.had, 0), 'order', p_order, o.ref, w.via
+  from (
+    select r.item_id, sum(r.need) as need, string_agg(distinct r.via, ', ') as via from (
+      select case when d.use_sub then i.sub_id else n.item_id end as item_id,
+             case when d.use_sub then n.need * coalesce(i.per_unit, 1) / coalesce(nullif(si.per_unit, 0), 1) else n.need end as need,
+             case when d.use_sub then '대체 · instead of ' || i.name end as via
+      from inv_order_need(o.items) n
+      join inv_items i on i.id = n.item_id
+      left join inv_items si on si.id = i.sub_id
+      cross join lateral (select (i.sub_id is not null and coalesce(si.active, false)
+          and not exists (select 1 from inv_moves x where x.order_id = p_order and x.item_id = n.item_id and x.kind = 'order')
+          and (i.qty <= 0 or exists (select 1 from inv_moves x where x.order_id = p_order and x.item_id = i.sub_id and x.kind = 'order'
+                                       and x.note = '대체 · instead of ' || i.name))) as use_sub) d
+      where o.status in ('accepted','awaiting_payment','confirmed','delivering','done')
+    ) r group by r.item_id
+  ) w
+  full join (select x.item_id, sum(x.delta) as had from inv_moves x where x.order_id = p_order and x.kind = 'order' group by x.item_id) h
+    on h.item_id = w.item_id
+  where round(-coalesce(w.need, 0) - coalesce(h.had, 0), 6) <> 0;
+end $$;

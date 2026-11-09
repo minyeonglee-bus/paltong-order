@@ -115,3 +115,4 @@ where not exists (select 1 from public.inv_recipes);
 -- 11/9 18:57 사장님: 154~157 = From Korea (따로 묶음, 3 plastic 알림), 꼼장어 용기·닭도리탕 그릇 = 현지 구매 (1 bundle 남으면 1 bundle 사기)
 update public.inv_items set note = '🇰🇷 From Korea — 미리 주문 (배송 오래 걸림)' where id in ('c154','c155','c156','c157') and note is null;
 update public.inv_items set note = '🛒 현지 구매 — 1 bundle(plastic)씩 사기' where id in ('dakdori_bowl','eel_dry') and note is null;
+update public.inv_items set sub_id = 'c157' where id = 'c156' and sub_id is null;  -- 156 없는 동안 157 (사장님 11/9 19:31)
