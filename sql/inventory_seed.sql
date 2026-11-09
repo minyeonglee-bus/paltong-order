@@ -3,7 +3,7 @@
 
 insert into public.inv_items(id, name, name_ko, cat, unit, per_unit, use_unit, low_at, sort) values
  -- Dry
- ('dakdori_bowl','Dakdoritang bowl','닭도리탕 그릇','dry','plastic',null,'pcs',2,10),
+ ('dakdori_bowl','Dakdoritang bowl','닭도리탕 그릇','dry','plastic',null,null,2,10),
  ('eel_dry','Eel (dry stock)','꼼장어 (건)','dry','plastic',null,null,1,11),
  ('c154','154 container','154 용기','dry','plastic',null,null,3,20),
  ('c155','155 container','155 용기','dry','plastic',null,null,1,21),
@@ -57,6 +57,8 @@ insert into public.inv_recipes(item_id, menu_id, name_kw, name_not, opt_ko, opt_
 select * from (values
  -- 꼼장어: 1 pack 900 g, 1 order 450 g, 150G 추가 × 개수
  ('eel','gomjangeo',null,null,null,null,false,450::numeric,'1 order 450g'),
+ ('dakdori_bowl','dakdoritang',null,null,null,null,false,1,'dakdoritang bowl'),
+ ('dakdori_bowl',null,'dakdori|닭도리|chicken stew',null,null,null,false,1,'external dakdoritang'),
  ('eel','gomjangeo',null,null,'150G 추가',null,true,150,'+150g add-on'),
  ('eel',null,'hagfish|꼼장어|\meel\M',null,null,null,false,450,'external order'),
  -- 154: 무뼈 닭발 · 삼겹 · 한국 쭈꾸미
