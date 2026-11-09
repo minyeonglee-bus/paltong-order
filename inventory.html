@@ -96,6 +96,17 @@ async function loadMenu(){
   if(!menu.length) menu = window.PALTONG_MENU || [];
 }
 const menuItems = () => menu.flatMap(c => (c.items || []).map(i => ({ id:i.id, name:i.name, en:i.en, options:i.options || [] })));
+/* 이 품목을 쓰는 메뉴 (레시피에서 자동) — 예: "Grilled Dakbal (Boneless) · Red Samgyeop" */
+function usesTxt(i, lang = "en"){
+  const mi = menuItems(), out = [];
+  recipes.filter(r => r.item_id === i.id && r.menu_id).forEach(r => {
+    const m = mi.find(x => x.id === r.menu_id); if(!m) return;
+    let nm = lang === "ko" ? m.name : (m.en || m.name);
+    if(r.opt_ko){ const ch = m.options.flatMap(g => g.choices || []).find(c => c.label === r.opt_ko); nm += ` (${lang === "ko" || !ch ? r.opt_ko : (ch.en || r.opt_ko)})`; }
+    if(!out.includes(nm)) out.push(nm);
+  });
+  return out.join(" · ");
+}
 const menuName = id => { const m = menuItems().find(i => i.id === id); return m ? `${m.name} · ${m.en || ""}` : id; };
 
 async function load(){
@@ -140,7 +151,7 @@ function renderStock(){
       const used = since[i.id] || 0, a = auto(i);
       return `<div class="row ${isLow(i) ? "low" : ""} ${Number(i.qty) <= 0 && i.counted_at ? "zero" : ""}">
         <div class="nm"><b>${esc(i.name)}</b>${a ? ' <span title="auto">🔄</span>' : ""}${!i.counted_at ? '<span class="tag g">아직 안 셈 · not counted</span>' : ""}${Number(i.qty) <= 0 && i.counted_at ? '<span class="tag r">No stock</span>' : isLow(i) ? '<span class="tag y">Low</span>' : ""}
-          <div class="s">${esc(i.name_ko || "")}${i.counted_at ? ` · 실사 ${new Date(i.counted_at).toLocaleString("ko-KR", { month:"numeric", day:"numeric", hour:"2-digit", minute:"2-digit" })}${i.counted_by ? " " + esc(i.counted_by) : ""}` : ""}${used ? ` · 주문 −${fmt(used)}` : ""}${i.per_unit ? ` · 1 ${esc(i.unit)} = ${fmt(i.per_unit)}${esc(i.use_unit || "")} (≈ ${Math.round(Number(i.qty) * Number(i.per_unit)).toLocaleString()} ${esc(i.use_unit || "")})` : ""}${hasBox(i) ? ` · 1 box = ${fmt(i.box_size)} ${esc(i.unit)} (총 ${fmt(i.qty)})` : ""}${i.low_at != null ? ` · 🔔 ≤ ${fmt(i.low_at)}` : ""}</div>${i.note ? `<div class="s" style="color:var(--ink-soft);font-weight:700">${esc(i.note)}</div>` : ""}</div>
+          <div class="s">${esc(i.name_ko || "")}${i.counted_at ? ` · 실사 ${new Date(i.counted_at).toLocaleString("ko-KR", { month:"numeric", day:"numeric", hour:"2-digit", minute:"2-digit" })}${i.counted_by ? " " + esc(i.counted_by) : ""}` : ""}${used ? ` · 주문 −${fmt(used)}` : ""}${i.per_unit ? ` · 1 ${esc(i.unit)} = ${fmt(i.per_unit)}${esc(i.use_unit || "")} (≈ ${Math.round(Number(i.qty) * Number(i.per_unit)).toLocaleString()} ${esc(i.use_unit || "")})` : ""}${hasBox(i) ? ` · 1 box = ${fmt(i.box_size)} ${esc(i.unit)} (총 ${fmt(i.qty)})` : ""}${i.low_at != null ? ` · 🔔 ≤ ${fmt(i.low_at)}` : ""}</div>${usesTxt(i) ? `<div class="s" style="color:var(--ink)">🍽 ${esc(usesTxt(i))}<br><span style="color:var(--muted)">${esc(usesTxt(i, "ko"))}</span></div>` : ""}${i.note ? `<div class="s" style="color:var(--ink-soft);font-weight:700">${esc(i.note)}</div>` : ""}</div>
         <div class="q">${qtyTxt(i, i.qty, true)}</div>
         <div><button class="btn sm" data-in="${i.id}">＋</button> <button class="btn sm" data-out="${i.id}">－</button></div></div>`;
     }).join("") + `</div>`;
@@ -178,7 +189,7 @@ function renderCount(){
     <label class="f">이름 · Name</label><input class="t" id="cWho" value="${esc(who())}">`;
   for(const c of Object.keys(CATS)){
     const list = items.filter(i => i.active && i.cat === c); if(!list.length) continue;
-    h += `<div class="sec">${CATS[c]}</div><div class="card">` + list.map(i => BOXCATS.includes(c) ? `<div class="row" style="grid-template-columns:1fr auto"><div class="nm"><b>${esc(i.name)}</b><div class="s">${esc(i.name_ko || "")} · 지금 앱 · app ${esc(qtyTxt(i))}</div>
+    h += `<div class="sec">${CATS[c]}</div><div class="card">` + list.map(i => BOXCATS.includes(c) ? `<div class="row" style="grid-template-columns:1fr auto"><div class="nm"><b>${esc(i.name)}</b><div class="s">${esc(i.name_ko || "")} · 지금 앱 · app ${esc(qtyTxt(i))}</div>${usesTxt(i) ? `<div class="s">🍽 ${esc(usesTxt(i))}</div>` : ""}
         <div class="s" style="margin-top:4px">1 box = <input class="n" style="width:62px;font-size:13px;padding:4px 6px" inputmode="decimal" data-bs="${i.id}" value="${i.box_size ?? ""}" placeholder="?"> ${esc(i.unit)}</div></div>
       <div style="display:flex;gap:4px;align-items:center;flex-wrap:wrap;justify-content:flex-end"><input class="n" style="width:64px" inputmode="decimal" data-cb="${i.id}" placeholder="0"><span class="hint">box</span>
         <input class="n" style="width:64px" inputmode="decimal" data-c="${i.id}" placeholder="0"><span class="hint">${esc(i.unit)}</span></div></div>`
