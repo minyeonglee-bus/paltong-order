@@ -6,7 +6,7 @@ insert into public.inv_items(id, name, name_ko, cat, unit, per_unit, use_unit, l
  ('dakdori_bowl','Dakdoritang bowl','닭도리탕 그릇','dry','plastic',null,'pcs',2,10),
  ('eel_dry','Eel (dry stock)','꼼장어 (건)','dry','plastic',null,null,1,11),
  ('c154','154 container','154 용기','dry','plastic',100,'pcs',3,20),
- ('c155','155 container','155 용기','dry','plastic',100,'pcs',3,21),
+ ('c155','155 container','155 용기','dry','plastic',100,'pcs',0.5,21),
  ('c156','156 container','156 용기','dry','plastic',100,'pcs',3,22),
  ('c157','157 container','157 용기','dry','plastic',100,'pcs',3,23),
  ('chicken_powder','Chicken powder','치킨 파우더','dry','plastic',null,null,1,30),
