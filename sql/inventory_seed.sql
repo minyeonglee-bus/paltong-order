@@ -78,17 +78,18 @@ select * from (values
  ('c157',null,'sausage|소세지|소시지',null,null,null,false,1,'external sausage'),
  ('c157',null,'nurungji|누룽지|scorched',null,null,null,false,1,'external nurungji'),
  ('c157',null,'tteokbokki|떡볶이','fish ?cake soup|odeng',null,null,false,1,'external tteokbokki'),
- -- 156: 주먹밥 전부 (사장님 11/9)
+ -- 155: 떡볶이 반 + 오뎅탕 반 (사장님 11/9)
+ ('c155','tteok_odeng_half',null,null,null,null,false,1,'tteok-odeng-tang'),
+ ('c155',null,'half.*(tteok|rice ?cake).*half.*(odeng|fish ?cake)|떡뎅|떡볶이\s*반.*오뎅탕?\s*반|tteok.?odeng',null,null,null,false,1,'external tteok-odeng-tang'),
+ -- 156: 밥 메뉴 전부 — 주먹밥 · 볶음밥 · 공기밥 (사장님 11/9)
  ('c156','tunamayo',null,null,null,null,false,1,'rice ball'),
  ('c156','redtuna',null,null,null,null,false,1,'rice ball'),
  ('c156','nalchial',null,null,null,null,false,1,'rice ball'),
  ('c156','selfball',null,null,null,null,false,1,'rice ball'),
- ('c156',null,'rice ?ball|주먹밥',null,null,null,false,1,'external rice ball'),
- -- 155: 밥 메뉴 — 볶음밥 · 공기밥 (사장님 11/9)
- ('c155','selfbokkeum',null,null,null,null,false,1,'fried rice'),
- ('c155','selfcheesebokkeum',null,null,null,null,false,1,'cheese fried rice'),
- ('c155','rice',null,null,null,null,false,1,'steamed rice'),
- ('c155',null,'(fried|plain|steamed|white) ?rice|볶음밥|공기밥|공깃밥','rice ?ball|rice ?cake|주먹밥',null,null,false,1,'external rice'),
+ ('c156','selfbokkeum',null,null,null,null,false,1,'fried rice'),
+ ('c156','selfcheesebokkeum',null,null,null,null,false,1,'cheese fried rice'),
+ ('c156','rice',null,null,null,null,false,1,'steamed rice'),
+ ('c156',null,'(fried|plain|steamed|white) ?rice|rice ?ball|볶음밥|공기밥|공깃밥|주먹밥','rice ?cake',null,null,false,1,'external rice / rice ball'),
  -- 쭈꾸미삼겹살: 쭈꾸미 250 g + 삼겹 250 g (쭈꾸미 Local / From Korea)
  ('pusit_local','jjukkumi_samgyeop',null,null,null,'From Korea',false,250,'jjusam local pusit 250g'),
  ('pusit_kr','jjukkumi_samgyeop',null,null,'From Korea',null,false,250,'jjusam korean pusit 250g'),
