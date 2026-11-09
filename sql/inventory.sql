@@ -176,3 +176,28 @@ revoke all on function public.inv_sync_order(uuid) from public, anon, authentica
 revoke all on function public.inv_order_need(jsonb) from public, anon;
 
 alter table public.inv_items add column if not exists box_size numeric;
+
+-- 부족 알림 (2026-11-09): low_at 또는 0 을 아래로 넘을 때 관리자 푸시 1번 (push_send)
+create or replace function public.inv_moves_apply() returns trigger language plpgsql security definer set search_path = public as $$
+declare i record; old_q numeric; new_q numeric; pcs text;
+begin
+  if tg_op = 'INSERT' then
+    update inv_items set qty = qty + new.delta, updated_at = now() where id = new.item_id
+      returning name, name_ko, unit, use_unit, per_unit, low_at, qty into i;
+    new_q := i.qty; old_q := i.qty - new.delta;
+    if i.low_at is not null and (
+         (old_q > i.low_at and new_q <= i.low_at) or (old_q > 0 and new_q <= 0)) then
+      begin
+        pcs := case when i.per_unit is not null then ' (≈' || round(greatest(new_q, 0) * i.per_unit) || ' ' || coalesce(i.use_unit, '') || ')' else '' end;
+        perform push_send(
+          case when new_q <= 0 then '❌ 재고 없음 No stock: ' else '📦 재고 부족 Low stock: ' end || i.name,
+          coalesce(i.name_ko || ' · ', '') || '남은 양 ' || trim(to_char(round(greatest(new_q, 0), 1), 'FM999990.0')) || ' ' || i.unit || pcs || ' — 주문하세요 · please reorder',
+          'inv-' || new.item_id, 'msg');
+      exception when others then raise warning 'inventory push failed: %', sqlerrm;
+      end;
+    end if;
+  elsif tg_op = 'DELETE' then
+    update inv_items set qty = qty - old.delta, updated_at = now() where id = old.item_id;
+  end if;
+  return null;
+end $$;
