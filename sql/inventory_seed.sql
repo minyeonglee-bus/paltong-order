@@ -3,8 +3,8 @@
 
 insert into public.inv_items(id, name, name_ko, cat, unit, per_unit, use_unit, low_at, sort) values
  -- Dry
- ('dakdori_bowl','Dakdoritang bowl','닭도리탕 그릇','dry','plastic',100,'pcs',1,10),
- ('eel_dry','Eel container','꼼장어 용기','dry','plastic',100,'pcs',1,11),
+ ('dakdori_bowl','Dakdoritang bowl','닭도리탕 그릇','dry','plastic',50,'pcs',1,10),
+ ('eel_dry','Eel container','꼼장어 용기','dry','plastic',50,'pcs',1,11),
  ('c154','154 container','154 용기','korea','plastic',100,'pcs',3,20),
  ('c155','155 container','155 용기','korea','plastic',100,'pcs',0.5,21),
  ('c156','156 container','156 용기','korea','plastic',100,'pcs',3,22),
