@@ -139,7 +139,7 @@ function renderStock(){
       const used = since[i.id] || 0, a = auto(i);
       return `<div class="row ${isLow(i) ? "low" : ""} ${Number(i.qty) <= 0 && i.counted_at ? "zero" : ""}">
         <div class="nm"><b>${esc(i.name)}</b>${a ? ' <span title="auto">🔄</span>' : ""}${!i.counted_at ? '<span class="tag g">아직 안 셈 · not counted</span>' : ""}${Number(i.qty) <= 0 && i.counted_at ? '<span class="tag r">No stock</span>' : isLow(i) ? '<span class="tag y">Low</span>' : ""}
-          <div class="s">${esc(i.name_ko || "")}${i.counted_at ? ` · 실사 ${new Date(i.counted_at).toLocaleString("ko-KR", { month:"numeric", day:"numeric", hour:"2-digit", minute:"2-digit" })}${i.counted_by ? " " + esc(i.counted_by) : ""}` : ""}${used ? ` · 주문 −${fmt(used)}` : ""}${i.per_unit ? ` · 1 ${esc(i.unit)} = ${fmt(i.per_unit)}${esc(i.use_unit || "")}` : ""}${hasBox(i) ? ` · 1 box = ${fmt(i.box_size)} ${esc(i.unit)} (총 ${fmt(i.qty)})` : ""}</div></div>
+          <div class="s">${esc(i.name_ko || "")}${i.counted_at ? ` · 실사 ${new Date(i.counted_at).toLocaleString("ko-KR", { month:"numeric", day:"numeric", hour:"2-digit", minute:"2-digit" })}${i.counted_by ? " " + esc(i.counted_by) : ""}` : ""}${used ? ` · 주문 −${fmt(used)}` : ""}${i.per_unit ? ` · 1 ${esc(i.unit)} = ${fmt(i.per_unit)}${esc(i.use_unit || "")} (≈ ${Math.round(Number(i.qty) * Number(i.per_unit)).toLocaleString()} ${esc(i.use_unit || "")})` : ""}${hasBox(i) ? ` · 1 box = ${fmt(i.box_size)} ${esc(i.unit)} (총 ${fmt(i.qty)})` : ""}</div></div>
         <div class="q">${qtyTxt(i, i.qty, true)}</div>
         <div><button class="btn sm" data-in="${i.id}">＋</button> <button class="btn sm" data-out="${i.id}">－</button></div></div>`;
     }).join("") + `</div>`;
