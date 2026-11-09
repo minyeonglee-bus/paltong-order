@@ -16,6 +16,7 @@ create table if not exists public.inv_items (
   use_unit    text,                     -- 레시피에서 쓰는 단위 (g, pcs ...). null 이면 unit 과 같음 (per_unit 1)
   qty         numeric not null default 0,
   low_at      numeric,                  -- 이 숫자 이하면 '부족'
+  box_size    numeric,                  -- Dry: 1 box = box_size × unit (n box + n plastic 으로 셈)
   counted_at  timestamptz,              -- 마지막 실사
   counted_by  text,
   active      boolean not null default true,
@@ -173,3 +174,5 @@ drop policy if exists inv_settings_admin on public.inv_settings;
 create policy inv_settings_admin on public.inv_settings for all using (is_admin()) with check (is_admin());
 revoke all on function public.inv_sync_order(uuid) from public, anon, authenticated;
 revoke all on function public.inv_order_need(jsonb) from public, anon;
+
+alter table public.inv_items add column if not exists box_size numeric;

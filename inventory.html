@@ -113,6 +113,15 @@ async function start(){
 $("refresh").onclick = async () => { await load(); render(); toast("↻"); };
 document.querySelectorAll(".tabb").forEach(b => b.onclick = () => { tab = b.dataset.t; document.querySelectorAll(".tabb").forEach(x => x.classList.toggle("sel", x === b)); render(); });
 
+const hasBox = i => i.cat === "dry" && Number(i.box_size) > 0;
+/* Dry: "2 box 3 plastic" */
+function qtyTxt(i, q = i.qty, html = false){
+  q = Number(q);
+  if(hasBox(i) && q >= 0){ const bs = Number(i.box_size), b = Math.floor(q / bs + 1e-9), r = q - b * bs;
+    const parts = []; if(b) parts.push(html ? `${b} <small>box</small>` : `${b} box`); if(r > 1e-9 || !b) parts.push(html ? `${fmt(r)} <small>${esc(i.unit)}</small>` : `${fmt(r)} ${i.unit}`);
+    return parts.join(" "); }
+  return html ? `${fmt(q)} <small>${esc(i.unit)}</small>` : `${fmt(q)} ${i.unit}`;
+}
 const auto = i => (i.per_unit != null || !i.use_unit) && recipes.some(r => r.item_id === i.id);
 const isLow = i => i.low_at != null && Number(i.qty) <= Number(i.low_at);
 function render(){ ({ stock:renderStock, count:renderCount, hist:renderHist, recipe:renderRecipe })[tab](); }
@@ -130,8 +139,8 @@ function renderStock(){
       const used = since[i.id] || 0, a = auto(i);
       return `<div class="row ${isLow(i) ? "low" : ""} ${Number(i.qty) <= 0 && i.counted_at ? "zero" : ""}">
         <div class="nm"><b>${esc(i.name)}</b>${a ? ' <span title="auto">🔄</span>' : ""}${!i.counted_at ? '<span class="tag g">아직 안 셈 · not counted</span>' : ""}${Number(i.qty) <= 0 && i.counted_at ? '<span class="tag r">No stock</span>' : isLow(i) ? '<span class="tag y">Low</span>' : ""}
-          <div class="s">${esc(i.name_ko || "")}${i.counted_at ? ` · 실사 ${new Date(i.counted_at).toLocaleString("ko-KR", { month:"numeric", day:"numeric", hour:"2-digit", minute:"2-digit" })}${i.counted_by ? " " + esc(i.counted_by) : ""}` : ""}${used ? ` · 주문 −${fmt(used)}` : ""}${i.per_unit ? ` · 1 ${esc(i.unit)} = ${fmt(i.per_unit)}${esc(i.use_unit || "")}` : ""}</div></div>
-        <div class="q">${fmt(i.qty)} <small>${esc(i.unit)}</small></div>
+          <div class="s">${esc(i.name_ko || "")}${i.counted_at ? ` · 실사 ${new Date(i.counted_at).toLocaleString("ko-KR", { month:"numeric", day:"numeric", hour:"2-digit", minute:"2-digit" })}${i.counted_by ? " " + esc(i.counted_by) : ""}` : ""}${used ? ` · 주문 −${fmt(used)}` : ""}${i.per_unit ? ` · 1 ${esc(i.unit)} = ${fmt(i.per_unit)}${esc(i.use_unit || "")}` : ""}${hasBox(i) ? ` · 1 box = ${fmt(i.box_size)} ${esc(i.unit)} (총 ${fmt(i.qty)})` : ""}</div></div>
+        <div class="q">${qtyTxt(i, i.qty, true)}</div>
         <div><button class="btn sm" data-in="${i.id}">＋</button> <button class="btn sm" data-out="${i.id}">－</button></div></div>`;
     }).join("") + `</div>`;
   }
@@ -141,7 +150,7 @@ function renderStock(){
   document.querySelectorAll("[data-out]").forEach(b => b.onclick = () => quickMove(b.dataset.out, -1));
 }
 function copyReport(){
-  const act = items.filter(i => i.active && i.counted_at), line = i => `${i.name} - ${fmt(i.qty)} ${i.unit}`;
+  const act = items.filter(i => i.active && i.counted_at), line = i => `${i.name} - ${qtyTxt(i)}`;
   const txt = `(Dry stock)\n${act.filter(i => i.cat === "dry" && i.qty > 0).map(line).join("\n")}\n\n(Frozen stock)\n${act.filter(i => i.cat === "frozen" && i.qty > 0).map(line).join("\n")}\n\n` +
     (act.some(i => i.cat === "drink") ? `(Drinks)\n${act.filter(i => i.cat === "drink" && i.qty > 0).map(line).join("\n")}\n\n` : "") +
     `(No stock)\n${act.filter(i => i.qty <= 0).map(i => i.name).join("\n")}`;
@@ -149,8 +158,14 @@ function copyReport(){
 }
 async function quickMove(id, sign){
   const i = items.find(x => x.id === id), n = who() || askWho(); if(!n) return;
-  const v = prompt(`${i.name} — ${sign > 0 ? "📥 입고 · Received" : "🗑 버림 · Waste / used"} (${i.unit})`, "1"); if(v == null) return;
-  const q = Number(v); if(!(q > 0)) return toast("숫자 · number");
+  const lbl = `${i.name} — ${sign > 0 ? "📥 입고 · Received" : "🗑 버림 · Waste / used"}`;
+  let q;
+  if(hasBox(i)){
+    const b = prompt(`${lbl}\n몇 box? · How many box? (1 box = ${fmt(i.box_size)} ${i.unit})`, "0"); if(b == null) return;
+    const r = prompt(`${lbl}\n+ 몇 ${i.unit}? · How many ${i.unit}?`, "0"); if(r == null) return;
+    q = (Number(b) || 0) * Number(i.box_size) + (Number(r) || 0);
+  }else{ const v = prompt(`${lbl} (${i.unit})`, "1"); if(v == null) return; q = Number(v); }
+  if(!(q > 0)) return toast("숫자 · number");
   const note = sign < 0 ? (prompt("이유 · Reason (optional)", "") || null) : null;
   try{ un(await sb.rpc("inv_move", { p_item:id, p_delta: sign * q, p_kind: sign > 0 ? "in" : "waste", p_by:n, p_note:note })); await load(); render(); toast("저장 · Saved"); }
   catch(e){ toast("실패 · " + (e.message || e), 4000); }
@@ -162,21 +177,36 @@ function renderCount(){
     <label class="f">이름 · Name</label><input class="t" id="cWho" value="${esc(who())}">`;
   for(const c of Object.keys(CATS)){
     const list = items.filter(i => i.active && i.cat === c); if(!list.length) continue;
-    h += `<div class="sec">${CATS[c]}</div><div class="card">` + list.map(i => `<div class="row"><div class="nm"><b>${esc(i.name)}</b><div class="s">${esc(i.name_ko || "")} · 지금 앱 · app ${fmt(i.qty)}</div></div>
+    h += `<div class="sec">${CATS[c]}</div><div class="card">` + list.map(i => c === "dry" ? `<div class="row" style="grid-template-columns:1fr auto"><div class="nm"><b>${esc(i.name)}</b><div class="s">${esc(i.name_ko || "")} · 지금 앱 · app ${esc(qtyTxt(i))}</div>
+        <div class="s" style="margin-top:4px">1 box = <input class="n" style="width:62px;font-size:13px;padding:4px 6px" inputmode="decimal" data-bs="${i.id}" value="${i.box_size ?? ""}" placeholder="?"> ${esc(i.unit)}</div></div>
+      <div style="display:flex;gap:4px;align-items:center;flex-wrap:wrap;justify-content:flex-end"><input class="n" style="width:64px" inputmode="decimal" data-cb="${i.id}" placeholder="0"><span class="hint">box</span>
+        <input class="n" style="width:64px" inputmode="decimal" data-c="${i.id}" placeholder="0"><span class="hint">${esc(i.unit)}</span></div></div>`
+      : `<div class="row"><div class="nm"><b>${esc(i.name)}</b><div class="s">${esc(i.name_ko || "")} · 지금 앱 · app ${fmt(i.qty)}</div></div>
       <input class="n" inputmode="decimal" data-c="${i.id}" placeholder="${fmt(i.qty)}"><div style="font-size:12px;color:var(--muted);width:44px">${esc(i.unit)}</div></div>`).join("") + `</div>`;
   }
   h += `<button class="btn red" id="cSave" style="width:100%;margin-top:14px;padding:13px">저장 · Save count</button><div id="cRes"></div>`;
   $("view").innerHTML = h;
   $("cSave").onclick = async () => {
     const n = $("cWho").value.trim(); if(!n) return toast("이름 · Name"); localStorage.setItem("inv_name", n);
-    const rows = [...document.querySelectorAll("[data-c]")].filter(x => x.value.trim() !== "");
+    const val = sel => { const el = document.querySelector(sel); return el && el.value.trim() !== "" ? Number(el.value) : null; };
+    const rows = [];
+    for(const i of items.filter(x => x.active)){
+      const u = val(`[data-c="${i.id}"]`), b = val(`[data-cb="${i.id}"]`), bs = val(`[data-bs="${i.id}"]`);
+      if([u, b, bs].some(v => v != null && !(v >= 0))) return toast(`${i.name}: 숫자만 · numbers only`);
+      if(bs != null && bs > 0 && bs !== Number(i.box_size)) rows.push({ i, setBox:bs });
+      if(u == null && b == null) continue;
+      const size = bs || Number(i.box_size) || 0;
+      if(b && !size) return toast(`${i.name}: 1 box = 몇 ${i.unit}? 먼저 넣어주세요 · set box size`, 4000);
+      rows.push({ i, total:(b || 0) * size + (u || 0) });
+    }
     if(!rows.length) return toast("숫자를 넣어주세요 · Enter counts");
-    if(rows.some(x => !(Number(x.value) >= 0))) return toast("숫자만 · numbers only");
     $("cSave").disabled = true; const diffs = [];
-    for(const x of rows){ try{ const d = un(await sb.rpc("inv_count", { p_item:x.dataset.c, p_counted:Number(x.value), p_by:n })); if(Math.abs(d) > 1e-6) diffs.push([x.dataset.c, d]); }catch(e){ toast("실패 · " + (e.message || e), 4000); } }
+    for(const r of rows.filter(r => r.setBox)){ try{ un(await sb.from("inv_items").update({ box_size:r.setBox, updated_at:new Date().toISOString() }).eq("id", r.i.id)); }catch(e){ toast("실패 · " + (e.message || e), 4000); } }
+    const counts = rows.filter(r => r.total != null);
+    for(const r of counts){ try{ const d = un(await sb.rpc("inv_count", { p_item:r.i.id, p_counted:r.total, p_by:n })); if(Math.abs(d) > 1e-6) diffs.push([r.i.id, d]); }catch(e){ toast("실패 · " + (e.message || e), 4000); } }
     await load(); $("cSave").disabled = false;
-    $("cRes").innerHTML = `<div class="alert" style="background:var(--surface)"><b>✅ ${rows.length}개 저장 · saved</b>${diffs.length ? "<br>앱과 차이 · Difference vs app:<br>" + diffs.map(([id, d]) => `${esc((items.find(i => i.id === id) || {}).name || id)}: <span class="${d > 0 ? "pos" : "neg"}">${d > 0 ? "+" : ""}${fmt(d)}</span>`).join("<br>") : "<br>앱 숫자와 같음 · matches the app"}</div>`;
-    document.querySelectorAll("[data-c]").forEach(x => x.value = "");
+    $("cRes").innerHTML = `<div class="alert" style="background:var(--surface)"><b>✅ ${counts.length}개 저장 · saved</b>${diffs.length ? "<br>앱과 차이 · Difference vs app:<br>" + diffs.map(([id, d]) => `${esc((items.find(i => i.id === id) || {}).name || id)}: <span class="${d > 0 ? "pos" : "neg"}">${d > 0 ? "+" : ""}${fmt(d)}</span>`).join("<br>") : "<br>앱 숫자와 같음 · matches the app"}</div>`;
+    document.querySelectorAll("[data-c],[data-cb]").forEach(x => x.value = "");
   };
 }
 
@@ -243,11 +273,12 @@ function itemSheet(i){
     <div class="grid2"><div><label class="f">레시피 단위 (g / pcs, 같으면 비움)</label><input class="t" name="use_unit" value="${esc(i.use_unit || "")}"></div>
       <div><label class="f">1 단위에 몇? (예: 900 g, 50 pcs)</label><input class="t" name="per_unit" inputmode="decimal" value="${i.per_unit ?? ""}"></div></div>
     <div class="grid2"><div><label class="f">부족 알림 (이하)</label><input class="t" name="low_at" inputmode="decimal" value="${i.low_at ?? ""}"></div>
-      <div><label class="f">순서</label><input class="t" name="sort" inputmode="numeric" value="${i.sort ?? 100}"></div></div>
+      <div><label class="f">1 box = 몇 unit? (Dry)</label><input class="t" name="box_size" inputmode="decimal" value="${i.box_size ?? ""}"></div></div>
+    <div class="grid2"><div><label class="f">순서</label><input class="t" name="sort" inputmode="numeric" value="${i.sort ?? 100}"></div><div></div></div>
     <label class="f"><input type="checkbox" name="active" ${i.active ? "checked" : ""}> 사용 중 · Active</label>`,
   async ov => {
     const g = k => ov.querySelector(`[name=${k}]`), row = { name:g("name").value.trim(), name_ko:g("name_ko").value.trim() || null, cat:g("cat").value, unit:g("unit").value.trim() || "pcs",
-      use_unit:g("use_unit").value.trim() || null, per_unit:num(g("per_unit").value), low_at:num(g("low_at").value), sort:Number(g("sort").value) || 0, active:g("active").checked, updated_at:new Date().toISOString() };
+      use_unit:g("use_unit").value.trim() || null, per_unit:num(g("per_unit").value), low_at:num(g("low_at").value), box_size:num(g("box_size").value), sort:Number(g("sort").value) || 0, active:g("active").checked, updated_at:new Date().toISOString() };
     if(!row.name) throw new Error("이름 · name");
     if(n){ const id = g("id").value.trim().toLowerCase().replace(/[^a-z0-9_]/g, "_"); if(!id) throw new Error("ID"); un(await sb.from("inv_items").insert({ id, ...row })); }
     else un(await sb.from("inv_items").update(row).eq("id", i.id));
