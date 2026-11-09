@@ -3,12 +3,12 @@
 
 insert into public.inv_items(id, name, name_ko, cat, unit, per_unit, use_unit, low_at, sort) values
  -- Dry
- ('dakdori_bowl','Dakdoritang bowl','닭도리탕 그릇','dry','plastic',100,'pcs',2,10),
+ ('dakdori_bowl','Dakdoritang bowl','닭도리탕 그릇','dry','plastic',100,'pcs',1,10),
  ('eel_dry','Eel container','꼼장어 용기','dry','plastic',100,'pcs',1,11),
- ('c154','154 container','154 용기','dry','plastic',100,'pcs',3,20),
- ('c155','155 container','155 용기','dry','plastic',100,'pcs',0.5,21),
- ('c156','156 container','156 용기','dry','plastic',100,'pcs',3,22),
- ('c157','157 container','157 용기','dry','plastic',100,'pcs',3,23),
+ ('c154','154 container','154 용기','korea','plastic',100,'pcs',3,20),
+ ('c155','155 container','155 용기','korea','plastic',100,'pcs',0.5,21),
+ ('c156','156 container','156 용기','korea','plastic',100,'pcs',3,22),
+ ('c157','157 container','157 용기','korea','plastic',100,'pcs',3,23),
  ('chicken_powder','Chicken powder','치킨 파우더','dry','plastic',null,null,1,30),
  ('spoon','Spoon','숟가락','dry','plastic',null,null,1,31),
  ('parchment','Parchment paper','종이호일','dry','plastic',null,null,3,32),
@@ -111,3 +111,7 @@ select * from (values
  ('coolpis_zero',null,'cool ?pi(s|ece).*zero|쿨피스.*제로','pine',null,null,false,1,'external')
 ) v(item_id, menu_id, name_kw, name_not, opt_ko, opt_not, per_opt_n, amount, note)
 where not exists (select 1 from public.inv_recipes);
+
+-- 11/9 18:57 사장님: 154~157 = From Korea (따로 묶음, 3 plastic 알림), 꼼장어 용기·닭도리탕 그릇 = 현지 구매 (1 bundle 남으면 1 bundle 사기)
+update public.inv_items set note = '🇰🇷 From Korea — 미리 주문 (배송 오래 걸림)' where id in ('c154','c155','c156','c157') and note is null;
+update public.inv_items set note = '🛒 현지 구매 — 1 bundle(plastic)씩 사기' where id in ('dakdori_bowl','eel_dry') and note is null;

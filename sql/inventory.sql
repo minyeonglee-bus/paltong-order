@@ -10,7 +10,7 @@ create table if not exists public.inv_items (
   id          text primary key,
   name        text not null,            -- 직원이 보는 이름 (영문)
   name_ko     text,
-  cat         text not null default 'dry',   -- dry | frozen | drink
+  cat         text not null default 'dry',   -- korea (한국에서 오는 용기) | dry | frozen | drink
   unit        text not null default 'pcs',   -- 세는 단위: plastic / pack / pcs / can ...
   per_unit    numeric,                  -- 1 unit 안에 몇 use_unit (예: 꼼장어 1 pack = 900 g). null = 아직 모름 → 자동 차감 안 함
   use_unit    text,                     -- 레시피에서 쓰는 단위 (g, pcs ...). null 이면 unit 과 같음 (per_unit 1)
@@ -183,7 +183,7 @@ declare i record; old_q numeric; new_q numeric; pcs text;
 begin
   if tg_op = 'INSERT' then
     update inv_items set qty = qty + new.delta, updated_at = now() where id = new.item_id
-      returning name, name_ko, unit, use_unit, per_unit, low_at, qty into i;
+      returning name, name_ko, unit, use_unit, per_unit, low_at, qty, note into i;
     new_q := i.qty; old_q := i.qty - new.delta;
     if i.low_at is not null and (
          (old_q > i.low_at and new_q <= i.low_at) or (old_q > 0 and new_q <= 0)) then
@@ -191,7 +191,8 @@ begin
         pcs := case when i.per_unit is not null then ' (≈' || round(greatest(new_q, 0) * i.per_unit) || ' ' || coalesce(i.use_unit, '') || ')' else '' end;
         perform push_send(
           case when new_q <= 0 then '❌ 재고 없음 No stock: ' else '📦 재고 부족 Low stock: ' end || i.name,
-          coalesce(i.name_ko || ' · ', '') || '남은 양 ' || trim(to_char(round(greatest(new_q, 0), 1), 'FM999990.0')) || ' ' || i.unit || pcs || ' — 주문하세요 · please reorder',
+          coalesce(i.name_ko || ' · ', '') || '남은 양 ' || trim(to_char(round(greatest(new_q, 0), 1), 'FM999990.0')) || ' ' || i.unit || pcs
+            || coalesce(' · ' || nullif(i.note, ''), ' — 주문하세요 · please reorder'),
           'inv-' || new.item_id, 'msg');
       exception when others then raise warning 'inventory push failed: %', sqlerrm;
       end;

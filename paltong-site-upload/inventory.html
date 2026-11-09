@@ -71,7 +71,8 @@ const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&":"&amp;","<":"&l
 const un = ({ data, error }) => { if(error) throw error; return data; };
 const toast = (m, ms = 2400) => { const t = $("toast"); t.textContent = m; t.style.display = "block"; clearTimeout(t._h); t._h = setTimeout(() => t.style.display = "none", ms); };
 const fmt = n => { n = Number(n); if(!isFinite(n)) return "–"; const r = Math.round(n * 10) / 10; return (Object.is(r, -0) ? 0 : r).toString(); };
-const CATS = { dry:"Dry stock · 건자재", frozen:"Frozen stock · 냉동", drink:"Drinks · 음료" };
+const CATS = { korea:"🇰🇷 From Korea · 한국에서 오는 용기", dry:"Dry stock · 건자재", frozen:"Frozen stock · 냉동", drink:"Drinks · 음료" };
+const BOXCATS = ["dry", "korea"];
 const KIND = { order:"🧾 주문 Order", count:"✍️ 실사 Count", in:"📥 입고 In", waste:"🗑 버림 Waste", adjust:"✏️ 조정 Adjust" };
 let items = [], recipes = [], tab = "stock", menu = [], since = {};
 const who = () => localStorage.getItem("inv_name") || "";
@@ -113,7 +114,7 @@ async function start(){
 $("refresh").onclick = async () => { await load(); render(); toast("↻"); };
 document.querySelectorAll(".tabb").forEach(b => b.onclick = () => { tab = b.dataset.t; document.querySelectorAll(".tabb").forEach(x => x.classList.toggle("sel", x === b)); render(); });
 
-const hasBox = i => i.cat === "dry" && Number(i.box_size) > 0;
+const hasBox = i => BOXCATS.includes(i.cat) && Number(i.box_size) > 0;
 /* Dry: "2 box 3 plastic" */
 function qtyTxt(i, q = i.qty, html = false){
   q = Number(q);
@@ -139,7 +140,7 @@ function renderStock(){
       const used = since[i.id] || 0, a = auto(i);
       return `<div class="row ${isLow(i) ? "low" : ""} ${Number(i.qty) <= 0 && i.counted_at ? "zero" : ""}">
         <div class="nm"><b>${esc(i.name)}</b>${a ? ' <span title="auto">🔄</span>' : ""}${!i.counted_at ? '<span class="tag g">아직 안 셈 · not counted</span>' : ""}${Number(i.qty) <= 0 && i.counted_at ? '<span class="tag r">No stock</span>' : isLow(i) ? '<span class="tag y">Low</span>' : ""}
-          <div class="s">${esc(i.name_ko || "")}${i.counted_at ? ` · 실사 ${new Date(i.counted_at).toLocaleString("ko-KR", { month:"numeric", day:"numeric", hour:"2-digit", minute:"2-digit" })}${i.counted_by ? " " + esc(i.counted_by) : ""}` : ""}${used ? ` · 주문 −${fmt(used)}` : ""}${i.per_unit ? ` · 1 ${esc(i.unit)} = ${fmt(i.per_unit)}${esc(i.use_unit || "")} (≈ ${Math.round(Number(i.qty) * Number(i.per_unit)).toLocaleString()} ${esc(i.use_unit || "")})` : ""}${hasBox(i) ? ` · 1 box = ${fmt(i.box_size)} ${esc(i.unit)} (총 ${fmt(i.qty)})` : ""}</div></div>
+          <div class="s">${esc(i.name_ko || "")}${i.counted_at ? ` · 실사 ${new Date(i.counted_at).toLocaleString("ko-KR", { month:"numeric", day:"numeric", hour:"2-digit", minute:"2-digit" })}${i.counted_by ? " " + esc(i.counted_by) : ""}` : ""}${used ? ` · 주문 −${fmt(used)}` : ""}${i.per_unit ? ` · 1 ${esc(i.unit)} = ${fmt(i.per_unit)}${esc(i.use_unit || "")} (≈ ${Math.round(Number(i.qty) * Number(i.per_unit)).toLocaleString()} ${esc(i.use_unit || "")})` : ""}${hasBox(i) ? ` · 1 box = ${fmt(i.box_size)} ${esc(i.unit)} (총 ${fmt(i.qty)})` : ""}${i.low_at != null ? ` · 🔔 ≤ ${fmt(i.low_at)}` : ""}</div>${i.note ? `<div class="s" style="color:var(--ink-soft);font-weight:700">${esc(i.note)}</div>` : ""}</div>
         <div class="q">${qtyTxt(i, i.qty, true)}</div>
         <div><button class="btn sm" data-in="${i.id}">＋</button> <button class="btn sm" data-out="${i.id}">－</button></div></div>`;
     }).join("") + `</div>`;
@@ -151,7 +152,7 @@ function renderStock(){
 }
 function copyReport(){
   const act = items.filter(i => i.active && i.counted_at), line = i => `${i.name} - ${qtyTxt(i)}`;
-  const txt = `(Dry stock)\n${act.filter(i => i.cat === "dry" && i.qty > 0).map(line).join("\n")}\n\n(Frozen stock)\n${act.filter(i => i.cat === "frozen" && i.qty > 0).map(line).join("\n")}\n\n` +
+  const txt = (act.some(i => i.cat === "korea") ? `(From Korea)\n${act.filter(i => i.cat === "korea" && i.qty > 0).map(line).join("\n")}\n\n` : "") + `(Dry stock)\n${act.filter(i => i.cat === "dry" && i.qty > 0).map(line).join("\n")}\n\n(Frozen stock)\n${act.filter(i => i.cat === "frozen" && i.qty > 0).map(line).join("\n")}\n\n` +
     (act.some(i => i.cat === "drink") ? `(Drinks)\n${act.filter(i => i.cat === "drink" && i.qty > 0).map(line).join("\n")}\n\n` : "") +
     `(No stock)\n${act.filter(i => i.qty <= 0).map(i => i.name).join("\n")}`;
   navigator.clipboard.writeText(txt).then(() => toast("복사됨 · Copied")).catch(() => prompt("Copy:", txt));
@@ -177,7 +178,7 @@ function renderCount(){
     <label class="f">이름 · Name</label><input class="t" id="cWho" value="${esc(who())}">`;
   for(const c of Object.keys(CATS)){
     const list = items.filter(i => i.active && i.cat === c); if(!list.length) continue;
-    h += `<div class="sec">${CATS[c]}</div><div class="card">` + list.map(i => c === "dry" ? `<div class="row" style="grid-template-columns:1fr auto"><div class="nm"><b>${esc(i.name)}</b><div class="s">${esc(i.name_ko || "")} · 지금 앱 · app ${esc(qtyTxt(i))}</div>
+    h += `<div class="sec">${CATS[c]}</div><div class="card">` + list.map(i => BOXCATS.includes(c) ? `<div class="row" style="grid-template-columns:1fr auto"><div class="nm"><b>${esc(i.name)}</b><div class="s">${esc(i.name_ko || "")} · 지금 앱 · app ${esc(qtyTxt(i))}</div>
         <div class="s" style="margin-top:4px">1 box = <input class="n" style="width:62px;font-size:13px;padding:4px 6px" inputmode="decimal" data-bs="${i.id}" value="${i.box_size ?? ""}" placeholder="?"> ${esc(i.unit)}</div></div>
       <div style="display:flex;gap:4px;align-items:center;flex-wrap:wrap;justify-content:flex-end"><input class="n" style="width:64px" inputmode="decimal" data-cb="${i.id}" placeholder="0"><span class="hint">box</span>
         <input class="n" style="width:64px" inputmode="decimal" data-c="${i.id}" placeholder="0"><span class="hint">${esc(i.unit)}</span></div></div>`
