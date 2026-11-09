@@ -3,8 +3,8 @@
 
 insert into public.inv_items(id, name, name_ko, cat, unit, per_unit, use_unit, low_at, sort) values
  -- Dry
- ('dakdori_bowl','Dakdoritang bowl','닭도리탕 그릇','dry','plastic',null,'pcs',2,10),
- ('eel_dry','Eel (dry stock)','꼼장어 (건)','dry','plastic',null,null,1,11),
+ ('dakdori_bowl','Dakdoritang bowl','닭도리탕 그릇','dry','plastic',100,'pcs',2,10),
+ ('eel_dry','Eel container','꼼장어 용기','dry','plastic',100,'pcs',1,11),
  ('c154','154 container','154 용기','dry','plastic',100,'pcs',3,20),
  ('c155','155 container','155 용기','dry','plastic',100,'pcs',0.5,21),
  ('c156','156 container','156 용기','dry','plastic',100,'pcs',3,22),
@@ -61,6 +61,8 @@ select * from (values
  ('dakdori_bowl',null,'dakdori|닭도리|chicken stew',null,null,null,false,1,'external dakdoritang'),
  ('eel','gomjangeo',null,null,'150G 추가',null,true,150,'+150g add-on'),
  ('eel',null,'hagfish|꼼장어|\meel\M',null,null,null,false,450,'external order'),
+ ('eel_dry','gomjangeo',null,null,null,null,false,1,'eel container'),
+ ('eel_dry',null,'hagfish|꼼장어|\meel\M',null,null,null,false,1,'external eel container'),
  -- 154: 무뼈 닭발 · 삼겹 · 한국 쭈꾸미
  ('c154','jikhwa_dakbal',null,null,'무뼈',null,false,1,'boneless dakbal'),
  ('c154','redsamgyeop',null,null,null,null,false,1,'samgyeop'),
