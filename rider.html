@@ -244,10 +244,14 @@ $("outBtn").onclick = async () => {
 function startApp(){
   $("loginView").hidden = true; $("appView").hidden = false; $("outBtn").hidden = false;
   $("sub").textContent = me.name + " · PAL TONG Rider";
-  onDuty = !!store.get("paltong_rider_duty", false);
+  // duty follows the server (riders.on_duty): the payroll app turns it on at clock-in and off at clock-out
+  onDuty = me.on_duty != null ? !!me.on_duty : !!store.get("paltong_rider_duty", false);
+  store.set("paltong_rider_duty", onDuty);
   if(onDuty) startGps();
   paintDuty(); loadOrders();
   setInterval(loadOrders, 10000);
+  setInterval(syncDuty, 10000);
+  document.addEventListener("visibilitychange", () => { if(!document.hidden) syncDuty(); });
   setInterval(paintDuty, 5000);
 }
 
@@ -290,6 +294,17 @@ async function keepAwake(){
 }
 document.addEventListener("visibilitychange", () => { if(!document.hidden){ keepAwake(); loadOrders(); maybeSend(true); } });
 
+/* 페이롤 앱 출근(IN) → 근무 시작 · 퇴근(OUT) → 근무 종료 (paltong-payroll supabase/pr_rider_duty.sql → rider_duty_ext) */
+async function syncDuty(){
+  try{
+    const m = unwrap(await sb.rpc("rider_me")); if(!m) return; me = m;
+    const on = !!m.on_duty; if(on === onDuty) return;
+    onDuty = on; store.set("paltong_rider_duty", on);
+    if(on){ startGps(); toast(T("페이롤 출근 확인 — 근무 시작 · 위치를 보내는 중", "Clocked in on Payroll — shift started · sharing location"), 4000); }
+    else { stopGps(); toast(T("페이롤 퇴근 확인 — 근무 종료", "Clocked out on Payroll — shift ended"), 4000); }
+    paintDuty();
+  }catch(e){ console.warn(e); }
+}
 async function setDuty(on){
   await sb.rpc("rider_set_duty", { p_on: on }).then(unwrap);
   onDuty = on; store.set("paltong_rider_duty", on);
