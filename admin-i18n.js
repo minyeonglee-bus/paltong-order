@@ -13,7 +13,7 @@ const DICT = [
   ["주문 관리 · Orders", "Orders"], ["🔔 알림 켜기", "🔔 Turn on alerts"], ["🔔 알림 켜짐", "🔔 Alerts on"], ["🔔 알림 ON", "🔔 Alerts ON"], ["🔕 알림 OFF", "🔕 Alerts OFF"],
   ["🔔 알림 소리를 켜려면 화면을 아무 곳이나 한 번 눌러주세요", "🔔 Tap anywhere once to turn on alert sounds"], ["알림 소리를 껐습니다", "Alert sound off"],
   ["🖨 프린터 연결", "🖨 Connect printer"], ["🖨 프린터", "🖨 Printer"], ["🖨 인쇄창", "🖨 Print dialog"], ["💬 채팅", "💬 Chat"], ["📸 리뷰 인증", "📸 Reviews"],
-  ["👥 회원·쿠폰", "👥 Members·Coupons"], ["🙋 직원", "🙋 Staff"], ["🍽 다이닝", "🍽 Dining"], ["블루투스 바로 연결 (아이폰은 Bluefy)", "Bluetooth direct (iPhone: Bluefy app)"], ["▸기기", "▸Device"], ["▸손님·주문", "▸Customers"], ["▸직원", "▸Staff"], ["▸가게", "▸Store"], ["🛵 기사", "🛵 Riders"], ["품절 관리", "Sold out"], ["🍽 메뉴 관리", "🍽 Menu"],
+  ["👥 회원·쿠폰", "👥 Members·Coupons"], ["🙋 직원", "🙋 Staff"], ["🍽 다이닝", "🍽 Dining"], ["블루투스 바로 연결 (아이폰은 Bluefy)", "Bluetooth direct (iPhone: Bluefy app)"], ["▸기기", "▸Device"], ["▸손님·주문", "▸Customers"], ["▸직원", "▸Staff"], ["▸가게", "▸Store"], ["🛵 기사", "🛵 Riders"], ["품절 관리", "Sold out"], ["🍽 메뉴 관리", "🍽 Menu"], ["📦 재고", "📦 Stock"],
   ["품절 · 할인가 · 카테고리 이동을 여기서 바꾸면 손님 화면에 바로 반영됩니다. 할인가를 비우고 '할인 적용'을 누르면 할인이 없어집니다.", "Changes to sold out, sale price and category show on the customer site right away. Clear the sale price and press Apply to remove a sale."], ["⚙ 설정", "⚙ Settings"], ["← 주문 목록", "← Orders"],
   ["데모 모드 — config.js 에 Supabase 정보를 넣으면 실제 운영 모드로 바뀝니다. 같은 브라우저 다른 탭에서 index.html 로 주문해보세요.",
    "Demo mode — add your Supabase details to config.js to go live. Try ordering from index.html in another tab of this browser."],

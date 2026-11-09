@@ -1,0 +1,288 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="robots" content="noindex">
+<title>빨통 재고 · Stock</title>
+<link rel="icon" href="admin-icon-192.png">
+<link href="https://fonts.googleapis.com/css2?family=Black+Han+Sans&family=Noto+Sans+KR:wght@400;500;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+<style>
+  body{max-width:820px;padding-bottom:80px;}
+  .top{display:flex;align-items:center;gap:10px;justify-content:space-between;padding:14px 0 6px;position:sticky;top:0;background:var(--bg);z-index:5;}
+  .top h1{font-size:22px;color:var(--red);}
+  .tabs{display:flex;gap:6px;overflow-x:auto;padding:6px 0 10px;position:sticky;top:52px;background:var(--bg);z-index:5;}
+  .tabb{flex-shrink:0;border:1px solid var(--line);background:var(--surface);padding:9px 14px;border-radius:999px;font-weight:800;font-size:13px;cursor:pointer;}
+  .tabb.sel{background:var(--ink);color:var(--bg);border-color:var(--ink);}
+  .btn{border:1px solid var(--line);background:var(--surface);border-radius:10px;padding:8px 12px;font-weight:700;font-size:13px;cursor:pointer;}
+  .btn.red{background:var(--red);border-color:var(--red);color:#fff;} .btn.green{background:var(--green);border-color:var(--green);color:#fff;}
+  .btn.sm{padding:5px 9px;font-size:12px;}
+  .sec{margin:14px 0 6px;font-weight:800;font-size:15px;display:flex;justify-content:space-between;align-items:center;}
+  .card{background:var(--surface);border:1px solid var(--line);border-radius:14px;overflow:hidden;}
+  .row{display:grid;grid-template-columns:1fr auto auto;gap:8px;align-items:center;padding:10px 12px;border-top:1px solid var(--line);}
+  .row:first-child{border-top:0;}
+  .nm b{font-size:14px;} .nm .s{font-size:11.5px;color:var(--muted);}
+  .q{font-weight:800;font-size:17px;text-align:right;white-space:nowrap;} .q small{font-size:11px;color:var(--muted);font-weight:600;}
+  .low .q{color:var(--red);} .zero{background:rgba(211,61,42,.07);}
+  .tag{display:inline-block;font-size:10.5px;font-weight:800;border-radius:6px;padding:1px 6px;margin-left:4px;vertical-align:1px;}
+  .tag.r{background:var(--red);color:#fff;} .tag.y{background:var(--mustard);color:#fff;} .tag.g{background:var(--line);color:var(--ink-soft);}
+  .alert{background:rgba(211,61,42,.09);border:1px solid rgba(211,61,42,.3);border-radius:12px;padding:10px 12px;margin:8px 0;font-size:13px;}
+  input.n{width:84px;padding:8px;border:1px solid var(--line);border-radius:9px;font:inherit;font-size:16px;font-weight:700;text-align:right;background:var(--surface);color:var(--ink);}
+  input.t,select.t{padding:8px;border:1px solid var(--line);border-radius:9px;font:inherit;background:var(--surface);color:var(--ink);width:100%;}
+  .hint{font-size:12px;color:var(--muted);margin:4px 0;}
+  table.h{width:100%;border-collapse:collapse;font-size:12.5px;} table.h td{padding:7px 8px;border-top:1px solid var(--line);vertical-align:top;}
+  .pos{color:var(--green);font-weight:800;} .neg{color:var(--red);font-weight:800;}
+  .rc{padding:10px 12px;border-top:1px solid var(--line);font-size:13px;display:flex;justify-content:space-between;gap:8px;align-items:center;}
+  .ov{position:fixed;inset:0;background:rgba(0,0,0,.45);display:flex;align-items:flex-end;justify-content:center;z-index:50;}
+  .sheet{background:var(--bg);width:100%;max-width:560px;max-height:92vh;overflow:auto;border-radius:18px 18px 0 0;padding:16px;}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:8px;} label.f{font-size:12px;font-weight:700;color:var(--ink-soft);display:block;margin-top:8px;}
+  #toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:12px;font-weight:700;z-index:99;display:none;}
+</style>
+</head>
+<body>
+<div id="login" hidden style="padding-top:40px">
+  <h1 style="color:var(--red)">빨통 재고 · Stock</h1>
+  <p class="hint">관리자 계정으로 로그인 · Sign in with the admin account</p>
+  <input class="t" id="lId" placeholder="ID" style="margin:6px 0"><input class="t" id="lPw" type="password" placeholder="Password" style="margin:6px 0">
+  <button class="btn red" id="lBtn" style="width:100%;margin-top:6px">로그인 · Sign in</button>
+</div>
+<div id="app" hidden>
+  <div class="top"><h1>📦 재고 · Stock</h1>
+    <div><button class="btn sm" id="refresh">↻</button> <a class="btn sm" href="/admin" style="text-decoration:none">← 주문</a></div></div>
+  <div class="tabs">
+    <button class="tabb sel" data-t="stock">재고 · Stock</button>
+    <button class="tabb" data-t="count">✍️ 실사 · Count</button>
+    <button class="tabb" data-t="hist">기록 · History</button>
+    <button class="tabb" data-t="recipe">⚙ 레시피 · Recipes</button>
+  </div>
+  <div id="view"></div>
+</div>
+<div id="toast"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="config.js"></script>
+<script src="menu.js"></script>
+<script>
+const CFG = window.PALTONG_CONFIG;
+const sb = window.supabase.createClient(CFG.SUPABASE_URL, CFG.SUPABASE_ANON_KEY, { auth:{ persistSession:true, storageKey:"paltong_admin_auth" } });
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[c]));
+const un = ({ data, error }) => { if(error) throw error; return data; };
+const toast = (m, ms = 2400) => { const t = $("toast"); t.textContent = m; t.style.display = "block"; clearTimeout(t._h); t._h = setTimeout(() => t.style.display = "none", ms); };
+const fmt = n => { n = Number(n); if(!isFinite(n)) return "–"; const r = Math.round(n * 10) / 10; return (Object.is(r, -0) ? 0 : r).toString(); };
+const CATS = { dry:"Dry stock · 건자재", frozen:"Frozen stock · 냉동", drink:"Drinks · 음료" };
+const KIND = { order:"🧾 주문 Order", count:"✍️ 실사 Count", in:"📥 입고 In", waste:"🗑 버림 Waste", adjust:"✏️ 조정 Adjust" };
+let items = [], recipes = [], tab = "stock", menu = [], since = {};
+const who = () => localStorage.getItem("inv_name") || "";
+const askWho = () => { let n = who(); if(!n){ n = (prompt("이름 · Your name") || "").trim(); if(n) localStorage.setItem("inv_name", n); } return n; };
+
+async function boot(){
+  const { data } = await sb.auth.getSession();
+  if(data.session){ try{ if(un(await sb.rpc("is_admin"))) return start(); }catch(e){} }
+  $("login").hidden = false;
+}
+$("lBtn").onclick = async () => {
+  const id = $("lId").value.trim(), email = id.includes("@") ? id : `${id.toLowerCase()}@paltong.app`;
+  try{ un(await sb.auth.signInWithPassword({ email, password: $("lPw").value }));
+    if(!un(await sb.rpc("is_admin"))) throw new Error("not admin");
+    $("login").hidden = true; start(); }catch(e){ toast("로그인 실패 · " + (e.message || e), 4000); }
+};
+
+async function loadMenu(){
+  menu = [];
+  try{ const c = un(await sb.from("menu_config").select("data").eq("id", 1).maybeSingle()); if(c && Array.isArray(c.data)) menu = c.data; }catch(e){}
+  if(!menu.length) menu = window.PALTONG_MENU || [];
+}
+const menuItems = () => menu.flatMap(c => (c.items || []).map(i => ({ id:i.id, name:i.name, en:i.en, options:i.options || [] })));
+const menuName = id => { const m = menuItems().find(i => i.id === id); return m ? `${m.name} · ${m.en || ""}` : id; };
+
+async function load(){
+  items = un(await sb.from("inv_items").select("*").order("sort").order("name"));
+  recipes = un(await sb.from("inv_recipes").select("*").order("item_id").order("id"));
+  // 마지막 실사 이후 주문으로 빠진 양
+  const mv = un(await sb.from("inv_moves").select("item_id,delta,kind,created_at").eq("kind", "order").gte("created_at", new Date(Date.now() - 14 * 864e5).toISOString()));
+  since = {};
+  items.forEach(i => since[i.id] = mv.filter(m => m.item_id === i.id && (!i.counted_at || m.created_at > i.counted_at)).reduce((a, m) => a - Number(m.delta), 0));
+}
+async function start(){
+  $("app").hidden = false;
+  await Promise.all([load(), loadMenu()]); render();
+  setInterval(async () => { if(tab === "stock" || tab === "hist"){ await load(); render(); } }, 60000);
+}
+$("refresh").onclick = async () => { await load(); render(); toast("↻"); };
+document.querySelectorAll(".tabb").forEach(b => b.onclick = () => { tab = b.dataset.t; document.querySelectorAll(".tabb").forEach(x => x.classList.toggle("sel", x === b)); render(); });
+
+const auto = i => (i.per_unit != null || !i.use_unit) && recipes.some(r => r.item_id === i.id);
+const isLow = i => i.low_at != null && Number(i.qty) <= Number(i.low_at);
+function render(){ ({ stock:renderStock, count:renderCount, hist:renderHist, recipe:renderRecipe })[tab](); }
+
+/* ---------- 재고 ---------- */
+function renderStock(){
+  const act = items.filter(i => i.active), out = act.filter(i => Number(i.qty) <= 0 && i.counted_at), low = act.filter(i => isLow(i) && Number(i.qty) > 0);
+  let h = "";
+  if(out.length || low.length) h += `<div class="alert">${out.length ? `<b>❌ No stock:</b> ${out.map(i => esc(i.name)).join(", ")}<br>` : ""}${low.length ? `<b>⚠️ 부족 · Low:</b> ${low.map(i => `${esc(i.name)} ${fmt(i.qty)}`).join(", ")}` : ""}</div>`;
+  h += `<div style="display:flex;gap:6px;flex-wrap:wrap;margin:6px 0"><button class="btn" id="copyRep">📋 주문톡용 복사 · Copy report</button><button class="btn" id="goCount">✍️ 지금 세기 · Count now</button></div>
+    <p class="hint">🔄 = 주문 들어오면 자동으로 빠짐 · auto-deducted by orders. 나머지는 실사로만 바뀜 · others change only by count.</p>`;
+  for(const c of Object.keys(CATS)){
+    const list = act.filter(i => i.cat === c); if(!list.length) continue;
+    h += `<div class="sec">${CATS[c]}</div><div class="card">` + list.map(i => {
+      const used = since[i.id] || 0, a = auto(i);
+      return `<div class="row ${isLow(i) ? "low" : ""} ${Number(i.qty) <= 0 && i.counted_at ? "zero" : ""}">
+        <div class="nm"><b>${esc(i.name)}</b>${a ? ' <span title="auto">🔄</span>' : ""}${!i.counted_at ? '<span class="tag g">아직 안 셈 · not counted</span>' : ""}${Number(i.qty) <= 0 && i.counted_at ? '<span class="tag r">No stock</span>' : isLow(i) ? '<span class="tag y">Low</span>' : ""}
+          <div class="s">${esc(i.name_ko || "")}${i.counted_at ? ` · 실사 ${new Date(i.counted_at).toLocaleString("ko-KR", { month:"numeric", day:"numeric", hour:"2-digit", minute:"2-digit" })}${i.counted_by ? " " + esc(i.counted_by) : ""}` : ""}${used ? ` · 주문 −${fmt(used)}` : ""}${i.per_unit ? ` · 1 ${esc(i.unit)} = ${fmt(i.per_unit)}${esc(i.use_unit || "")}` : ""}</div></div>
+        <div class="q">${fmt(i.qty)} <small>${esc(i.unit)}</small></div>
+        <div><button class="btn sm" data-in="${i.id}">＋</button> <button class="btn sm" data-out="${i.id}">－</button></div></div>`;
+    }).join("") + `</div>`;
+  }
+  $("view").innerHTML = h;
+  $("copyRep").onclick = copyReport; $("goCount").onclick = () => document.querySelector('[data-t="count"]').click();
+  document.querySelectorAll("[data-in]").forEach(b => b.onclick = () => quickMove(b.dataset.in, 1));
+  document.querySelectorAll("[data-out]").forEach(b => b.onclick = () => quickMove(b.dataset.out, -1));
+}
+function copyReport(){
+  const act = items.filter(i => i.active && i.counted_at), line = i => `${i.name} - ${fmt(i.qty)} ${i.unit}`;
+  const txt = `(Dry stock)\n${act.filter(i => i.cat === "dry" && i.qty > 0).map(line).join("\n")}\n\n(Frozen stock)\n${act.filter(i => i.cat === "frozen" && i.qty > 0).map(line).join("\n")}\n\n` +
+    (act.some(i => i.cat === "drink") ? `(Drinks)\n${act.filter(i => i.cat === "drink" && i.qty > 0).map(line).join("\n")}\n\n` : "") +
+    `(No stock)\n${act.filter(i => i.qty <= 0).map(i => i.name).join("\n")}`;
+  navigator.clipboard.writeText(txt).then(() => toast("복사됨 · Copied")).catch(() => prompt("Copy:", txt));
+}
+async function quickMove(id, sign){
+  const i = items.find(x => x.id === id), n = who() || askWho(); if(!n) return;
+  const v = prompt(`${i.name} — ${sign > 0 ? "📥 입고 · Received" : "🗑 버림 · Waste / used"} (${i.unit})`, "1"); if(v == null) return;
+  const q = Number(v); if(!(q > 0)) return toast("숫자 · number");
+  const note = sign < 0 ? (prompt("이유 · Reason (optional)", "") || null) : null;
+  try{ un(await sb.rpc("inv_move", { p_item:id, p_delta: sign * q, p_kind: sign > 0 ? "in" : "waste", p_by:n, p_note:note })); await load(); render(); toast("저장 · Saved"); }
+  catch(e){ toast("실패 · " + (e.message || e), 4000); }
+}
+
+/* ---------- 실사 ---------- */
+function renderCount(){
+  let h = `<p class="hint">센 숫자만 넣고 저장 (빈칸은 그대로) · Enter what you counted, leave blank to skip. 차이는 기록에 남아요 · differences are logged.</p>
+    <label class="f">이름 · Name</label><input class="t" id="cWho" value="${esc(who())}">`;
+  for(const c of Object.keys(CATS)){
+    const list = items.filter(i => i.active && i.cat === c); if(!list.length) continue;
+    h += `<div class="sec">${CATS[c]}</div><div class="card">` + list.map(i => `<div class="row"><div class="nm"><b>${esc(i.name)}</b><div class="s">${esc(i.name_ko || "")} · 지금 앱 · app ${fmt(i.qty)}</div></div>
+      <input class="n" inputmode="decimal" data-c="${i.id}" placeholder="${fmt(i.qty)}"><div style="font-size:12px;color:var(--muted);width:44px">${esc(i.unit)}</div></div>`).join("") + `</div>`;
+  }
+  h += `<button class="btn red" id="cSave" style="width:100%;margin-top:14px;padding:13px">저장 · Save count</button><div id="cRes"></div>`;
+  $("view").innerHTML = h;
+  $("cSave").onclick = async () => {
+    const n = $("cWho").value.trim(); if(!n) return toast("이름 · Name"); localStorage.setItem("inv_name", n);
+    const rows = [...document.querySelectorAll("[data-c]")].filter(x => x.value.trim() !== "");
+    if(!rows.length) return toast("숫자를 넣어주세요 · Enter counts");
+    if(rows.some(x => !(Number(x.value) >= 0))) return toast("숫자만 · numbers only");
+    $("cSave").disabled = true; const diffs = [];
+    for(const x of rows){ try{ const d = un(await sb.rpc("inv_count", { p_item:x.dataset.c, p_counted:Number(x.value), p_by:n })); if(Math.abs(d) > 1e-6) diffs.push([x.dataset.c, d]); }catch(e){ toast("실패 · " + (e.message || e), 4000); } }
+    await load(); $("cSave").disabled = false;
+    $("cRes").innerHTML = `<div class="alert" style="background:var(--surface)"><b>✅ ${rows.length}개 저장 · saved</b>${diffs.length ? "<br>앱과 차이 · Difference vs app:<br>" + diffs.map(([id, d]) => `${esc((items.find(i => i.id === id) || {}).name || id)}: <span class="${d > 0 ? "pos" : "neg"}">${d > 0 ? "+" : ""}${fmt(d)}</span>`).join("<br>") : "<br>앱 숫자와 같음 · matches the app"}</div>`;
+    document.querySelectorAll("[data-c]").forEach(x => x.value = "");
+  };
+}
+
+/* ---------- 기록 ---------- */
+let hItem = "";
+async function renderHist(){
+  $("view").innerHTML = `<select class="t" id="hSel"><option value="">전체 · All</option>${items.map(i => `<option value="${i.id}" ${hItem === i.id ? "selected" : ""}>${esc(i.name)}</option>`).join("")}</select><div id="hBox" class="hint">…</div>`;
+  $("hSel").onchange = e => { hItem = e.target.value; renderHist(); };
+  let q = sb.from("inv_moves").select("*").order("created_at", { ascending:false }).limit(300); if(hItem) q = q.eq("item_id", hItem);
+  try{ const mv = un(await q); const nm = id => (items.find(i => i.id === id) || {}).name || id;
+    $("hBox").innerHTML = mv.length ? `<div class="card" style="margin-top:8px"><table class="h">${mv.map(m => `<tr><td style="white-space:nowrap">${new Date(m.created_at).toLocaleString("ko-KR", { month:"numeric", day:"numeric", hour:"2-digit", minute:"2-digit" })}</td>
+      <td><b>${esc(nm(m.item_id))}</b><br><span class="hint">${KIND[m.kind] || m.kind}${m.order_ref ? " #" + esc(m.order_ref) : ""}${m.kind === "count" ? ` → ${fmt(m.counted)}` : ""}${m.by_name ? " · " + esc(m.by_name) : ""}${m.note ? " · " + esc(m.note) : ""}</span></td>
+      <td class="${m.delta > 0 ? "pos" : "neg"}" style="text-align:right;white-space:nowrap">${m.delta > 0 ? "+" : ""}${fmt(m.delta)}</td></tr>`).join("")}</table></div>` : "기록 없음 · none";
+  }catch(e){ $("hBox").textContent = e.message || e; }
+}
+
+/* ---------- 레시피 ---------- */
+function rText(r){
+  const i = items.find(x => x.id === r.item_id) || {}, u = i.use_unit || i.unit || "";
+  const what = r.menu_id ? `🍽 ${esc(menuName(r.menu_id))}` : `🔎 외부주문 "${esc(r.name_kw)}"${r.name_not ? ` (제외 "${esc(r.name_not)}")` : ""}`;
+  return `${what}${r.opt_ko ? ` + 옵션 <b>${esc(r.opt_ko)}</b>${r.per_opt_n ? " ×개수" : ""}` : ""}${r.opt_not ? ` (옵션 ${esc(r.opt_not)} 제외)` : ""} → <b>${fmt(r.amount)} ${esc(u)}</b>`;
+}
+function renderRecipe(){
+  let h = `<p class="hint">주문 1개에 쓰는 양 · amount used per 1 order. 용기처럼 <b>1 ${"plastic"}에 몇 개인지</b>(per unit)를 넣어야 자동으로 빠져요.</p>
+    <button class="btn" id="newItem">＋ 새 품목 · New item</button>`;
+  for(const c of Object.keys(CATS)){
+    const list = items.filter(i => i.cat === c); if(!list.length) continue;
+    h += `<div class="sec">${CATS[c]}</div>`;
+    h += list.map(i => {
+      const rs = recipes.filter(r => r.item_id === i.id), need = i.use_unit && i.per_unit == null;
+      return `<div class="card" style="margin-bottom:8px;${i.active ? "" : "opacity:.5"}"><div class="rc" style="border-top:0"><div><b>${esc(i.name)}</b> <span class="hint">${esc(i.name_ko || "")}</span>
+          <div class="hint">단위 ${esc(i.unit)}${i.use_unit ? ` · 1 ${esc(i.unit)} = ${i.per_unit != null ? fmt(i.per_unit) : "<b style='color:var(--red)'>?</b>"} ${esc(i.use_unit)}` : ""}${i.low_at != null ? ` · 부족 ≤ ${fmt(i.low_at)}` : ""}${need && rs.length ? ` · <b style="color:var(--red)">⚠ per unit 입력 필요 → 지금은 자동 차감 안 됨</b>` : ""}</div></div>
+          <button class="btn sm" data-ei="${i.id}">✏️</button></div>
+        ${rs.map(r => `<div class="rc"><span>${rText(r)}</span><span style="white-space:nowrap"><button class="btn sm" data-er="${r.id}">✏️</button> <button class="btn sm" data-dr="${r.id}">🗑</button></span></div>`).join("")}
+        <div class="rc"><button class="btn sm" data-ar="${i.id}">＋ 메뉴 연결 · Link menu</button></div></div>`;
+    }).join("");
+  }
+  $("view").innerHTML = h;
+  $("newItem").onclick = () => itemSheet(null);
+  document.querySelectorAll("[data-ei]").forEach(b => b.onclick = () => itemSheet(items.find(i => i.id === b.dataset.ei)));
+  document.querySelectorAll("[data-ar]").forEach(b => b.onclick = () => recipeSheet({ item_id:b.dataset.ar, amount:1 }));
+  document.querySelectorAll("[data-er]").forEach(b => b.onclick = () => recipeSheet(recipes.find(r => String(r.id) === b.dataset.er)));
+  document.querySelectorAll("[data-dr]").forEach(b => b.onclick = async () => {
+    if(!confirm("이 연결을 지울까요? · Delete?")) return;
+    try{ un(await sb.from("inv_recipes").delete().eq("id", b.dataset.dr)); await load(); render(); }catch(e){ toast(e.message || e, 4000); }
+  });
+}
+function sheet(html, onSave){
+  const ov = document.createElement("div"); ov.className = "ov";
+  ov.innerHTML = `<div class="sheet">${html}<div style="display:flex;gap:8px;margin-top:14px"><button class="btn" data-x style="flex:1">취소</button><button class="btn red" data-s style="flex:2">저장 · Save</button></div></div>`;
+  document.body.appendChild(ov);
+  ov.querySelector("[data-x]").onclick = () => ov.remove(); ov.onclick = e => { if(e.target === ov) ov.remove(); };
+  ov.querySelector("[data-s]").onclick = async () => { try{ await onSave(ov); ov.remove(); await load(); render(); toast("저장 · Saved"); }catch(e){ toast("실패 · " + (e.message || e), 4000); } };
+  return ov;
+}
+const num = v => v === "" || v == null ? null : Number(v);
+function itemSheet(i){
+  const n = !i; i = i || { cat:"dry", unit:"pcs", active:true, sort:100 };
+  sheet(`<h3>${n ? "새 품목 · New item" : esc(i.name)}</h3>
+    ${n ? `<label class="f">ID (영문, 바꿀 수 없음)</label><input class="t" name="id" placeholder="e.g. honey_mustard">` : ""}
+    <div class="grid2"><div><label class="f">이름 (EN)</label><input class="t" name="name" value="${esc(i.name || "")}"></div><div><label class="f">이름 (KO)</label><input class="t" name="name_ko" value="${esc(i.name_ko || "")}"></div></div>
+    <div class="grid2"><div><label class="f">분류</label><select class="t" name="cat">${Object.entries(CATS).map(([k, v]) => `<option value="${k}" ${i.cat === k ? "selected" : ""}>${v}</option>`).join("")}</select></div>
+      <div><label class="f">세는 단위 (plastic / pack / pcs / can)</label><input class="t" name="unit" value="${esc(i.unit)}"></div></div>
+    <div class="grid2"><div><label class="f">레시피 단위 (g / pcs, 같으면 비움)</label><input class="t" name="use_unit" value="${esc(i.use_unit || "")}"></div>
+      <div><label class="f">1 단위에 몇? (예: 900 g, 50 pcs)</label><input class="t" name="per_unit" inputmode="decimal" value="${i.per_unit ?? ""}"></div></div>
+    <div class="grid2"><div><label class="f">부족 알림 (이하)</label><input class="t" name="low_at" inputmode="decimal" value="${i.low_at ?? ""}"></div>
+      <div><label class="f">순서</label><input class="t" name="sort" inputmode="numeric" value="${i.sort ?? 100}"></div></div>
+    <label class="f"><input type="checkbox" name="active" ${i.active ? "checked" : ""}> 사용 중 · Active</label>`,
+  async ov => {
+    const g = k => ov.querySelector(`[name=${k}]`), row = { name:g("name").value.trim(), name_ko:g("name_ko").value.trim() || null, cat:g("cat").value, unit:g("unit").value.trim() || "pcs",
+      use_unit:g("use_unit").value.trim() || null, per_unit:num(g("per_unit").value), low_at:num(g("low_at").value), sort:Number(g("sort").value) || 0, active:g("active").checked, updated_at:new Date().toISOString() };
+    if(!row.name) throw new Error("이름 · name");
+    if(n){ const id = g("id").value.trim().toLowerCase().replace(/[^a-z0-9_]/g, "_"); if(!id) throw new Error("ID"); un(await sb.from("inv_items").insert({ id, ...row })); }
+    else un(await sb.from("inv_items").update(row).eq("id", i.id));
+  });
+}
+function recipeSheet(r){
+  const i = items.find(x => x.id === r.item_id) || {}, mi = menuItems();
+  const ov = sheet(`<h3>${esc(i.name)} — 메뉴 연결</h3>
+    <label class="f">메뉴 (주문 앱)</label><select class="t" name="menu_id"><option value="">— 외부 주문 이름으로 찾기 —</option>${mi.map(m => `<option value="${esc(m.id)}" ${r.menu_id === m.id ? "selected" : ""}>${esc(m.name)} · ${esc(m.en || "")}</option>`).join("")}</select>
+    <div data-kw><label class="f">외부 주문 이름에 이 글자가 있으면 (정규식, 대소문자 무시) — 예: boneless.*dakbal</label><input class="t" name="name_kw" value="${esc(r.name_kw || "")}">
+      <label class="f">이 글자가 있으면 제외 (선택)</label><input class="t" name="name_not" value="${esc(r.name_not || "")}"></div>
+    <label class="f">옵션을 고른 경우만 (선택)</label><select class="t" name="opt_ko"></select>
+    <label class="f"><input type="checkbox" name="per_opt_n" ${r.per_opt_n ? "checked" : ""}> 옵션 개수만큼 곱하기 (예: 150G 추가 ×2)</label>
+    <label class="f">이 옵션이면 제외 (선택)</label><select class="t" name="opt_not"></select>
+    <label class="f">주문 1개당 양 (${esc(i.use_unit || i.unit || "")})</label><input class="t" name="amount" inputmode="decimal" value="${r.amount ?? 1}">`,
+  async ov => {
+    const g = k => ov.querySelector(`[name=${k}]`), row = { item_id:r.item_id, menu_id:g("menu_id").value || null, name_kw:g("name_kw").value.trim() || null, name_not:g("name_not").value.trim() || null,
+      opt_ko:g("opt_ko").value || null, opt_not:g("opt_not").value || null, per_opt_n:g("per_opt_n").checked, amount:Number(g("amount").value) };
+    if(!row.menu_id && !row.name_kw) throw new Error("메뉴 또는 이름 · menu or keyword");
+    if(row.menu_id){ row.name_kw = null; row.name_not = null; }
+    if(row.name_kw){ try{ new RegExp(row.name_kw, "i"); }catch(e){ throw new Error("정규식 오류 · bad pattern"); } }
+    if(!(row.amount > 0)) throw new Error("양 · amount");
+    if(r.id) un(await sb.from("inv_recipes").update(row).eq("id", r.id)); else un(await sb.from("inv_recipes").insert(row));
+  });
+  const sel = ov.querySelector("[name=menu_id]"), paint = () => {
+    const m = mi.find(x => x.id === sel.value), opts = m ? [...new Set(m.options.flatMap(gr => (gr.choices || []).map(c => c.label)))] : [];
+    [["opt_ko", r.opt_ko], ["opt_not", r.opt_not]].forEach(([k, cur]) => {
+      const all = cur && !opts.includes(cur) ? [cur, ...opts] : opts;
+      ov.querySelector(`[name=${k}]`).innerHTML = `<option value="">— 없음 —</option>` + all.map(o => `<option ${o === cur ? "selected" : ""}>${esc(o)}</option>`).join("");
+    });
+    ov.querySelector("[data-kw]").hidden = !!sel.value;
+  };
+  sel.onchange = () => { r = { ...r, opt_ko:null, opt_not:null }; paint(); }; paint();
+}
+boot();
+</script>
+</body>
+</html>
