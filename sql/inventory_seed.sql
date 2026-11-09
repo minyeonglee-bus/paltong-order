@@ -74,6 +74,8 @@ select * from (values
  ('c157','sausage',null,null,null,null,false,1,'sausage'),
  ('c157','nurungji',null,null,null,null,false,1,'nurungji'),
  ('c157','tteokbokki',null,null,null,null,false,1,'tteokbokki'),
+ ('c157','odeng',null,null,null,null,false,1,'odengtang'),
+ ('c157',null,'odeng|fish ?cake soup|오뎅탕|어묵탕','half|반',null,null,false,1,'external odengtang'),
  ('c157',null,'gukmul|soup.*dakbal|국물.*닭발',null,null,null,false,1,'external gukmul dakbal'),
  ('c157',null,'sausage|소세지|소시지',null,null,null,false,1,'external sausage'),
  ('c157',null,'nurungji|누룽지|scorched',null,null,null,false,1,'external nurungji'),
