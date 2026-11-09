@@ -73,6 +73,14 @@ const toast = (m, ms = 2400) => { const t = $("toast"); t.textContent = m; t.sty
 const fmt = n => { n = Number(n); if(!isFinite(n)) return "–"; const r = Math.round(n * 10) / 10; return (Object.is(r, -0) ? 0 : r).toString(); };
 const CATS = { korea:"🇰🇷 From Korea · 한국에서 오는 용기", dry:"Dry stock · 건자재", frozen:"Frozen stock · 냉동", drink:"Drinks · 음료" };
 const BOXCATS = ["dry", "korea"];
+/* 세는 법 설명 (실사 화면) */
+const CAT_HINT = {
+  korea:"📦 box + plastic 으로 세기 (1 plastic = 용기 100개) · Count boxes + plastics (1 plastic = 100 pcs)",
+  dry:"📦 box + plastic(pack) 으로 세기 · Count boxes + plastics/packs",
+  frozen:"🧊 팩으로 세기 · Count in PACKS. <b>뜯은 팩은 0.5</b> · <b>Opened pack = 0.5</b><br>삼겹살 · 로컬 쭈꾸미는 <b>kg</b> (저울, 예: 2.5) · Pork belly & local pusit in <b>kg</b> (weigh, e.g. 2.5)<br>먹태는 개수 · Maktae in pcs",
+  drink:"🥫 캔 개수 · Count cans"
+};
+const rowHint = i => i.unit === "kg" ? "⚖️ kg (예 2.5 · e.g. 2.5)" : (i.cat === "frozen" && i.unit === "pack") ? "뜯은 팩 0.5 · opened = 0.5" : "";
 const KIND = { order:"🧾 주문 Order", count:"✍️ 실사 Count", in:"📥 입고 In", waste:"🗑 버림 Waste", adjust:"✏️ 조정 Adjust" };
 let items = [], recipes = [], tab = "stock", menu = [], since = {};
 const who = () => localStorage.getItem("inv_name") || "";
@@ -189,11 +197,11 @@ function renderCount(){
     <label class="f">이름 · Name</label><input class="t" id="cWho" value="${esc(who())}">`;
   for(const c of Object.keys(CATS)){
     const list = items.filter(i => i.active && i.cat === c); if(!list.length) continue;
-    h += `<div class="sec">${CATS[c]}</div><div class="card">` + list.map(i => BOXCATS.includes(c) ? `<div class="row" style="grid-template-columns:1fr auto"><div class="nm"><b>${esc(i.name)}</b><div class="s">${esc(i.name_ko || "")} · 지금 앱 · app ${esc(qtyTxt(i))}</div>${usesTxt(i) ? `<div class="s">🍽 ${esc(usesTxt(i))}</div>` : ""}
+    h += `<div class="sec">${CATS[c]}</div>${CAT_HINT[c] ? `<div class="alert" style="background:var(--surface);border-color:var(--line);margin:4px 0 8px">${CAT_HINT[c]}</div>` : ""}<div class="card">` + list.map(i => BOXCATS.includes(c) ? `<div class="row" style="grid-template-columns:1fr auto"><div class="nm"><b>${esc(i.name)}</b><div class="s">${esc(i.name_ko || "")} · 지금 앱 · app ${esc(qtyTxt(i))}</div>${usesTxt(i) ? `<div class="s">🍽 ${esc(usesTxt(i))}</div>` : ""}
         <div class="s" style="margin-top:4px">1 box = <input class="n" style="width:62px;font-size:13px;padding:4px 6px" inputmode="decimal" data-bs="${i.id}" value="${i.box_size ?? ""}" placeholder="?"> ${esc(i.unit)}</div></div>
       <div style="display:flex;gap:4px;align-items:center;flex-wrap:wrap;justify-content:flex-end"><input class="n" style="width:64px" inputmode="decimal" data-cb="${i.id}" placeholder="0"><span class="hint">box</span>
         <input class="n" style="width:64px" inputmode="decimal" data-c="${i.id}" placeholder="0"><span class="hint">${esc(i.unit)}</span></div></div>`
-      : `<div class="row"><div class="nm"><b>${esc(i.name)}</b><div class="s">${esc(i.name_ko || "")} · 지금 앱 · app ${fmt(i.qty)}</div></div>
+      : `<div class="row"><div class="nm"><b>${esc(i.name)}</b><div class="s">${esc(i.name_ko || "")} · 지금 앱 · app ${fmt(i.qty)} ${esc(i.unit)}</div>${rowHint(i) ? `<div class="s" style="color:var(--ink-soft);font-weight:700">${rowHint(i)}</div>` : ""}</div>
       <input class="n" inputmode="decimal" data-c="${i.id}" placeholder="${fmt(i.qty)}"><div style="font-size:12px;color:var(--muted);width:44px">${esc(i.unit)}</div></div>`).join("") + `</div>`;
   }
   h += `<button class="btn red" id="cSave" style="width:100%;margin-top:14px;padding:13px">저장 · Save count</button><div id="cRes"></div>`;

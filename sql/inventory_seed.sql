@@ -116,3 +116,12 @@ where not exists (select 1 from public.inv_recipes);
 update public.inv_items set note = '🇰🇷 From Korea — 미리 주문 (배송 오래 걸림)' where id in ('c154','c155','c156','c157') and note is null;
 update public.inv_items set note = '🛒 현지 구매 — 1 bundle(plastic)씩 사기' where id in ('dakdori_bowl','eel_dry') and note is null;
 update public.inv_items set sub_id = 'c157' where id = 'c156' and sub_id is null;  -- 156 없는 동안 157 (사장님 11/9 19:31)
+
+-- 11/10 00:23 사장님: 냉동은 팩(뜯은 팩 0.5), 먹태 그대로 pcs, 삼겹살·로컬 쭈꾸미 kg, 한국 쭈꾸미 pack, 쿨피스 4종
+update public.inv_items set unit='pack' where cat='frozen' and id in ('odolppyeo','odari','odengtang','sausage','nalchial','pusit_kr');
+update public.inv_items set unit='kg', per_unit=1000, use_unit='g' where id in ('samgyeop','pusit_local');
+update public.inv_items set name='Coolpis peach zero', name_ko='쿨피스 피치 제로' where id='coolpis_zero';
+insert into public.inv_items(id,name,name_ko,cat,unit,low_at,sort) values ('coolpis_pine_zero','Coolpis pineapple zero','쿨피스 파인 제로','drink','can',6,83) on conflict (id) do nothing;
+update public.inv_recipes set opt_ko='피치 제로' where item_id='coolpis_zero' and menu_id='coolpis';
+insert into public.inv_recipes(item_id, menu_id, name_kw, opt_ko, amount, note)
+select 'coolpis_pine_zero','coolpis',null,'파인 제로',1,null where not exists (select 1 from public.inv_recipes where item_id='coolpis_pine_zero');
