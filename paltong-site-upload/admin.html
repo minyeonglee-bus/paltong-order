@@ -1337,6 +1337,10 @@ async function unsvcLine(o, i){
 /* ➕ 메뉴 추가 / 🎁 서비스 추가 — 관리자가 주문에 메뉴를 넣음 (옵션 선택 포함)
    svc=false → 정상 가격으로 추가 (영수증 [추가 ADD]), svc=true → ₱0 서비스 */
 function addSvcItem(o){ return addItemModal(o, true); }
+/* 📝 메뉴별 요청사항: opts 안에 note 줄로 저장 (가격 없음 → 영수증·주방·손님 화면에 그대로 보임) */
+const reqOpt = t => { t = String(t || "").replace(/\s+/g, " ").trim().slice(0, 100); return t ? { ko: "요청: " + t, en: "Request: " + t, note: true, req: t } : null; };
+const lineReq = l => { const x = (l.opts || []).find(o => o.req); return x ? x.req : ""; };
+function setLineReq(l, t){ l.opts = (l.opts || []).filter(o => !o.req); const x = reqOpt(t); if(x) l.opts.push(x); }
 /* 🍽 다이닝 가격: 메뉴 관리에서 '다이닝 포함'을 체크한 메뉴만 할인가, 나머지는 정가 (R15) */
 const dinePrice = it => it.onSale && !it.saleDine ? it.listPrice : it.price;
 function addItemModal(o, svc){
@@ -1356,7 +1360,7 @@ function addItemModal(o, svc){
       <div class="field" style="width:100px;margin:0"><label>${svc ? L("정가 ₱ (선택)", "Price ₱ (opt.)") : L("가격 ₱", "Price ₱")}</label><input id="svPrice" type="number" min="0" inputmode="numeric"></div></div>
     <div id="svOpts"></div>
     <div class="fee-row" style="gap:8px;margin:0 0 8px">
-      <div class="field" style="flex:1;margin:0"><label>${L("메모 (선택, 영수증에 보임)", "Note (optional, on receipt)")}</label><input id="svOpt" placeholder="${L("예: 덜맵게", "e.g. less spicy")}"></div>
+      <div class="field" style="flex:1;margin:0"><label>📝 ${L("이 메뉴 요청사항 (선택, 영수증·주방에 보임)", "Request for this item (optional, on receipt)")}</label><input id="svOpt" maxlength="100" placeholder="${L("예: 덜 맵게, 양파 빼기", "e.g. less spicy, no onions")}"></div>
       <div class="field" style="width:90px;margin:0"><label>${L("수량", "Qty")}</label><input id="svQty" type="number" min="1" value="1" inputmode="numeric"></div></div>
     <div class="sum-row total" style="margin:0 0 6px"><span>${svc ? L("서비스 (₱0)", "Free (₱0)") : L("추가 금액", "Amount added")}</span><b id="svSum">—</b></div>
     <p class="hint" style="margin:0 0 10px" ${o.pickOnly ? "hidden" : ""}>${svc
@@ -1414,13 +1418,13 @@ function addItemModal(o, svc){
         picks.forEach(([ci, n]) => { const c = g.choices[ci]; unit += (c.delta || 0) * n;
           opts.push({ g: gi, c: ci, n, ko: c.label + (n > 1 ? ` ×${n}` : ""), en: (c.en || c.label) + (n > 1 ? ` ×${n}` : "") }); });
       }
-      if(note) opts.push({ ko: note, en: note, note: true });
+      if(note) opts.push(reqOpt(note));
       line = { id: it.id, name: it.name, en: it.en || it.name, opts, unitPrice: unit };
     } else {
       const name = ov.querySelector("#svName").value.trim(), price = Math.round(+ov.querySelector("#svPrice").value || 0);
       if(!name) return fail(L("메뉴 이름을 넣어주세요", "Enter a name"));
       if(!svc && !(price > 0)) return fail(L("가격을 넣어주세요", "Enter a price"));
-      line = { id: (svc ? "svc_" : "adm_") + Date.now().toString(36), name, en: ov.querySelector("#svEn").value.trim() || name, opts: note ? [{ ko: note, en: note, note: true }] : [], unitPrice: Math.max(0, price), custom: true };
+      line = { id: (svc ? "svc_" : "adm_") + Date.now().toString(36), name, en: ov.querySelector("#svEn").value.trim() || name, opts: note ? [reqOpt(note)] : [], unitPrice: Math.max(0, price), custom: true };
     }
     line.qty = qty; line.added = true; line.added_at = new Date().toISOString(); line.byAdmin = true;
     if(svc){ line.origUnit = line.unitPrice; line.unitPrice = 0; line.svc = true; line.svcAdded = true; delete line.added; delete line.added_at; }
@@ -3688,14 +3692,15 @@ async function extOrderModal(pre){   // pre = { text, ch, inboxId } — 📥 DK 
   /* 메뉴 줄: 이름 · 수량 · 단가를 바로 고칠 수 있고, 줄마다 금액이 보임 */
   const paintItems = () => {
     const box = ov.querySelector("#exItems"), amt = F("amount");
-    const nm = l => esc(EN() ? l.en || l.name : l.name) + (l.opts && l.opts.length ? ` <span class="hint" style="margin:0">${esc(l.opts.map(x => EN() ? x.en || x.ko : x.ko).join(", "))}</span>` : "");
+    const nm = l => { const op = (l.opts || []).filter(x => !x.req); return esc(EN() ? l.en || l.name : l.name) + (op.length ? ` <span class="hint" style="margin:0">${esc(op.map(x => EN() ? x.en || x.ko : x.ko).join(", "))}</span>` : ""); };
     box.innerHTML = ov._items.length ? `<div class="calc-box" style="margin:0 0 6px">${ov._items.map((l, i) => `<div class="sum-row" style="align-items:center;gap:6px;flex-wrap:wrap${l.unitPrice ? "" : ";background:#fff1c9;border-radius:6px"}">
         <span style="flex:1 1 140px;min-width:0">${l.custom ? "" : "✅ "}<b>${nm(l)}</b></span>
         <span style="display:flex;align-items:center;gap:4px;white-space:nowrap">
           <input type="number" min="1" max="50" inputmode="numeric" value="${l.qty}" data-exq="${i}" title="${L("수량", "Qty")}" style="width:46px;padding:4px;border:1px solid var(--line);border-radius:8px;font-size:14px">
           × ₱<input type="number" min="0" inputmode="numeric" value="${l.unitPrice}" data-exu="${i}" title="${L("단가", "Unit price")}" style="width:72px;padding:4px;border:1px solid var(--line);border-radius:8px;font-size:14px">
           = <b data-exl="${i}" style="min-width:64px;text-align:right">${peso(l.unitPrice * l.qty)}</b>
-          <button type="button" class="chip" data-exrm="${i}">✕</button></span></div>`).join("")}
+          <button type="button" class="chip" data-exrm="${i}">✕</button></span>
+        <input type="text" maxlength="100" value="${esc(lineReq(l))}" data-exr="${i}" placeholder="📝 ${L("이 메뉴 요청사항 (예: 덜 맵게)", "Request for this item (e.g. less spicy)")}" style="flex:1 1 100%;padding:5px 8px;border:1px dashed var(--line);border-radius:8px;font-size:14px;background:var(--surface);color:var(--ink)"></div>`).join("")}
       <div class="sum-row total"><span>🍽 ${L("메뉴 합계 = 음식값", "Items = food")}</span><b data-exsum>${peso(itemSum())}</b></div>
       <p class="hint" style="margin:4px 0 0">${L("✅ = 메뉴판에 있는 메뉴 · 수량·가격은 눌러서 고칠 수 있어요", "✅ = on the menu · tap qty / price to fix")}</p></div>` : "";
     box.querySelectorAll("[data-exrm]").forEach(b => b.onclick = () => { ov._items.splice(+b.dataset.exrm, 1); paintItems(); });
@@ -3703,6 +3708,7 @@ async function extOrderModal(pre){   // pre = { text, ch, inboxId } — 📥 DK 
       box.querySelector(`[data-exl="${i}"]`).textContent = peso(l.unitPrice * l.qty); box.querySelector("[data-exsum]").textContent = peso(itemSum()); amt.value = itemSum(); paintTotal(); };
     box.querySelectorAll("[data-exq]").forEach(x => x.oninput = () => upd(+x.dataset.exq, "qty", x.value));
     box.querySelectorAll("[data-exu]").forEach(x => x.oninput = () => upd(+x.dataset.exu, "unitPrice", x.value));
+    box.querySelectorAll("[data-exr]").forEach(x => x.oninput = () => { const l = ov._items[+x.dataset.exr]; if(l) setLineReq(l, x.value); });
     if(ov._items.length){ amt.value = itemSum(); amt.readOnly = true; amt.style.opacity = .6; } else { amt.readOnly = false; amt.style.opacity = ""; }
     paintTotal();
   };

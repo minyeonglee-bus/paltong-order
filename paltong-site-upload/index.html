@@ -318,6 +318,8 @@ function sheet(opts = {}){
 /* 상세 창 둘째 줄 (common.js가 옛 버전으로 캐시돼 있어도 멈추지 않게 여기서도 정의) */
 const itemSubLine = it => { try{ if(typeof itemSub === "function") return itemSub(it); }catch(e){}
   const a = [it.rom, it.desc].filter(Boolean); return a.length ? a.join(" · ") : (it.en && it.en !== it.name ? it.en : ""); };
+/* 옵션 표시 — 📝 메뉴별 요청사항은 한 번만 (한/영 중복 없이) */
+const optLine = l => (l.opts || []).map(o => o.req ? "📝 " + o.req : T(o.ko, o.en)).join(", ");
 function openItem(item){
   // max 가 2 이상인 옵션 그룹은 여러 개 선택(체크) 가능, 아니면 하나만 선택
   const groups = item.options || [];
@@ -331,7 +333,7 @@ function openItem(item){
   const tagHtml = g => isReq(g)
     ? ` <span class="opt-tag req">${esc(T("필수","Required"))}</span>`
     : ` <span class="opt-tag">${esc(T("선택","Optional"))}</span>`;
-  let qty = 1;
+  let qty = 1, req = "";   // 📝 이 메뉴만의 요청사항
   const s = sheet();
   const chosen = () => groups.flatMap((g,gi) =>
     isCount(g) ? g.choices.map((c,ci) => ({ g:gi, ci, c, n:sel[gi][ci] })).filter(x => x.n > 0)
@@ -355,10 +357,13 @@ function openItem(item){
             return `<button class="opt-choice ${on?'sel':''}" data-g="${gi}" data-c="${ci}">${isMulti(g) ? (on ? '☑ ' : '☐ ') : ''}${L(c.label, c.en)}${c.delta ? ` (+${peso(c.delta)})` : ''}</button>`;
           }).join('')}
           </div>`}</div>`).join('')}
+      <div class="opt-group"><div class="opt-title">📝 ${L("이 메뉴 요청사항","Request for this item")} <span class="opt-tag">${esc(T("선택","Optional"))}</span></div>
+        <textarea id="itReq" maxlength="100" rows="2" style="width:100%;box-sizing:border-box;border:1px solid var(--line);background:var(--surface);color:var(--ink);border-radius:10px;padding:10px 12px;font-size:16px;font-family:inherit;resize:vertical" placeholder="${esc(T("예: 덜 맵게, 양파 빼주세요","e.g. less spicy, no onions"))}">${esc(req)}</textarea></div>
       <div class="qty-row"><div class="opt-title" style="margin:0">${L("수량","Quantity")}</div>
         <div class="qty-ctrl"><button data-a="dec">−</button><span>${qty}</span><button data-a="inc">+</button></div></div>
       <div class="sum-row total"><span>${L("금액","Amount")}</span><b>${peso(unit()*qty)}</b></div>
       <button class="primary-btn" style="margin-top:14px">${L("장바구니 담기","Add to cart")}</button>`;
+    s.el.querySelector("#itReq").oninput = e => { req = e.target.value; };
     s.el.querySelectorAll(".opt-choice").forEach(b => b.onclick = () => {
       const gi = +b.dataset.g, ci = +b.dataset.c, g = groups[gi];
       if(isMulti(g)){
@@ -383,7 +388,9 @@ function openItem(item){
       if(miss >= 0){ const g = groups[miss]; toast(T(`'${g.title}' 옵션을 선택해주세요 (필수)`, `Please choose '${g.titleEn || g.title}' (required)`)); return; }
       const opts = chosen().map(x => ({ g:x.g, c:x.ci, n:x.n,
         ko: x.c.label + (x.n > 1 ? ` ×${x.n}` : ""), en: (x.c.en || x.c.label) + (x.n > 1 ? ` ×${x.n}` : "") }));
-      const key = item.id + "|" + opts.map(o => o.g + ":" + o.c + ":" + o.n).join(",");
+      const rq = req.replace(/\s+/g, " ").trim().slice(0, 100);
+      if(rq) opts.push({ ko: "요청: " + rq, en: "Request: " + rq, note: true, req: rq });   // 가격 없음 · 영수증·주방에 그대로 보임
+      const key = item.id + "|" + opts.map(o => o.req ? "req:" + o.req : o.g + ":" + o.c + ":" + o.n).join(",");
       const ex = cart.find(l => l.key === key);
       if(item.requires && !item.requires.some(id => cart.some(l => l.id === id) || (addMode && addMode.itemIds.includes(id)))){ toast(requireText(item), 4000); return; }
       if(ex) ex.qty += qty; else cart.push({ key, id:item.id, name:item.name, en:item.en||"", opts, unitPrice:unit(), qty });
@@ -402,7 +409,7 @@ function openCart(){
           <div class="cart-line">
             <div class="cart-line-main">
               <div class="cart-line-name">${PT.lineName(l,"html")}</div>
-              ${l.opts && l.opts.length ? `<div class="cart-line-opt">${esc(PT.lineOpt(l))}</div>` : ''}
+              ${l.opts && l.opts.length ? `<div class="cart-line-opt">${esc(optLine(l))}</div>` : ''}
               <div class="cart-line-price">${peso(l.unitPrice*l.qty)}</div>
               <button class="link-btn" data-rm="${i}">${esc(T("삭제","Remove"))}</button>
             </div>
@@ -528,7 +535,7 @@ function openCheckout(){
         </div>
         <p class="hint" id="payHint" style="margin:8px 0 0"></p>
       </div>
-      <div class="field"><label for="fMemo">${L("요청사항","Special instructions")}</label>
+      <div class="field"><label for="fMemo">${L("전체 요청사항 (배달·기타)","Order notes (delivery etc.)")}</label>
         <textarea id="fMemo" maxlength="500" placeholder="${esc(T("예: 로비에 맡겨주세요 (한글로 써도 가게에는 영어로 번역돼요)","e.g. Please leave it at the lobby"))}"></textarea></div>
       <div class="field"><label>⏰ ${L("예약 주문 (선택)","Schedule (optional)")}</label>
         <div class="seg" id="whenSeg" style="margin-bottom:8px">
@@ -539,7 +546,7 @@ function openCheckout(){
           <input id="fTime" type="time" step="900" value="${esc(cust.sTime)}"></div>
         <p class="hint" id="schedHint" style="margin:6px 0 0" ${cust.sched ? "" : "hidden"}>${isPickup() ? L("찾으러 오실 시간을 골라주세요 (지금부터 15분 뒤 ~ 7일 안).","Choose when you'll pick it up (15 min to 7 days from now).") : L("받고 싶은 시간을 골라주세요 (지금부터 15분 뒤 ~ 7일 안). 가게에서 시간에 맞춰 준비해요.","Choose when you want it delivered (15 min to 7 days from now).")}</p></div>
       <div class="card">
-        ${cart.map(l => `<div class="sum-row"><span>${PT.lineName(l,"html")}${l.opts && l.opts.length ? ` <span class="en">(${esc(PT.lineOpt(l))})</span>` : ''} ×${l.qty}</span><span>${peso(l.unitPrice*l.qty)}</span></div>`).join('')}
+        ${cart.map(l => `<div class="sum-row"><span>${PT.lineName(l,"html")}${l.opts && l.opts.length ? ` <span class="en">(${esc(optLine(l))})</span>` : ''} ×${l.qty}</span><span>${peso(l.unitPrice*l.qty)}</span></div>`).join('')}
         <div id="sumBox"></div>
       </div>
       <button class="primary-btn" id="placeBtn">${L("주문 요청하기","Place order")}</button>
@@ -1083,7 +1090,7 @@ function openTracker(id, opts = {}){
       ${body}${extra}${tools}
       <details class="card"><summary><b>${L("주문 내역","Order summary")}</b> · ${peso(o.total ?? o.subtotal)}</summary>
         <div style="margin-top:8px">
-        ${(o.items||[]).map(l => `<div class="sum-row"><span>${PT.isSvc(l) ? `<b style="color:var(--red-deep)">🎁 ${L("서비스","Service")}</b> ` : l.added ? "➕ " : ""}${PT.lineName(l,"html")}${l.opts && l.opts.length ? ` <span class="en">(${esc(PT.lineOpt(l))})</span>` : ''} ×${l.qty}</span><span>${PT.isSvc(l) ? `${l.origUnit ? `<s class="hint">${peso(l.origUnit*l.qty)}</s> ` : ""}<b style="color:var(--red-deep)">${L("무료","FREE")}</b>` : peso(l.unitPrice*l.qty)}</span></div>`).join('')}
+        ${(o.items||[]).map(l => `<div class="sum-row"><span>${PT.isSvc(l) ? `<b style="color:var(--red-deep)">🎁 ${L("서비스","Service")}</b> ` : l.added ? "➕ " : ""}${PT.lineName(l,"html")}${l.opts && l.opts.length ? ` <span class="en">(${esc(optLine(l))})</span>` : ''} ×${l.qty}</span><span>${PT.isSvc(l) ? `${l.origUnit ? `<s class="hint">${peso(l.origUnit*l.qty)}</s> ` : ""}<b style="color:var(--red-deep)">${L("무료","FREE")}</b>` : peso(l.unitPrice*l.qty)}</span></div>`).join('')}
         ${PT.svcValue(o) ? `<div class="sum-row" style="color:var(--red-deep);font-weight:700"><span>🎁 ${L("가게 서비스","On the house")}</span><span>${peso(PT.svcValue(o))} ${L("상당","value")}</span></div>` : ""}
         ${o.discount ? `<div class="sum-row"><span>${/^DC\b/.test(o.coupon_title || "") ? esc(o.coupon_title) : L("쿠폰 할인","Coupon")}</span><span>-${peso(o.discount)}</span></div>` : ""}
         ${o.store_discount ? `<div class="sum-row"><span>${L("매장 할인","Store discount")}</span><span>-${peso(o.store_discount)}</span></div>` : ""}
