@@ -50,7 +50,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Black+Han+Sans&family=Noto+Sans+KR:wght@400;500;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="style.css?v=20261110b">
 </head>
 <body>
 
@@ -85,7 +85,7 @@
 <script>window.PT_AUTH_KEY = "paltong_member_auth";</script>
 <script src="config.js"></script>
 <script src="menu.js"></script>
-<script src="common.js"></script>
+<script src="common.js?v=20261110b"></script>
 <script src="address.js"></script>
 <script>
 const { CFG, MENU, ITEM_BY_ID, esc, peso, ls, L, T, STATUS, payInfo, isOnlinePay, api, toast } = PT;
@@ -315,6 +315,9 @@ function sheet(opts = {}){
   return h;
 }
 
+/* 상세 창 둘째 줄 (common.js가 옛 버전으로 캐시돼 있어도 멈추지 않게 여기서도 정의) */
+const itemSubLine = it => { try{ if(typeof itemSub === "function") return itemSub(it); }catch(e){}
+  const a = [it.rom, it.desc].filter(Boolean); return a.length ? a.join(" · ") : (it.en && it.en !== it.name ? it.en : ""); };
 function openItem(item){
   // max 가 2 이상인 옵션 그룹은 여러 개 선택(체크) 가능, 아니면 하나만 선택
   const groups = item.options || [];
@@ -336,7 +339,7 @@ function openItem(item){
   const unit = () => item.price + chosen().reduce((p,x) => p + (x.c.delta||0) * x.n, 0);
   s.setRender(function render(){
     s.el.innerHTML = `
-      <div class="sheet-head item-title"><div><h3 class="it-ko">${esc(item.name)}</h3>${itemSub(item) ? `<div class="it-en">${esc(itemSub(item))}</div>` : ""}</div><button class="close-x" aria-label="close">✕</button></div>
+      <div class="sheet-head item-title"><div><h3 class="it-ko">${esc(item.name)}</h3>${itemSubLine(item) ? `<div class="it-en">${esc(itemSubLine(item))}</div>` : ""}</div><button class="close-x" aria-label="close">✕</button></div>
       ${itemImg(item, sel) ? `<div class="item-photo"><img src="${esc(itemImg(item, sel))}" alt="${esc(item.name)}" onerror="this.parentNode.remove()"></div>` : ""}
       <div class="item-price detail-price">${item.onSale ? `<s class="was">${peso(item.listPrice)}</s> ` : ''}${peso(item.price)}${hasRange(item) ? ' ~' : ''}</div>
       ${groups.map((g,gi) => `
