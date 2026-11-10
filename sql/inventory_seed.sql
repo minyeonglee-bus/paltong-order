@@ -126,3 +126,5 @@ update public.inv_recipes set opt_ko='피치 제로' where item_id='coolpis_zero
 insert into public.inv_recipes(item_id, menu_id, name_kw, opt_ko, amount, note)
 select 'coolpis_pine_zero','coolpis',null,'파인 제로',1,null where not exists (select 1 from public.inv_recipes where item_id='coolpis_pine_zero');
 update public.inv_items set count_mode='bundle_pcs' where id in ('dakdori_bowl','eel_dry');  -- 직접 사는 것: 1 plastic(bundle) + pcs (사장님 11/10 08:45)
+-- 11/10 08:52 사장님: 한국 쭈꾸미 1 pack = 960 g. 쿨피스 메뉴 옵션 4종(복숭아 / 피치 제로 / 파인 / 파인 제로)은 menu_config 에 직접 추가 (백업: backup_menu_config_20261110)
+update public.inv_items set per_unit = 960 where id = 'pusit_kr';
