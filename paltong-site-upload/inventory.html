@@ -133,10 +133,15 @@ async function start(){
 $("refresh").onclick = async () => { await load(); render(); toast("↻"); };
 document.querySelectorAll(".tabb").forEach(b => b.onclick = () => { tab = b.dataset.t; document.querySelectorAll(".tabb").forEach(x => x.classList.toggle("sel", x === b)); render(); });
 
-const hasBox = i => BOXCATS.includes(i.cat) && Number(i.box_size) > 0;
+const isBundle = i => i.count_mode === "bundle_pcs" && Number(i.per_unit) > 0;   // 직접 사는 것: plastic(bundle) + pcs
+const hasBox = i => !isBundle(i) && BOXCATS.includes(i.cat) && Number(i.box_size) > 0;
 /* Dry: "2 box 3 plastic" */
 function qtyTxt(i, q = i.qty, html = false){
   q = Number(q);
+  if(isBundle(i) && q >= 0){ const pu = Number(i.per_unit); let b = Math.floor(q + 1e-9), r = Math.round((q - b) * pu); if(r >= pu){ b++; r = 0; }
+    const pcsU = i.use_unit || "pcs", parts = [];
+    if(b) parts.push(html ? `${b} <small>${esc(i.unit)}</small>` : `${b} ${i.unit}`); if(r || !b) parts.push(html ? `${r} <small>${esc(pcsU)}</small>` : `${r} ${pcsU}`);
+    return parts.join(" "); }
   if(hasBox(i) && q >= 0){ const bs = Number(i.box_size), b = Math.floor(q / bs + 1e-9), r = q - b * bs;
     const parts = []; if(b) parts.push(html ? `${b} <small>box</small>` : `${b} box`); if(r > 1e-9 || !b) parts.push(html ? `${fmt(r)} <small>${esc(i.unit)}</small>` : `${fmt(r)} ${i.unit}`);
     return parts.join(" "); }
@@ -180,7 +185,11 @@ async function quickMove(id, sign){
   const i = items.find(x => x.id === id), n = who() || askWho(); if(!n) return;
   const lbl = `${i.name} — ${sign > 0 ? "📥 입고 · Received" : "🗑 버림 · Waste / used"}`;
   let q;
-  if(hasBox(i)){
+  if(isBundle(i)){
+    const b = prompt(`${lbl}\n몇 ${i.unit}(bundle)? · How many bundles? (1 = ${fmt(i.per_unit)} ${i.use_unit || "pcs"})`, sign > 0 ? "1" : "0"); if(b == null) return;
+    const r = prompt(`${lbl}\n+ 낱개 몇 ${i.use_unit || "pcs"}? · Loose pcs?`, "0"); if(r == null) return;
+    q = (Number(b) || 0) + (Number(r) || 0) / Number(i.per_unit);
+  }else if(hasBox(i)){
     const b = prompt(`${lbl}\n몇 box? · How many box? (1 box = ${fmt(i.box_size)} ${i.unit})`, "0"); if(b == null) return;
     const r = prompt(`${lbl}\n+ 몇 ${i.unit}? · How many ${i.unit}?`, "0"); if(r == null) return;
     q = (Number(b) || 0) * Number(i.box_size) + (Number(r) || 0);
@@ -197,7 +206,11 @@ function renderCount(){
     <label class="f">이름 · Name</label><input class="t" id="cWho" value="${esc(who())}">`;
   for(const c of Object.keys(CATS)){
     const list = items.filter(i => i.active && i.cat === c); if(!list.length) continue;
-    h += `<div class="sec">${CATS[c]}</div>${CAT_HINT[c] ? `<div class="alert" style="background:var(--surface);border-color:var(--line);margin:4px 0 8px">${CAT_HINT[c]}</div>` : ""}<div class="card">` + list.map(i => BOXCATS.includes(c) ? `<div class="row" style="grid-template-columns:1fr auto"><div class="nm"><b>${esc(i.name)}</b><div class="s">${esc(i.name_ko || "")} · 지금 앱 · app ${esc(qtyTxt(i))}</div>${usesTxt(i) ? `<div class="s">🍽 ${esc(usesTxt(i))}</div>` : ""}
+    h += `<div class="sec">${CATS[c]}</div>${CAT_HINT[c] ? `<div class="alert" style="background:var(--surface);border-color:var(--line);margin:4px 0 8px">${CAT_HINT[c]}</div>` : ""}<div class="card">` + list.map(i => isBundle(i) ? `<div class="row" style="grid-template-columns:1fr auto"><div class="nm"><b>${esc(i.name)}</b><div class="s">${esc(i.name_ko || "")} · 지금 앱 · app ${esc(qtyTxt(i))}</div>${usesTxt(i) ? `<div class="s">🍽 ${esc(usesTxt(i))}</div>` : ""}
+        <div class="s" style="color:var(--ink-soft);font-weight:700">🛒 1 ${esc(i.unit)} (bundle) = ${fmt(i.per_unit)} ${esc(i.use_unit || "pcs")} · 묶음 + 낱개로 세기 · count bundles + loose pcs</div></div>
+      <div style="display:flex;gap:4px;align-items:center;flex-wrap:wrap;justify-content:flex-end"><input class="n" style="width:64px" inputmode="decimal" data-cbu="${i.id}" placeholder="0"><span class="hint">${esc(i.unit)}</span>
+        <input class="n" style="width:64px" inputmode="numeric" data-cpc="${i.id}" placeholder="0"><span class="hint">${esc(i.use_unit || "pcs")}</span></div></div>`
+      : BOXCATS.includes(c) ? `<div class="row" style="grid-template-columns:1fr auto"><div class="nm"><b>${esc(i.name)}</b><div class="s">${esc(i.name_ko || "")} · 지금 앱 · app ${esc(qtyTxt(i))}</div>${usesTxt(i) ? `<div class="s">🍽 ${esc(usesTxt(i))}</div>` : ""}
         <div class="s" style="margin-top:4px">1 box = <input class="n" style="width:62px;font-size:13px;padding:4px 6px" inputmode="decimal" data-bs="${i.id}" value="${i.box_size ?? ""}" placeholder="?"> ${esc(i.unit)}</div></div>
       <div style="display:flex;gap:4px;align-items:center;flex-wrap:wrap;justify-content:flex-end"><input class="n" style="width:64px" inputmode="decimal" data-cb="${i.id}" placeholder="0"><span class="hint">box</span>
         <input class="n" style="width:64px" inputmode="decimal" data-c="${i.id}" placeholder="0"><span class="hint">${esc(i.unit)}</span></div></div>`
@@ -211,6 +224,12 @@ function renderCount(){
     const val = sel => { const el = document.querySelector(sel); return el && el.value.trim() !== "" ? Number(el.value) : null; };
     const rows = [];
     for(const i of items.filter(x => x.active)){
+      if(isBundle(i)){
+        const bu = val(`[data-cbu="${i.id}"]`), pc = val(`[data-cpc="${i.id}"]`);
+        if([bu, pc].some(v => v != null && !(v >= 0))) return toast(`${i.name}: 숫자만 · numbers only`);
+        if(bu != null || pc != null) rows.push({ i, total:(bu || 0) + (pc || 0) / Number(i.per_unit) });
+        continue;
+      }
       const u = val(`[data-c="${i.id}"]`), b = val(`[data-cb="${i.id}"]`), bs = val(`[data-bs="${i.id}"]`);
       if([u, b, bs].some(v => v != null && !(v >= 0))) return toast(`${i.name}: 숫자만 · numbers only`);
       if(bs != null && bs > 0 && bs !== Number(i.box_size)) rows.push({ i, setBox:bs });
@@ -226,7 +245,7 @@ function renderCount(){
     for(const r of counts){ try{ const d = un(await sb.rpc("inv_count", { p_item:r.i.id, p_counted:r.total, p_by:n })); if(Math.abs(d) > 1e-6) diffs.push([r.i.id, d]); }catch(e){ toast("실패 · " + (e.message || e), 4000); } }
     await load(); $("cSave").disabled = false;
     $("cRes").innerHTML = `<div class="alert" style="background:var(--surface)"><b>✅ ${counts.length}개 저장 · saved</b>${diffs.length ? "<br>앱과 차이 · Difference vs app:<br>" + diffs.map(([id, d]) => `${esc((items.find(i => i.id === id) || {}).name || id)}: <span class="${d > 0 ? "pos" : "neg"}">${d > 0 ? "+" : ""}${fmt(d)}</span>`).join("<br>") : "<br>앱 숫자와 같음 · matches the app"}</div>`;
-    document.querySelectorAll("[data-c],[data-cb]").forEach(x => x.value = "");
+    document.querySelectorAll("[data-c],[data-cb],[data-cbu],[data-cpc]").forEach(x => x.value = "");
   };
 }
 

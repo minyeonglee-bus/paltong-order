@@ -125,3 +125,4 @@ insert into public.inv_items(id,name,name_ko,cat,unit,low_at,sort) values ('cool
 update public.inv_recipes set opt_ko='피치 제로' where item_id='coolpis_zero' and menu_id='coolpis';
 insert into public.inv_recipes(item_id, menu_id, name_kw, opt_ko, amount, note)
 select 'coolpis_pine_zero','coolpis',null,'파인 제로',1,null where not exists (select 1 from public.inv_recipes where item_id='coolpis_pine_zero');
+update public.inv_items set count_mode='bundle_pcs' where id in ('dakdori_bowl','eel_dry');  -- 직접 사는 것: 1 plastic(bundle) + pcs (사장님 11/10 08:45)

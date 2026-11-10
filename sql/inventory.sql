@@ -234,3 +234,6 @@ begin
     on h.item_id = w.item_id
   where round(-coalesce(w.need, 0) - coalesce(h.had, 0), 6) <> 0;
 end $$;
+
+-- 세는 방식 (2026-11-10): null = 기본 (dry/korea: box + plastic), 'bundle_pcs' = 직접 사는 것 plastic(bundle) + 낱개 pcs
+alter table public.inv_items add column if not exists count_mode text;
