@@ -128,3 +128,47 @@ select 'coolpis_pine_zero','coolpis',null,'파인 제로',1,null where not exist
 update public.inv_items set count_mode='bundle_pcs' where id in ('dakdori_bowl','eel_dry');  -- 직접 사는 것: 1 plastic(bundle) + pcs (사장님 11/10 08:45)
 -- 11/10 08:52 사장님: 한국 쭈꾸미 1 pack = 960 g. 쿨피스 메뉴 옵션 4종(복숭아 / 피치 제로 / 파인 / 파인 제로)은 menu_config 에 직접 추가 (백업: backup_menu_config_20261110)
 update public.inv_items set per_unit = 960 where id = 'pusit_kr';
+
+-- 11/10 23:09 사장님 1인분 양: Eel 450g · 쭈꾸미 500g · 오돌뼈 300g · 쭈삼 250/250 · 삼겹 330g · 똥집 350g · 오다리 200g
+--   닭발 18-20pcs · 무뼈닭발 28-30pcs · 날개 7-8pcs · 순살치킨 660g · 뼈치킨 900-1000g(1마리) · 영계 900-1100g(1마리)
+insert into public.inv_items(id,name,name_ko,cat,unit,per_unit,use_unit,low_at,sort,note) values
+ ('gizzard','Gizzard','똥집','frozen','kg',1000,'g',1,64,null),
+ ('dakbal_bone','Dakbal (bone)','닭발 (뼈)','frozen','pack',null,'pcs',2,65,null),
+ ('dakbal_boneless','Boneless dakbal','무뼈 닭발','frozen','pack',null,'pcs',2,66,null),
+ ('wings','Wings','날개','frozen','pack',null,'pcs',2,67,null),
+ ('chicken_boneless_meat','Boneless chicken','순살 치킨 (닭고기)','frozen','kg',1000,'g',2,68,null),
+ ('chicken_whole','Chicken with bone','뼈 치킨 (생닭 900-1000g)','frozen','pcs',null,null,3,69,'1마리 = 900~1000 g'),
+ ('youngye','Youngye','영계 (900-1100g)','frozen','pcs',null,null,3,70,'1마리 = 900~1100 g')
+on conflict (id) do nothing;
+update public.inv_items set use_unit='g' where id in ('odolppyeo','odari');
+insert into public.inv_recipes(item_id, menu_id, name_kw, name_not, opt_ko, amount, note)
+select * from (values
+ ('odolppyeo','odolppyeo',null,null,null,300::numeric,'1 order 300g'),
+ ('odolppyeo',null,'odol|오돌뼈',null,null,300,'external'),
+ ('samgyeop','redsamgyeop',null,null,null,330,'red samgyeop 330g'),
+ ('samgyeop',null,'red.*samgyeop|빨간.*삼겹','pusit|octopus|쭈꾸미',null,330,'external'),
+ ('gizzard','tongjipfried',null,null,null,350,'350g'),
+ ('gizzard','tongjipbokkeum',null,null,null,350,'350g'),
+ ('gizzard',null,'ttongjip|tongjip|gizzard|똥집',null,null,350,'external'),
+ ('odari','butterodari',null,null,null,200,'200g'),
+ ('odari',null,'odari|오다리',null,null,200,'external'),
+ ('dakbal_bone','jikhwa_dakbal',null,null,'뼈',19,'18-20 pcs'),
+ ('dakbal_bone','gukmuldakbal',null,null,'뼈',19,'18-20 pcs'),
+ ('dakbal_bone',null,'dakbal|닭발','boneless|무뼈',null,19,'external'),
+ ('dakbal_boneless','jikhwa_dakbal',null,null,'무뼈',29,'28-30 pcs'),
+ ('dakbal_boneless','gukmuldakbal',null,null,'무뼈',29,'28-30 pcs'),
+ ('dakbal_boneless',null,'boneless.*dakbal|무뼈.*닭발',null,null,29,'external'),
+ ('wings','redwing',null,null,null,7.5,'7-8 pcs'),
+ ('wings',null,'wing|날개',null,null,7.5,'external'),
+ ('chicken_boneless_meat','chicken_boneless',null,null,'한마리',660,'whole 660g'),
+ ('chicken_boneless_meat','chicken_boneless',null,null,'반마리',330,'half 330g'),
+ ('chicken_boneless_meat',null,'boneless.*chicken|순살.*치킨','dakbal|stew|dakdori|whole|한마리',null,330,'external half'),
+ ('chicken_boneless_meat',null,'boneless.*(whole|한마리)|(whole|한마리).*boneless',null,null,660,'external whole'),
+ ('chicken_whole','chicken_bone',null,null,'한마리',1,'whole'),
+ ('chicken_whole','chicken_bone',null,null,'반마리',0.5,'half'),
+ ('chicken_whole',null,'one whole|한마리','boneless|순살|dakbal|stew|dakdori',null,0.5,'external "one whole" = half → whole upgrade (+0.5)'),
+ ('chicken_whole',null,'half.*chicken|반마리','boneless|순살|stew|dakdori',null,0.5,'external half'),
+ ('youngye','tonggu',null,null,null,1,'1 chicken'),
+ ('youngye',null,'young ?gye|영계|tonggu',null,null,1,'external')
+) v(item_id, menu_id, name_kw, name_not, opt_ko, amount, note)
+where not exists (select 1 from public.inv_recipes where item_id = 'youngye');
