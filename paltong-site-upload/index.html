@@ -336,7 +336,7 @@ function openItem(item){
   const unit = () => item.price + chosen().reduce((p,x) => p + (x.c.delta||0) * x.n, 0);
   s.setRender(function render(){
     s.el.innerHTML = `
-      <div class="sheet-head"><h3>${L(item.name, item.en)}</h3><button class="close-x" aria-label="close">✕</button></div>
+      <div class="sheet-head item-title"><div><h3 class="it-ko">${esc(item.name)}</h3>${itemSub(item) ? `<div class="it-en">${esc(itemSub(item))}</div>` : ""}</div><button class="close-x" aria-label="close">✕</button></div>
       ${itemImg(item, sel) ? `<div class="item-photo"><img src="${esc(itemImg(item, sel))}" alt="${esc(item.name)}" onerror="this.parentNode.remove()"></div>` : ""}
       <div class="item-price detail-price">${item.onSale ? `<s class="was">${peso(item.listPrice)}</s> ` : ''}${peso(item.price)}${hasRange(item) ? ' ~' : ''}</div>
       ${groups.map((g,gi) => `

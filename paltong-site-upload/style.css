@@ -280,3 +280,8 @@ a.track-btn{display:block;text-align:center;text-decoration:none;margin-top:10px
 .item-photo{margin:-4px 0 12px;border-radius:16px;overflow:hidden;background:var(--line);aspect-ratio:1/1;max-height:46vh;display:flex;align-items:center;justify-content:center;}
 .item-photo img{width:100%;height:100%;object-fit:cover;display:block;}
 .detail-price{font-size:18px;margin:0 0 6px;}
+
+/* 메뉴 상세 창 이름: 빨간 막대 + 큰 한글 + 로마자 · 영어 */
+.sheet-head.item-title{align-items:flex-start;}
+.it-ko{font-size:28px !important;font-weight:900;line-height:1.15;border-left:6px solid var(--red);padding-left:10px;letter-spacing:-.5px;}
+.it-en{font-size:16px;font-weight:600;color:var(--ink-soft);margin-top:6px;line-height:1.3;}

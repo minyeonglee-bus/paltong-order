@@ -61,6 +61,11 @@ function loadMenuData(data, opts = {}){
   applyMenuOverrides({});
   return true;
 }
+/* 메뉴 상세 창 둘째 줄: "Jjukumi · Baby Octopus" (rom · desc), 없으면 기존 영어 이름 */
+function itemSub(it){
+  const a = [it.rom, it.desc].filter(Boolean);
+  return a.length ? a.join(" · ") : (it.en && it.en !== it.name ? it.en : "");
+}
 /* 지금 메뉴판을 저장용 JSON으로 (관리자 메뉴 편집) */
 function exportMenu(){
   const pick = it => {
@@ -68,6 +73,7 @@ function exportMenu(){
     if(it.onSale) o.sale = it.price;
     if(it.saleDine) o.saleDine = true;   // 🍽 다이닝에도 할인가 적용 (R15)
     if(it.isNew) o.isNew = true; if(it.isHot) o.isHot = true; if(it.isLimited) o.isLimited = true; if(it.hidden) o.hidden = true;
+    if(it.rom) o.rom = it.rom; if(it.desc) o.desc = it.desc;   // 상세 창 이름 표기 (로마자 · 영어 설명)
     if(it.requires && it.requires.length) o.requires = it.requires.slice();
     if(it.options && it.options.length) o.options = JSON.parse(JSON.stringify(it.options));
     return o;
