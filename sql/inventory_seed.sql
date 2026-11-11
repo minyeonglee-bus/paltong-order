@@ -172,3 +172,10 @@ select * from (values
  ('youngye',null,'young ?gye|영계|tonggu',null,null,1,'external')
 ) v(item_id, menu_id, name_kw, name_not, opt_ko, amount, note)
 where not exists (select 1 from public.inv_recipes where item_id = 'youngye');
+
+-- 11/11 11:19 사장님: 소스 3종 추가 (재고 0, 실사 필요)
+insert into public.inv_items(id,name,name_ko,cat,unit,low_at,sort) values
+ ('mayonnaise','Mayonnaise','마요네즈','dry','pack',1,39),
+ ('ketchup','Ketchup','케첩','dry','pack',1,40),
+ ('mustard','Mustard','머스타드','dry','ea',1,41)
+on conflict (id) do nothing;
