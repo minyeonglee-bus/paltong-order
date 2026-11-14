@@ -197,3 +197,5 @@ update public.inv_recipes set amount=1 where item_id='dakbal_boneless';
 -- 11/14 20:40 사장님: 양념 1볼 = 닭발 뼈 1.8 kg / 날개 2.5 kg (1인분 g 알면 per_unit 계산)
 update public.inv_items set note='1 bowl = 1.8 kg · 양념 버무린 것부터 먼저 나감 · use first' where id='dakbal_bone_mix';
 update public.inv_items set note='1 bowl = 2.5 kg · 양념 버무린 것부터 먼저 나감 · use first' where id='wings_mix';
+-- 11/14 20:41: 양념 볼은 크기가 달라서 kg으로 셈 (날개 1.8 + 0.7 = 2.5 kg, 뼈 닭발 1.8 kg)
+update public.inv_items set unit='kg', low_at=null, note='양념 버무린 것부터 먼저 나감 · use first · 볼 무게로 kg' where id in ('wings_mix','dakbal_bone_mix');
