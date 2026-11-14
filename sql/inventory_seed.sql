@@ -182,3 +182,15 @@ on conflict (id) do nothing;
 
 -- 11/14 사장님: 닭발(뼈)·무뼈 닭발은 kg으로 셈 (직원 보고: 뼈 냉동 3kg + 양념 버무린 1볼 / 무뼈 냉동 2.4kg + 해동 3kg)
 update public.inv_items set unit='kg', low_at=1 where id in ('dakbal_bone','dakbal_boneless');
+
+-- 11/14 사장님: 날개 냉동 2kg + 양념 버무린 2볼, 닭발 뼈 양념 1볼. "조리 나가면 양념 버무린 것부터 나감"
+--   → 1인분(serving) 기준. 양념 볼(wings_mix, dakbal_bone_mix)에서 먼저 빠지고, 볼이 0이면 냉동 kg(sub_id)에서.
+--   per_unit(1볼 = 몇 인분, 1kg = 몇 인분)을 알기 전엔 자동 차감 안 함.
+update public.inv_items set unit='kg', use_unit='serving', per_unit=null, low_at=1 where id in ('wings','dakbal_bone','dakbal_boneless');
+insert into public.inv_items(id,name,name_ko,cat,unit,per_unit,use_unit,low_at,sort,note,sub_id) values
+ ('wings_mix','Wings — mixed with red sauce','날개 (양념 버무림)','frozen','bowl',null,'serving',null,68,'양념 버무린 것부터 먼저 나감 · use first','wings'),
+ ('dakbal_bone_mix','Dakbal bone — mixed with red sauce','닭발 뼈 (양념 버무림)','frozen','bowl',null,'serving',null,65,'양념 버무린 것부터 먼저 나감 · use first','dakbal_bone')
+on conflict (id) do nothing;
+update public.inv_recipes set item_id='wings_mix', amount=1 where item_id='wings';
+update public.inv_recipes set item_id='dakbal_bone_mix', amount=1 where item_id='dakbal_bone';
+update public.inv_recipes set amount=1 where item_id='dakbal_boneless';

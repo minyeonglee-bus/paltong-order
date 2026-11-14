@@ -223,7 +223,7 @@ begin
       from inv_order_need(o.items) n
       join inv_items i on i.id = n.item_id
       left join inv_items si on si.id = i.sub_id
-      cross join lateral (select (i.sub_id is not null and coalesce(si.active, false)
+      cross join lateral (select (i.sub_id is not null and coalesce(si.active, false) and (si.per_unit is not null or si.use_unit is null)
           and not exists (select 1 from inv_moves x where x.order_id = p_order and x.item_id = n.item_id and x.kind = 'order')
           and (i.qty <= 0 or exists (select 1 from inv_moves x where x.order_id = p_order and x.item_id = i.sub_id and x.kind = 'order'
                                        and x.note = '대체 · instead of ' || i.name))) as use_sub) d
