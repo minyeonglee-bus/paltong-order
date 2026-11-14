@@ -194,3 +194,6 @@ on conflict (id) do nothing;
 update public.inv_recipes set item_id='wings_mix', amount=1 where item_id='wings';
 update public.inv_recipes set item_id='dakbal_bone_mix', amount=1 where item_id='dakbal_bone';
 update public.inv_recipes set amount=1 where item_id='dakbal_boneless';
+-- 11/14 20:40 사장님: 양념 1볼 = 닭발 뼈 1.8 kg / 날개 2.5 kg (1인분 g 알면 per_unit 계산)
+update public.inv_items set note='1 bowl = 1.8 kg · 양념 버무린 것부터 먼저 나감 · use first' where id='dakbal_bone_mix';
+update public.inv_items set note='1 bowl = 2.5 kg · 양념 버무린 것부터 먼저 나감 · use first' where id='wings_mix';
