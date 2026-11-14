@@ -179,3 +179,6 @@ insert into public.inv_items(id,name,name_ko,cat,unit,low_at,sort) values
  ('ketchup','Ketchup','케첩','dry','pack',1,40),
  ('mustard','Mustard','머스타드','dry','ea',1,41)
 on conflict (id) do nothing;
+
+-- 11/14 사장님: 닭발(뼈)·무뼈 닭발은 kg으로 셈 (직원 보고: 뼈 냉동 3kg + 양념 버무린 1볼 / 무뼈 냉동 2.4kg + 해동 3kg)
+update public.inv_items set unit='kg', low_at=1 where id in ('dakbal_bone','dakbal_boneless');

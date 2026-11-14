@@ -77,7 +77,7 @@ const BOXCATS = ["dry", "korea"];
 const CAT_HINT = {
   korea:"📦 box + plastic 으로 세기 (1 plastic = 용기 100개) · Count boxes + plastics (1 plastic = 100 pcs)",
   dry:"📦 box + plastic(pack) 으로 세기 · Count boxes + plastics/packs",
-  frozen:"🧊 팩으로 세기 · Count in PACKS. <b>뜯은 팩은 0.5</b> · <b>Opened pack = 0.5</b><br>삼겹살 · 로컬 쭈꾸미는 <b>kg</b> (저울, 예: 2.5) · Pork belly & local pusit in <b>kg</b> (weigh, e.g. 2.5)<br>먹태는 개수 · Maktae in pcs",
+  frozen:"🧊 팩으로 세기 · Count in PACKS. <b>뜯은 팩은 0.5</b> · <b>Opened pack = 0.5</b><br>삼겹살 · 로컬 쭈꾸미 · 똥집 · 순살 닭고기 · <b>닭발(뼈·무뼈)</b>은 <b>kg</b> (저울, 예: 2.5, 해동한 것도 같이) · Pork belly, local pusit, gizzard, boneless chicken, <b>dakbal</b> in <b>kg</b> (weigh, e.g. 2.5, include thawed)<br>먹태는 개수 · Maktae in pcs",
   drink:"🥫 캔 개수 · Count cans"
 };
 const rowHint = i => i.unit === "kg" ? "⚖️ kg (예 2.5 · e.g. 2.5)" : (i.cat === "frozen" && i.unit === "pack") ? "뜯은 팩 0.5 · opened = 0.5" : "";
