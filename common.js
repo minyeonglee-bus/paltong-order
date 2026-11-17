@@ -487,6 +487,7 @@ function errMsg(e){
     [/Could not find the function public\.admin_set_items|admin_set_items/, ["서비스 기능 SQL(37-order-service.sql)을 먼저 실행해주세요", "Run sql/37-order-service.sql first"]],
     [/add_not_allowed/, ["배달이 출발해서 더 추가할 수 없어요. 채팅으로 문의해주세요", "The rider already left. Please message us"]],
     [/chat_closed/, ["종료된 채팅입니다", "This chat has ended"]],
+    [/invalid image/, ["사진을 보내지 못했어요. 다시 시도해주세요", "Couldn't send the photo. Please try again"]],
     [/too_many_chats|too_many_messages/, ["잠시 후 다시 시도해주세요", "Please try again in a moment"]],
     [/birthday_locked/, ["생일은 한 번만 등록할 수 있어요. 바꾸려면 가게에 문의해주세요", "Birthday can only be set once. Please contact us to change it"]],
     [/birthday_invalid/, ["생일 날짜를 확인해주세요", "Please check the date"]],
@@ -558,6 +559,16 @@ function makeSupabaseApi(){
       if(r.error && /p_lang|function .*chat_faq/i.test(r.error.message || "")) return unwrap(await sb.rpc("chat_faq", { p_thread: tid, p_idx: i }));   // 17단계 SQL 실행 전
       unwrap(r); },
     async chatUnread(tid){ return unwrap(await sb.rpc("chat_unread", { p_thread: tid })); },
+    /* 채팅 사진 (sql/chat_photo.sql) — 공개 버킷 'chat', 경로 {thread}/{uuid}.jpg */
+    async chatUploadImage(tid, blob){
+      const path = `${tid}/${crypto.randomUUID()}.jpg`;
+      try{ unwrap(await sb.storage.from("chat").upload(path, blob, { contentType: "image/jpeg", upsert: false })); }
+      catch(e){ if(/row-level security|unauthorized|403/i.test(String(e.message || e))) throw new Error("too_many_messages"); throw e; }
+      return path;
+    },
+    async chatSendImage(tid, blob){ const p = await this.chatUploadImage(tid, blob); unwrap(await sb.rpc("chat_send_image", { p_thread: tid, p_path: p })); },
+    async adminChatSendImage(tid, blob){ const p = await this.chatUploadImage(tid, blob); unwrap(await sb.rpc("admin_chat_send_image", { p_thread: tid, p_path: p })); },
+    chatImageUrl(path){ return /^(data:|https?:)/.test(path) ? path : sb.storage.from("chat").getPublicUrl(path).data.publicUrl; },
     async cancelOrder(id){ unwrap(await sb.rpc("cancel_order", { p_id: id })); },
     async getMenuStatus(opts = {}){
       try{ const c = await sb.from("menu_config").select("data").eq("id", 1).maybeSingle(); if(!c.error && c.data && c.data.data) loadMenuData(c.data.data, opts); }catch(e){}
@@ -996,7 +1007,7 @@ function makeDemoApi(){
       const t = TH(); const th = t.find(x => x.id === tid); if(!th) throw new Error("not found");
       if(th.cust_unread){ th.cust_unread = 0; ls.set("paltong_demo_threads", t); }
       return { open: chatOpen(th), kind: th.kind, order_id: th.order_id, faq: (ST().chat_faq || []).map(f => f.q), faq_en: (ST().chat_faq || []).map(f => f.q_en || f.q),
-        messages: MS().filter(m => m.thread_id === tid && m.id > (after || 0)).map(m => ({ id:m.id, sender:m.sender, body:m.body, body_en: m.sender !== "cust" ? m.body_en || null : null, body_ko: m.sender !== "cust" ? m.body_ko || null : null, created_at:m.created_at })) };
+        messages: MS().filter(m => m.thread_id === tid && m.id > (after || 0)).map(m => ({ id:m.id, sender:m.sender, body:m.body, body_en: m.sender !== "cust" ? m.body_en || null : null, body_ko: m.sender !== "cust" ? m.body_ko || null : null, image: m.image || null, created_at:m.created_at })) };
     },
     async chatSend(tid, body){
       body = String(body || "").trim(); if(!body) throw new Error("invalid message");
@@ -1009,6 +1020,12 @@ function makeDemoApi(){
       const qe = f.q_en || f.q, qb = lang === "en" ? qe : f.q;
       m.push({ id: ++id, thread_id: tid, sender:"cust", body:qb, body_en:qe, created_at:new Date().toISOString() }, { id: ++id, thread_id: tid, sender:"bot", body:f.a, body_en:f.a_en || null, created_at:new Date().toISOString() }); setMS(m); },
     async chatUnread(tid){ return ((TH().find(x => x.id === tid) || {}).cust_unread) || 0; },
+    async chatSendImage(tid, blob){ const th = TH().find(x => x.id === tid); if(!th) throw new Error("not found"); if(!chatOpen(th)) throw new Error("chat_closed");
+      const url = await new Promise(r => { const f = new FileReader(); f.onload = () => r(f.result); f.readAsDataURL(blob); });
+      chatPost(tid, "cust", "📷 사진 / Photo"); const m = MS(); m[m.length - 1].image = url; setMS(m); },
+    async adminChatSendImage(tid, blob){ const url = await new Promise(r => { const f = new FileReader(); f.onload = () => r(f.result); f.readAsDataURL(blob); });
+      chatPost(tid, "admin", "📷 사진 / Photo"); const m = MS(); m[m.length - 1].image = url; setMS(m); const t = TH(); const th = t.find(x => x.id === tid); if(th){ th.admin_unread = 0; setTH(t); } },
+    chatImageUrl(path){ return path; },
     async confirmCash(id){ mut(id, o => { if(o.status !== "awaiting_payment" || o.payment !== "cash") throw new Error("not allowed"); o.status = "confirmed"; o.confirmed_at = new Date().toISOString(); }); },
     async cancelOrder(id){ mut(id, o => { if(!["new","accepted"].includes(o.status)) throw new Error("not allowed"); o.status = "cancelled"; }); },
     async getMenuStatus(opts = {}){ const cfg = ls.get("paltong_demo_menu_cfg", null); if(cfg) loadMenuData(cfg, opts); applyMenuOverrides(ls.get("paltong_demo_menu_ov", {})); return ls.get(MKEY, {}); },

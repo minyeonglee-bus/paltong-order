@@ -1129,7 +1129,7 @@ function openChat(tid, title, onNewInquiry, extra){
     <div class="sheet-head"><h3>💬 ${esc(title)}</h3><div style="display:flex;gap:6px;align-items:center">${extra && extra.onAdd ? `<button class="sm-btn red" id="chatAdd">${esc(extra.addLabel)}</button>` : ""}<button class="close-x">✕</button></div></div>
     <div class="chat-log" id="chatLog"><div class="wait-box"><div class="spinner"></div></div></div>
     <div class="chat-faq" id="chatFaq"></div>
-    <div class="chat-input" id="chatBar"><textarea id="chatIn" rows="1" maxlength="1000" placeholder="${esc(CT("메시지 입력","Type a message"))}"></textarea><button class="sm-btn red" id="chatSend">${esc(CT("보내기","Send"))}</button></div>`;
+    <div class="chat-input" id="chatBar"><label class="chat-photo" title="${esc(CT("사진 보내기","Send a photo"))}">📷<input type="file" id="chatPic" accept="image/*" hidden></label><textarea id="chatIn" rows="1" maxlength="1000" placeholder="${esc(CT("메시지 입력","Type a message"))}"></textarea><button class="sm-btn red" id="chatSend">${esc(CT("보내기","Send"))}</button></div>`;
   const $ = q => s.el.querySelector(q), log = $("#chatLog");
   $(".close-x").onclick = s.close;
   if(extra && extra.onAdd) $("#chatAdd").onclick = () => extra.onAdd(s);
@@ -1139,7 +1139,8 @@ function openChat(tid, title, onNewInquiry, extra){
     else if(list.length && log.querySelector(".hint")) log.innerHTML = "";
     list.forEach(m => {
       const d = document.createElement("div"); d.className = "msg " + (m.sender === "cust" ? "me" : m.sender === "bot" ? "bot" : "them");
-      d.innerHTML = `${who(m) ? `<small class="who">${esc(who(m))}</small>` : ""}<div class="bubble">${esc(PT.msgText(m)).replace(/\n/g, "<br>")}</div><small class="at">${esc(fmtHM(m.created_at))}</small>`;
+      d.innerHTML = `${who(m) ? `<small class="who">${esc(who(m))}</small>` : ""}${m.image ? `<a class="bubble img" href="${esc(api.chatImageUrl(m.image))}" target="_blank" rel="noopener"><img src="${esc(api.chatImageUrl(m.image))}" alt="📷" loading="lazy"></a>` : `<div class="bubble">${esc(PT.msgText(m)).replace(/\n/g, "<br>")}</div>`}<small class="at">${esc(fmtHM(m.created_at))}</small>`;
+      d.querySelectorAll("img").forEach(i => i.onload = () => { log.scrollTop = log.scrollHeight; });
       log.appendChild(d); last = Math.max(last, m.id);
     });
     if(list.length) log.scrollTop = log.scrollHeight;
@@ -1164,6 +1165,14 @@ function openChat(tid, title, onNewInquiry, extra){
     const v = inp.value.trim(); if(!v || busy) return; busy = true;
     try{ await api.chatSend(tid, v); inp.value = ""; inp.style.height = "auto"; await poll(); }catch(e){ toast(PT.errMsg(e), 3000); if(String(e.message||e).includes("chat_closed")){ open = false; paintState(); } }
     busy = false;
+  };
+  const pic = $("#chatPic");
+  pic.onchange = async () => {
+    const file = pic.files[0]; pic.value = ""; if(!file || busy) return; busy = true;
+    const lbl = pic.parentElement; lbl.classList.add("busy");
+    try{ const blob = await PT.compressImage(file); await api.chatSendImage(tid, blob); await poll(); }
+    catch(e){ toast(PT.errMsg(e), 3000); if(String(e.message||e).includes("chat_closed")){ open = false; paintState(); } }
+    lbl.classList.remove("busy"); busy = false;
   };
   poll();
 }

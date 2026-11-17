@@ -1803,7 +1803,7 @@ function buildPane(tid){
   pane.innerHTML = `<div class="ch-head" id="chHead"></div>
     <div class="chat-log" id="chLog"></div>
     <div class="chat-faq">${((chSettings && chSettings.chat_quick) || []).map((q, i) => `<button class="chip" data-qr="${i}" data-raw>${esc(q)}</button>`).join("")}</div>
-    <div class="chat-input"><textarea id="chIn" rows="2" maxlength="1000" placeholder="답장 입력 (Enter 전송, Shift+Enter 줄바꿈)"></textarea><button class="primary-btn sm" id="chSend" style="width:auto;margin:0">보내기</button></div>`;
+    <div class="chat-input"><label class="chat-photo" title="사진 보내기">📷<input type="file" id="chPic" accept="image/*" hidden></label><textarea id="chIn" rows="2" maxlength="1000" placeholder="답장 입력 (Enter 전송, Shift+Enter 줄바꿈)"></textarea><button class="primary-btn sm" id="chSend" style="width:auto;margin:0">보내기</button></div>`;
   const inp = pane.querySelector("#chIn");
   pane.querySelectorAll("[data-qr]").forEach(b => b.onclick = () => { inp.value = chSettings.chat_quick[+b.dataset.qr]; inp.focus(); });
   inp.addEventListener("keydown", e => { if(e.key === "Enter" && !e.shiftKey && !e.isComposing){ e.preventDefault(); pane.querySelector("#chSend").click(); } });
@@ -1817,6 +1817,14 @@ function buildPane(tid){
     }
     try{ await api.adminChatSend2(tid, v, en, ko); await loadMsgs(true); }catch(e){ inp.value = v; toast(L("전송 실패: ", "Send failed: ") + (e.message || e), 4000); }
     btn.disabled = false;
+  };
+  const pic = pane.querySelector("#chPic");
+  pic.onchange = async () => {
+    const file = pic.files[0]; pic.value = ""; if(!file) return;
+    const lbl = pic.parentElement; lbl.classList.add("busy");
+    try{ await api.adminChatSendImage(tid, await PT.compressImage(file)); await loadMsgs(true); }
+    catch(e){ toast(L("사진 전송 실패: ", "Photo send failed: ") + (e.message || e), 4000); }
+    lbl.classList.remove("busy");
   };
 }
 async function loadMsgs(scroll){
@@ -1834,13 +1842,14 @@ async function loadMsgs(scroll){
   const log = $("chLog"), atBottom = log.scrollHeight - log.scrollTop - log.clientHeight < 60;
   log.innerHTML = chMsgs.map(m => `<div class="msg ${m.sender === "admin" ? "me" : m.sender === "bot" ? "bot" : "them"}">
       ${m.sender === "bot" ? `<small class="who">🤖 자동응답</small>` : ""}
-      <div class="bubble"><span data-raw>${esc(m.body).replace(/\n/g, "<br>")}</span>${(() => { const t = trOf(m);
-        return t === "…" ? `<div class="tr">🌐 번역 중…</div>` : t ? `<div class="tr" data-raw>🌐 ${esc(t).replace(/\n/g, "<br>")}</div>` : ""; })()}</div>
+      ${m.image ? `<a class="bubble img" href="${esc(api.chatImageUrl(m.image))}" target="_blank" rel="noopener"><img src="${esc(api.chatImageUrl(m.image))}" alt="📷" loading="lazy" onload="const l=this.closest('.chat-log');if(l&&l.scrollHeight-l.scrollTop-l.clientHeight<400)l.scrollTop=1e9"></a>` :
+      `<div class="bubble"><span data-raw>${esc(m.body).replace(/\n/g, "<br>")}</span>${(() => { const t = trOf(m);
+        return t === "…" ? `<div class="tr">🌐 번역 중…</div>` : t ? `<div class="tr" data-raw>🌐 ${esc(t).replace(/\n/g, "<br>")}</div>` : ""; })()}</div>`}
       <small class="at">${fmtTime(m.created_at)}</small></div>`).join("") || `<p class="hint" style="text-align:center">아직 메시지가 없습니다</p>`;
   if(scroll || atBottom) log.scrollTop = log.scrollHeight;
   // 손님 메시지 자동 번역 — 관리자 '한국어' 화면: 영어 → 한국어 / 'English' 화면: 한국어 → 영어
   for(const m of chMsgs){
-    if(m.sender !== "cust" || trOf(m) !== "…") continue;
+    if(m.sender !== "cust" || m.image || trOf(m) !== "…") continue;
     const key = m.id + (EN() ? "en" : "ko"); if(msgTr[key]) continue; msgTr[key] = true;
     (EN() ? trText(m.body).then(en => en && api.setMsgEn(m.id, en)) : api.translateTo(m.body, "ko").then(ko => ko && ko !== m.body && api.setMsgKo(m.id, ko)))
       .then(() => { if(chCur === tid) loadMsgs(); }).catch(() => {});
