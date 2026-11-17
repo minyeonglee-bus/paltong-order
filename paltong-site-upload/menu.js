@@ -161,16 +161,23 @@ window.PALTONG_MENU_IMG = {
   spicysoy_boneless:  BONELESS_IMG["땡초간장"],
 
   /* JTV 세트 — 단품 사진 합쳐서 만듦 (11/17). 옵션 고르면 사진 바뀜 */
-  set_lady:        { options:["치킨 맛","치즈볼"], by:{          // 레이디스 세트 — 치킨 맛 × 치즈볼 (닭발 무뼈 사진은 아직 없음)
-    "간장|치즈볼(4pcs)+치즈스틱+감튀":"images/menu/set_lady_soy_mix.jpg", "간장|치즈볼만 (8pcs)":"images/menu/set_lady_soy_8.jpg",
-    "양념|치즈볼(4pcs)+치즈스틱+감튀":"images/menu/set_lady_yang_mix.jpg", "양념|치즈볼만 (8pcs)":"images/menu/set_lady_yang_8.jpg" } },
+  set_lady:        { options:["닭발 부위","치킨 맛","치즈볼"], by:{   // 레이디스 세트 — 닭발 × 치킨 맛 × 치즈볼 (8장)
+    "뼈|간장|치즈볼(4pcs)+치즈스틱+감튀":"images/menu/set_lady_bone_soy_mix.jpg",
+    "뼈|간장|치즈볼만 (8pcs)":"images/menu/set_lady_bone_soy_8.jpg",
+    "뼈|양념|치즈볼(4pcs)+치즈스틱+감튀":"images/menu/set_lady_bone_yang_mix.jpg",
+    "뼈|양념|치즈볼만 (8pcs)":"images/menu/set_lady_bone_yang_8.jpg",
+    "무뼈|간장|치즈볼(4pcs)+치즈스틱+감튀":"images/menu/set_lady_nobone_soy_mix.jpg",
+    "무뼈|간장|치즈볼만 (8pcs)":"images/menu/set_lady_nobone_soy_8.jpg",
+    "무뼈|양념|치즈볼(4pcs)+치즈스틱+감튀":"images/menu/set_lady_nobone_yang_mix.jpg",
+    "무뼈|양념|치즈볼만 (8pcs)":"images/menu/set_lady_nobone_yang_8.jpg",
+  } },
   set_beerfit:     "images/menu/set_beerfit.jpg?v=2",       // 비어핏 세트
   set_redsamgyeop: { option:"주먹밥", by:{ "참치마요":"images/menu/set_redsamgyeop_tuna.jpg", "날치알":"images/menu/set_redsamgyeop_nalchi.jpg" } },  // 빨간 삼겹 세트
   set_jjikmeok:    "images/menu/set_jjikmeok.jpg?v=2",      // 찍먹세트
 
   /* 메인 안주류 */
   jikhwa_dakbal:      "images/menu/jikhwa_dakbal.jpg",       // 직화 닭발 (무뼈 사진)
-  gukmuldakbal:       "images/menu/gukmul_dakbal.jpg",       // 국물닭발 (뼈 사진)
+  gukmuldakbal:       { option:"부위", by:{ "뼈":"images/menu/gukmul_dakbal.jpg", "무뼈":"images/menu/gukmul_dakbal_boneless.jpg" } },  // 국물닭발 (무뼈 사진은 직화 무뼈를 국물로 합성)
   gomjangeo:          "images/menu/gomjangeo.jpg",           // 꼼장어
   redwing:            "images/menu/redwing.jpg",             // 빨간 날개
   dakdoritang:        "images/menu/dakdoritang.jpg",         // 닭도리탕
