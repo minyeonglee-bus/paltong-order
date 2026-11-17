@@ -66,7 +66,7 @@ function drawReceipt(o, copyLabel, kitchen){
     hr();
     (o.items || []).forEach(l => {
       row(`${PT.isSvc(l) ? "[FREE] " : l.added ? "[ADD] " : ""}${nameEn(l)}`, `×${l.qty}`, { size:34, bold:true });
-      PT.optList(l).forEach(x => text(`   ${x.extra ? ">> " : "- "}${x.gen ? x.gen + ": " : ""}${x.extra ? String(x.en).toUpperCase() : x.en}${x.n > 1 ? " x" + x.n : ""}`, { size: x.extra ? 30 : 26, bold: x.extra }));   // 옵션 한 줄씩, 바뀐 선택은 크게 (2026-11-17)
+      if(PT.optList(l).length) text("   >> " + PT.optList(l).map(x => { const t = x.en + (x.n > 1 ? " x" + x.n : ""); return x.extra ? t.toUpperCase() : t; }).join(" • "), { size:30, bold:true });   // 순살 • 한마리 • 양념 (2026-11-17)
       y += 4;
     });
     hr();
@@ -88,7 +88,7 @@ function drawReceipt(o, copyLabel, kitchen){
     row(`${svc ? B("[서비스]", "[FREE]") + " " : l.added ? B("[추가]", "[ADD]") + " " : ""}${en ? nameEn(l) : (l.name || it.name)} x${l.qty}`, svc ? "FREE" : peso(l.unitPrice * l.qty), { size:24, bold:true });
     const sub = [en ? "" : l.en || it.en || "", svc && l.origUnit ? `(${peso(l.origUnit * l.qty)})` : ""].filter(Boolean).join(" · ");
     if(sub) text("  " + sub, { size:19 });
-    PT.optList(l).forEach(x => text(`   ${x.extra ? "▶" : "·"} ${en ? (x.gen ? x.gen + ": " : "") + x.en : (x.gko ? x.gko + ": " : "") + (x.ko === x.en ? x.ko : x.ko + " " + x.en)}${x.n > 1 ? " x" + x.n : ""}${x.delta ? " +" + peso(x.delta) : ""}`, { size: x.extra ? 21 : 19, bold: x.extra }));
+    if(PT.optList(l).length) text("   ▶ " + PT.optLine(l, en) + (!en && PT.optLine(l, false) !== PT.optLine(l, true) ? " / " + PT.optLine(l, true) : ""), { size:21, bold:true });
   });
   hr();
   if((o.items || []).some(PT.isSvc)) row(B("서비스", "Service"), PT.svcValue(o) ? `${peso(PT.svcValue(o))} FREE` : "FREE", { bold:true });
