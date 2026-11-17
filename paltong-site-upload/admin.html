@@ -3664,6 +3664,16 @@ function dkParse(x){
   const isDk = !!(id || name) && /주문|order/i.test(t);
   return { id, name, pickup, isDk, kind: pickup ? L("픽업", "Pickup") : L("배달", "Delivery") };
 }
+/* 외부 주문 손님 이름 규칙: DK = 숫자(DK 주문번호)만, 그 외 = 영어·숫자만 (한글 X) */
+function extNameBad(n, ch){
+  if(ch === "DK") return /^\d{4,}$/.test(n) ? "" : L("DK 주문은 이름 칸에 DK 주문번호(숫자)만 적어요 — 예: 14596527", "DK orders: put the DK order number (digits only) in the name field");
+  return /^[A-Za-z0-9 .,'&()#\/-]+$/.test(n) && /[A-Za-z0-9]/.test(n) ? "" : L("손님 이름은 영어 또는 숫자로만 적어요 (한글 X)", "Customer name: English letters or numbers only");
+}
+/* 붙여넣은 DK 글에서 DK 주문번호 찾기 ("주문아이디 14596527" · "14596527 유정옥 배달주문") */
+function extDkId(t){
+  t = t || "";
+  return (t.match(/주문\s*아이디\s*[:#]?\s*(\d{5,})/) || t.match(/order\s*(?:id|no\.?)\s*[:#]?\s*(\d{5,})/i) || t.match(/(?:^|\n)\s*(\d{6,10})\s+\S+\s*(?:배달|픽업|포장)\s*주문/) || [])[1] || "";
+}
 async function extOrderModal(pre){   // pre = { text, ch, inboxId } — 📥 DK 자동 접수에서 열 때
   if(PT.DEMO){ toast(L("데모 모드에서는 쓸 수 없어요", "Not available in demo mode")); return; }
   const act = riders.filter(r => r.active).sort((a, b) => (b.on_duty - a.on_duty) || a.name.localeCompare(b.name));
@@ -3672,7 +3682,7 @@ async function extOrderModal(pre){   // pre = { text, ch, inboxId } — 📥 DK 
     ${pasteBoxHTML(true)}
     <div class="field"><label>${L("주문 경로", "Channel")}</label><div class="chips" id="exCh">${EXT_CHANNELS.map((c, i) => `<button type="button" class="chip ${i === 0 ? "sel" : ""}" data-ch="${c[0]}">${c[0] === "DK" ? "DK" : `${chLabel(c[0])} <span class="en">P</span>`}</button>`).join("")}</div></div>
     <div class="seg" id="exType" style="margin-bottom:12px"><button type="button" data-ot="delivery" class="sel">🛵 ${L("배달", "Delivery")}</button><button type="button" data-ot="pickup">🏃 ${L("픽업", "Pickup")}</button></div>
-    <div class="field"><label>${L("손님 이름", "Customer name")}</label><input data-f="name" placeholder="Juan"></div>
+    <div class="field"><label>${L("손님 이름", "Customer name")}</label><input data-f="name" placeholder="Juan" autocomplete="off"><p class="hint" id="exNameHint" style="margin:4px 0 0"></p></div>
     <div class="field"><label>${L("손님 연락처", "Customer phone")}</label><input data-f="phone" inputmode="tel" placeholder="09xx xxx xxxx"></div>
     <div class="ex-dlv"><div class="field"><label>${L("주소", "Address")}</label><input data-f="addr" placeholder="Building, street, area"></div>
     ${pinFieldHTML()}</div>
@@ -3690,7 +3700,10 @@ async function extOrderModal(pre){   // pre = { text, ch, inboxId } — 📥 DK 
     <div class="field ex-dlv"><label>🛵 ${L("기사", "Rider")}</label><select data-f="rider_id" class="note-in" style="margin:0"><option value="">${L("— 나중에 배정 —", "— Assign later —")}</option>${act.map(r => `<option value="${r.user_id}">${r.on_duty ? "🟢" : "⚪"} ${esc(r.name)}</option>`).join("")}</select></div>`,
     async ov => {
       const f = readFields(ov);
-      if(!f.name){ toast(L("손님 이름을 입력하세요", "Enter the customer name")); return false; }
+      f.name = (f.name || "").trim();
+      if(!f.name){ toast(ov._ch === "DK" ? L("DK 주문번호(숫자)를 입력하세요", "Enter the DK order number") : L("손님 이름을 입력하세요", "Enter the customer name")); return false; }
+      const nmBad = extNameBad(f.name, ov._ch);
+      if(nmBad){ toast(nmBad, 5000); F("name").focus(); return false; }
       const pickup = ov._ot === "pickup";
       if(!pickup && !f.addr && !ov._pin){ toast(L("주소를 쓰거나 지도에 핀을 찍어주세요", "Enter an address or drop a pin")); return false; }
       if(f.amount === "" || isNaN(+f.amount)){ toast(L("음식값을 숫자로 입력하세요", "Enter the food amount")); return false; }
@@ -3720,6 +3733,7 @@ async function extOrderModal(pre){   // pre = { text, ch, inboxId } — 📥 DK 
     }, L("등록하고 링크 받기", "Create & get link"));
   ov._ch = EXT_CHANNELS[0][0]; ov._items = []; ov._ot = "delivery";
   const F = k => ov.querySelector(`[data-f="${k}"]`);
+  setTimeout(() => nameRule && nameRule(), 0);
   const itemSum = () => ov._items.reduce((a, l) => a + l.unitPrice * l.qty, 0);
   /* 음식값 + 배달비 = 합계 (붙여넣은 글의 합계와 다르면 경고) */
   const paintTotal = () => {
@@ -3755,7 +3769,16 @@ async function extOrderModal(pre){   // pre = { text, ch, inboxId } — 📥 DK 
     paintTotal();
   };
   ov.querySelector("#exAdd").onclick = () => addItemModal({ pickOnly: l => { ov._items.push(l); paintItems(); }, items: [] }, false);
-  const pickCh = ch => { ov._ch = ch; ov.querySelectorAll("[data-ch]").forEach(x => x.classList.toggle("sel", x.dataset.ch === ch)); ov.querySelector("#exPtsBox").hidden = ch !== "DK"; paintTotal(); };
+  /* 손님 이름 규칙 (사장님 11/18): 영어 또는 숫자만 · DK는 DK 주문번호(숫자)만 */
+  const nameRule = () => { const n = F("name"), dk = ov._ch === "DK";
+    n.placeholder = dk ? "14596527" : "Juan"; n.inputMode = dk ? "numeric" : "text";
+    if(dk && ov._dkId && !/^\d+$/.test(n.value.trim())) n.value = ov._dkId;   // DK면 주문번호로 자동 바꿈
+    ov.querySelector("#exNameHint").textContent = dk ? L("DK는 DK 주문번호(숫자)만 적어요 — 예: 14596527", "DK: type the DK order number only (digits) — e.g. 14596527")
+      : L("영어 또는 숫자로만 적어요 (한글 X)", "English letters or numbers only");
+    paintName(); };
+  const paintName = () => { const n = F("name"), bad = n.value.trim() && extNameBad(n.value.trim(), ov._ch); n.style.borderColor = bad ? "var(--red)" : ""; ov.querySelector("#exNameHint").style.color = bad ? "var(--red-deep)" : ""; };
+  F("name").addEventListener("input", () => { if(ov._ch === "DK"){ const v = F("name").value, d = v.replace(/\D/g, ""); if(v !== d) F("name").value = d; } paintName(); });
+  const pickCh = ch => { ov._ch = ch; ov.querySelectorAll("[data-ch]").forEach(x => x.classList.toggle("sel", x.dataset.ch === ch)); ov.querySelector("#exPtsBox").hidden = ch !== "DK"; nameRule(); paintTotal(); };
   ov.querySelectorAll("[data-ch]").forEach(b => b.onclick = () => pickCh(b.dataset.ch));
   /* 🛵 배달 / 🏃 픽업 — 픽업이면 주소·지도·배달비·기사 칸을 숨기고 배달비 0 */
   const pickOt = t => { ov._ot = t; ov.querySelectorAll("[data-ot]").forEach(x => x.classList.toggle("sel", x.dataset.ot === t));
@@ -3773,7 +3796,10 @@ async function extOrderModal(pre){   // pre = { text, ch, inboxId } — 📥 DK 
     const got = [];
     if(ov._ocr){ p.memo = (p.memoLabeled || []).join(" / "); if(ocrFix(p)) got.push("🔧 " + L("DK 합계에 맞춰 숫자 보정", "numbers matched to DK total")); }
     const put = (k, v, lab) => { if(v == null || v === "") return; F(k).value = v; got.push(lab); };
-    put("name", p.name, L("이름", "name")); put("phone", p.phone, L("연락처", "phone")); put("addr", p.addr, L("주소", "address"));
+    ov._dkId = extDkId(ov.querySelector("[data-paste]").value) || ov._dkId || "";
+    if(p.name && !extNameBad(p.name.trim(), "")) put("name", p.name.trim(), L("이름", "name"));
+    else if(p.name) got.push("⚠️ " + L("이름이 한글이라 비워둠 — 영어/숫자로", "name not English — retype"));
+    put("phone", p.phone, L("연락처", "phone")); put("addr", p.addr, L("주소", "address"));
     // 메뉴: 붙여넣기로 넣었던 줄은 바꾸고, 직접 넣은 메뉴는 그대로
     ov._items = ov._items.filter(l => !l.pasted).concat(p.items || []);
     ov._pastedTotal = p.total != null ? p.total : null;
@@ -3790,7 +3816,8 @@ async function extOrderModal(pre){   // pre = { text, ch, inboxId } — 📥 DK 
     const raw = ov.querySelector("[data-paste]").value.toLowerCase();
     if(/pick\s*-?\s*up|픽업|포장|take\s*-?\s*out|takeout/.test(raw)){ pickOt("pickup"); got.push("🏃 " + L("픽업", "pickup")); }
     if(/kakao|카톡|카카오/.test(raw)) pickCh("카카오톡"); else if(/messenger|facebook|페북|페이스북|sms|문자/.test(raw)) pickCh("메세지"); else if(/viber|바이버/.test(raw)) pickCh("바이버");
-    if(ov._forceCh) pickCh(ov._forceCh);
+    if(ov._forceCh) pickCh(ov._forceCh); else nameRule();
+    if(ov._ch === "DK"){ if(ov._dkId){ F("name").value = ov._dkId; got.push(L("DK 주문번호 → 이름", "DK no. → name")); } else if(!/^\d+$/.test(F("name").value.trim())){ F("name").value = ""; got.push("⚠️ " + L("DK 주문번호를 이름 칸에 적어주세요", "type the DK order no. as name")); } paintName(); }
     return got;
   });
   bindOcr(ov, (text, d) => { ov._ocr = true; if(d.id || /주문\s*하신\s*분|DK/i.test(text)) ov._forceCh = "DK"; });
