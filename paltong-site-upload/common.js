@@ -276,6 +276,22 @@ function optChips(l, en){
   return `<div class="optline" style="margin:3px 0 1px;padding:2px 9px;display:table;border-radius:8px;background:#fff6dd;border:1px solid #f0c25a;font-size:14px;line-height:1.5">${os.map(o =>
     o.extra ? `<b style="color:#b85c00">${esc(optName(o, en))}</b>` : `<span style="color:#444">${esc(optName(o, en))}</span>`).join(`<span style="color:#c9a24a"> • </span>`)}</div>`;
 }
+/* 짧은 메뉴 이름 (관리자 주문 화면): 고른 옵션이 이름 안의 "양념·간장·땡초간장·마늘" 목록에 있으면 목록을 빼고 옵션 칸으로만 보여줌
+   "순살 양념·간장·땡초간장·마늘 치킨" + 땡초간장 → "순살" (사장님 2026-11-18) */
+function shortName(l, en){
+  const name = en ? (l.en || l.name || "") : (l.name || ""), os = (l.opts || []).filter(o => !o.req && !o.note);
+  if(!os.length) return name;
+  const picked = os.map(o => String(en ? o.en || o.ko : o.ko || "").trim()).filter(Boolean);
+  if(en){
+    const i = name.indexOf(" · "); if(i < 0) return name;
+    const rest = name.slice(i + 3).split("/").map(x => x.trim());
+    return picked.some(p => rest.includes(p)) ? name.slice(0, i).trim() : name;
+  }
+  const words = name.split(/\s+/), k = words.findIndex(w => w.includes("·") && w.split("·").some(x => picked.includes(x.trim())));
+  if(k < 0) return name;
+  const out = words.filter((w, j) => j !== k && !(j === k + 1 && w === "치킨")).join(" ").trim();
+  return out || name;
+}
 /* 단가 풀이: 기본 ₱550 + 옵션 ₱420 = ₱970 × 4 */
 function unitBreak(l, en){
   const it = ITEM_BY_ID[l.id], add = optList(l).reduce((s, o) => s + o.delta, 0), base = l.base != null ? +l.base : it ? it.price : null;
@@ -1496,5 +1512,5 @@ function contactHTML(){
     CFG.VIBER_PHONE ? `Viber·WhatsApp: <a href="https://wa.me/${num(CFG.VIBER_PHONE)}" target="_blank" rel="noopener"><b>${esc(CFG.VIBER_PHONE)}</b></a>` : ""].filter(Boolean).join("<br>");
 }
 window.PT = { contactLines, contactHTML, PRINT_SETS, PRINT_SETS_EN, KIND_LABEL, printKinds, manilaDay, bizDay, bizStart, DAY_START_HOUR, orderDay, get menuCfgActive(){ return menuCfgActive; }, loadMenuData, exportMenu, priceSig, politeKo, CATS, get menuOv(){ return menuOv; }, applyMenuOverrides, cleanForTranslate, setTranslateKey, googleTranslate, splitKoEn, msgText, schedLabel, menuToEnglish, matchZone, zoneFee, phoneMask, phoneValue, phoneOk, phoneDigits, phoneFmt, englishOnly, EN_NAME, EN_ADDR, hasHangul, stampRewards, stampText, isMemberPhone, normPhone, phoneEmail, prettyPhone, couponDiscount, couponValue, couponFace, couponsFace, couponCond, couponUsable, COUPON_KINDS, couponKind, stackKey, stackMax, couponStackOk, couponsDiscount, bestCoupons, stackRulesText, repriceLine, setNoSale, get noSale(){ return noSale; }, setJtvPlaces, isJtvAt, jtvPicks, errMsg, CFG, MENU, ITEM_BY_ID, esc, peso, ls, L, T, setLang, get LANG(){ return LANG; },
-  orderPrefix, orderCode, isDine, inClosingWindow, isSvc, svcValue, riderPhone, riderEmail, STATUS, payInfo, isOnlinePay, lineName, lineOpt, optList, optLine, optChips, unitBreak, compressImage, api, DEMO, receiptDoc, printReceipt, toast };
+  orderPrefix, orderCode, isDine, inClosingWindow, isSvc, svcValue, riderPhone, riderEmail, STATUS, payInfo, isOnlinePay, lineName, lineOpt, optList, optLine, optChips, shortName, unitBreak, compressImage, api, DEMO, receiptDoc, printReceipt, toast };
 })();
