@@ -11,13 +11,14 @@ MENU.forEach(c => c.items.forEach(it => { ITEM_BY_ID[it.id] = it; it.menuPrice =
 const MENU_BASE = MENU.map(c => ({ ...c, items: c.items.slice() }));
 const CATS = MENU_BASE.map(c => ({ cat: c.cat, catEn: c.catEn }));
 let menuOv = {}, menuCfgActive = false;
+let noSale = false;   // JTV 주소 주문: 기존 메뉴 할인 안 보이게 · 정가 (사장님 11/17)
 function applyMenuOverrides(ov){
   menuOv = ov || {};
   Object.values(ITEM_BY_ID).forEach(it => {
     const o = menuCfgActive ? {} : (menuOv[it.id] || {});   // 26단계: 관리자가 저장한 메뉴판이 있으면 그게 기준
     it.listPrice = +o.base_price > 0 ? +o.base_price : it.menuPrice;          // 정가: 관리자 값 우선 (25단계)
     const sale = o.sale_price != null ? +o.sale_price : (it.sale || 0);     // 관리자 값 우선 (0 = 할인 없음)
-    it.price = sale > 0 && sale < it.listPrice ? sale : it.listPrice;
+    it.price = !noSale && sale > 0 && sale < it.listPrice ? sale : it.listPrice;
     it.onSale = it.price < it.listPrice;
     it.cat = o.cat && CATS.some(c => c.cat === o.cat) ? o.cat : it.homeCat;
     it.isNew = o.is_new != null ? !!o.is_new : (o.cat === "신메뉴" || it.baseNew);    // 🆕 신메뉴 표시
@@ -82,6 +83,18 @@ function exportMenu(){
     items: MENU_BASE.flatMap(x => x.items).filter(it => it.cat === c.cat).map(pick) }));
 }
 applyMenuOverrides({});
+/* JTV 주소면 할인 끔 (정가) — 바뀌었으면 true */
+function setNoSale(on){ on = !!on; if(on === noSale) return false; noSale = on; applyMenuOverrides(menuOv); return true; }
+/* JTV 장소 (jtv_places) 안인지 — 반경 radius_m */
+let JTV_PLACES = [];
+function setJtvPlaces(list){ JTV_PLACES = Array.isArray(list) ? list : []; }
+function isJtvAt(lat, lng){
+  if(lat == null || lng == null) return false;
+  const R = 6371000, rad = d => d * Math.PI / 180;
+  return JTV_PLACES.some(p => { const dl = rad(lat - p.lat), dg = rad(lng - p.lng);
+    const a = Math.sin(dl/2)**2 + Math.cos(rad(p.lat)) * Math.cos(rad(lat)) * Math.sin(dg/2)**2;
+    return 2 * R * Math.asin(Math.sqrt(a)) <= (p.radius_m || 80); });
+}
 
 /* ---------------- helpers ---------------- */
 /* ---------- 번역 전 정리 ----------
@@ -502,6 +515,7 @@ function errMsg(e){
     [/coupon_code_member/, ["회원은 쿠폰 코드를 등록한 뒤 쿠폰함에서 골라 써주세요", "Members: add the code first, then pick it from your coupons"]],
     [/check_coupon_code|coupon_code.*(function|column)/i, ["가게에서 48단계 설치가 필요해요 (비회원 쿠폰 코드)", "Guest coupon codes are not set up yet"]],
     [/closing_time/, ["오전 7:50~8:00은 마감 정산 시간이라 주문을 받지 않아요. 8시부터 다시 주문할 수 있어요", "Orders pause 7:50–8:00 AM for daily closing. Please order again from 8:00 AM"]],
+    [/jtv_price/, ["JTV 주소 주문은 정가로 계산돼요. 화면을 새로고침한 뒤 다시 주문해주세요", "Orders to JTV venues use regular prices. Please refresh and order again"]],
     [/jtv_only/, ["JTV 메뉴는 지정된 JTV 매장 주소로만 주문할 수 있어요 (지도 위치 확인)", "JTV menu can only be ordered to the listed JTV venues (check the map pin)"]],
     [/store_closed/, ["지금은 영업 종료라 주문을 받을 수 없어요", "We are closed right now — orders are not available"]],
     [/sold_out/, ["품절된 메뉴가 있습니다", "Some items are sold out"]],
@@ -577,6 +591,7 @@ function makeSupabaseApi(){
       unwrap(await sb.storage.from("receipts").upload(path, blob, { contentType: blob.type || "image/jpeg", upsert: false }));
       unwrap(await sb.rpc("attach_extra_receipt", { p_id: id, p_path: path }));
     },
+    async jtvPlaces(){ return unwrap(await sb.from("jtv_places").select("lat,lng,radius_m").eq("active", true)); },
     async quoteDelivery(lat, lng, addr){ return unwrap(await sb.rpc("quote_delivery", { p_lat: lat, p_lng: lng, p_addr: addr || "" })); },
     async addItems(id, items, sub){ return unwrap(await sb.rpc("add_items", { p_id: id, p_items: items, p_sub: sub })); },
     priceUnlock: {},   // 🔓 완료된 주문 가격 수정: { 주문id: 가격 비밀번호 } (52단계)
@@ -1477,6 +1492,6 @@ function contactHTML(){
     CFG.STORE_PHONE ? `${T("전화·SMS", "Call·SMS")}: <a href="tel:${esc(CFG.STORE_PHONE.replace(/\s/g, ""))}"><b>${esc(CFG.STORE_PHONE)}</b></a>` : "",
     CFG.VIBER_PHONE ? `Viber·WhatsApp: <a href="https://wa.me/${num(CFG.VIBER_PHONE)}" target="_blank" rel="noopener"><b>${esc(CFG.VIBER_PHONE)}</b></a>` : ""].filter(Boolean).join("<br>");
 }
-window.PT = { contactLines, contactHTML, PRINT_SETS, PRINT_SETS_EN, KIND_LABEL, printKinds, manilaDay, bizDay, bizStart, DAY_START_HOUR, orderDay, get menuCfgActive(){ return menuCfgActive; }, loadMenuData, exportMenu, priceSig, politeKo, CATS, get menuOv(){ return menuOv; }, applyMenuOverrides, cleanForTranslate, setTranslateKey, googleTranslate, splitKoEn, msgText, schedLabel, menuToEnglish, matchZone, zoneFee, phoneMask, phoneValue, phoneOk, phoneDigits, phoneFmt, englishOnly, EN_NAME, EN_ADDR, hasHangul, stampRewards, stampText, isMemberPhone, normPhone, phoneEmail, prettyPhone, couponDiscount, couponValue, couponFace, couponsFace, couponCond, couponUsable, COUPON_KINDS, couponKind, stackKey, stackMax, couponStackOk, couponsDiscount, bestCoupons, stackRulesText, repriceLine, errMsg, CFG, MENU, ITEM_BY_ID, esc, peso, ls, L, T, setLang, get LANG(){ return LANG; },
+window.PT = { contactLines, contactHTML, PRINT_SETS, PRINT_SETS_EN, KIND_LABEL, printKinds, manilaDay, bizDay, bizStart, DAY_START_HOUR, orderDay, get menuCfgActive(){ return menuCfgActive; }, loadMenuData, exportMenu, priceSig, politeKo, CATS, get menuOv(){ return menuOv; }, applyMenuOverrides, cleanForTranslate, setTranslateKey, googleTranslate, splitKoEn, msgText, schedLabel, menuToEnglish, matchZone, zoneFee, phoneMask, phoneValue, phoneOk, phoneDigits, phoneFmt, englishOnly, EN_NAME, EN_ADDR, hasHangul, stampRewards, stampText, isMemberPhone, normPhone, phoneEmail, prettyPhone, couponDiscount, couponValue, couponFace, couponsFace, couponCond, couponUsable, COUPON_KINDS, couponKind, stackKey, stackMax, couponStackOk, couponsDiscount, bestCoupons, stackRulesText, repriceLine, setNoSale, get noSale(){ return noSale; }, setJtvPlaces, isJtvAt, errMsg, CFG, MENU, ITEM_BY_ID, esc, peso, ls, L, T, setLang, get LANG(){ return LANG; },
   orderPrefix, orderCode, isDine, inClosingWindow, isSvc, svcValue, riderPhone, riderEmail, STATUS, payInfo, isOnlinePay, lineName, lineOpt, optList, optLine, optChips, unitBreak, compressImage, api, DEMO, receiptDoc, printReceipt, toast };
 })();

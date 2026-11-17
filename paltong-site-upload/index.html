@@ -116,6 +116,15 @@ const ss = {
 let cart = ss.get("paltong_cart", []);
 /* 주문서에 적던 내용도 이 탭에 기억 → 뒤로가기·새로고침·결제앱 다녀와도 그대로 (탭을 닫으면 초기화) */
 let cust = Object.assign({ name:"", phone:"", addr:"", memo:"", payment:"gcash", otype:"delivery", sched:false, sDay:"", sTime:"" }, ss.get("paltong_cust", {}) || {});
+/* JTV 3곳 주소로 가는 주문: 기존 메뉴 할인 없이 정가 (사장님 11/17) — 저장된 주소/지도 핀 기준 */
+function jtvSync(lat, lng){
+  const on = !!(cust.otype !== "pickup" && PT.isJtvAt(lat, lng));
+  if(!PT.setNoSale(on)) return false;
+  cart.forEach(l => { const p = PT.repriceLine(l); if(p != null) l.unitPrice = p; });
+  try{ saveCart(); }catch(e){}
+  try{ renderMenu(); refreshCartBar(); }catch(e){}
+  return true;
+}
 const saveCust = () => ss.set("paltong_cust", cust);
 /* ---- 예약 주문 (선택) — 날짜·시간은 마닐라 시간 기준 ---- */
 const mnlDay = (plusDays = 0) => new Date(Date.now() + plusDays * 864e5).toLocaleDateString("en-CA", { timeZone:"Asia/Manila" });
@@ -563,7 +572,8 @@ function openCheckout(){
     if(!addrW) addrW = PTAddress.createAddressWidget({
       saved: acct ? (acct.member.addresses || []) : [], pins: acct ? { ...(acct.member.addr_pins || {}) } : {},
       initial: cust.addr, initialPin: cust.lat != null ? { lat: cust.lat, lng: cust.lng } : null,
-      onChange: pin => { requestQuote(pin); try{ const v = addrW.value(); if(v && v.addr){ cust.addr = v.addr; cust.lat = v.lat; cust.lng = v.lng; saveCust(); } }catch(e){} } });
+      onChange: pin => { requestQuote(pin); try{ const v = addrW.value(); if(v && v.addr){ cust.addr = v.addr; cust.lat = v.lat; cust.lng = v.lng; saveCust(); } }catch(e){}
+        if(pin && jtvSync(pin.lat, pin.lng)){ toast(PT.noSale ? T("JTV 주소 — 메뉴가 정가로 바뀌었어요","JTV venue — regular prices apply") : T("메뉴 가격이 다시 계산됐어요","Prices updated"), 3500); render(); } } });
     $("#addrSlot").replaceWith(addrW.el);
     $("#fName").value = (cust.name || "").replace(PT.EN_NAME, ""); $("#fPhone").value = cust.phone ? PT.phoneFmt(PT.phoneDigits(cust.phone)) : ""; $("#fMemo").value = cust.memo;
     PT.englishOnly($("#fName"), PT.EN_NAME); PT.phoneMask($("#fPhone"));
@@ -611,7 +621,7 @@ function openCheckout(){
       cust.payment = b.dataset.pay; sync();
       s.el.querySelectorAll("[data-pay]").forEach(x => x.classList.toggle("sel", x === b)); payHint();
     });
-    s.el.querySelectorAll("[data-ot]").forEach(b => b.onclick = () => { sync(); cust.otype = b.dataset.ot; render(); });
+    s.el.querySelectorAll("[data-ot]").forEach(b => b.onclick = () => { sync(); cust.otype = b.dataset.ot; jtvSync(cust.lat, cust.lng); render(); });
     const cb = $("#ckCodeBtn");
     if(cb) cb.onclick = async () => {
       const v = $("#ckCode").value.trim(); if(!v || codeBusy) return; codeBusy = true; cb.disabled = true; sync();
@@ -680,6 +690,7 @@ function openCheckout(){
       const av = isPickup() ? { addr: "", lat: null, lng: null } : addrW.value();
       if(av.error){ toast(av.error, 3000); addrW.focus(av.focus); return; }
       if(!isPickup()){ cust.addr = av.addr; cust.lat = av.lat; cust.lng = av.lng; }
+      if(jtvSync(av.lat, av.lng)){ toast(PT.noSale ? T("JTV 주소 — 메뉴가 정가로 바뀌었어요. 금액 확인 후 다시 눌러주세요","JTV venue — regular prices apply. Check the total and tap again") : T("메뉴 가격이 다시 계산됐어요. 확인 후 다시 눌러주세요","Prices updated. Please check and tap again"), 4500); render(); return; }
       if(!isPickup() && quote && quote.reason === "pin_required" && av.lat == null){
         toast(T("배달 위치를 지도에 찍어주세요 (배달비 자동 계산)","Please mark your location on the map (for the delivery fee)"), 3500);
         const pm = s.el.querySelector(".addr-pinmap"); if(pm) pm.click();
@@ -1292,6 +1303,7 @@ loadSoldOut();
 api.onMenuStatus(loadSoldOut);
 renderActiveOrders();
 loadAccount().then(pollInquiry);
+api.jtvPlaces && api.jtvPlaces().then(list => { PT.setJtvPlaces(list); jtvSync(cust.lat, cust.lng); }).catch(() => {});
 api.getSettings().then(st => { if(st){ const was = isClosed(); shopSettings = st; PTAddress.setGoogle(st.google_maps_key, st.google_map_id); if(was !== isClosed()) renderMenu(); } }).catch(() => {});
 try{ api.onSettings && api.onSettings(reloadStoreStatus); }catch(e){}
 setInterval(reloadStoreStatus, 60000);
