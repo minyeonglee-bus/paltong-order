@@ -141,7 +141,10 @@ function chooseJtv(p){ cust.jtvId = p.id; cust.addr = jtvLabel(p); cust.lat = p.
 function jtvChipsHtml(){
   const ps = PT.jtvPicks(); if(!ps.length) return "";
   return `<div style="margin:0 0 12px"><div style="font-weight:800;font-size:14px;margin:0 0 6px">🎤 ${L("JTV 매장에서 주문하세요?","Ordering from a JTV venue?")}</div>
-    <div style="display:flex;flex-direction:column;gap:6px">${ps.map(p => `<button class="ghost-btn" data-jtv="${p.id}" style="margin:0;text-align:left;${cust.jtvId === p.id ? "border-color:var(--red);color:var(--red-deep);font-weight:800" : ""}">${cust.jtvId === p.id ? "✅ " : ""}<b>${esc(p.name)}</b> <span class="en" style="font-weight:400">${esc(p.addr)}</span></button>`).join("")}</div>
+    <select data-jtvsel style="width:100%;padding:13px 12px;border:1px solid var(--line);border-radius:12px;background:var(--surface);color:var(--ink);font-size:15px;font-weight:700">
+      <option value="">${L("JTV 매장 선택 ▾","Choose JTV venue ▾")}</option>
+      ${ps.map(p => `<option value="${p.id}" ${cust.jtvId === p.id ? "selected" : ""}>${esc(p.name)} — ${esc(p.addr)}</option>`).join("")}
+    </select>
     <p class="hint" style="margin:6px 0 0">${L("룸 번호는 요청사항에 적어주세요","Write your room number in the request")}</p></div>`;
 }
 /* 처음 들어오면 주소부터 (사장님 11/17) — 그 주소 기준 가격으로 메뉴를 보여주고, 주문할 때 자동으로 들어감 */
@@ -168,8 +171,8 @@ function openAddrGate(){
       cust.addr = v.addr; cust.lat = v.lat; cust.lng = v.lng; cust.otype = "delivery"; cust.jtvId = null; saveCust();
       s.close(); jtvSync(cust.lat, cust.lng); renderMenu();
     };
-    s.el.querySelectorAll("[data-jtv]").forEach(b => b.onclick = () => {
-      const p = PT.jtvPicks().find(x => String(x.id) === b.dataset.jtv); if(!p) return;
+    s.el.querySelectorAll("[data-jtvsel]").forEach(b => b.onchange = () => {
+      const p = PT.jtvPicks().find(x => String(x.id) === b.value); if(!p) return;
       chooseJtv(p); s.close(); jtvSync(cust.lat, cust.lng); renderMenu();
     });
     s.el.querySelector("#gatePick").onclick = () => { cust.otype = "pickup"; cust.jtvId = null; saveCust(); s.close(); jtvSync(null, null); renderMenu(); };
@@ -648,8 +651,8 @@ function openCheckout(){
       if(!quoteFor || quoteFor.lat !== jp.lat || quoteFor.lng !== jp.lng){ if(quote !== "loading") requestQuote({ lat: jp.lat, lng: jp.lng, addr: jtvLabel(jp) }); }
       const off = $("#jtvOff"); if(off) off.onclick = () => { cust.jtvId = null; cust.addr = ""; cust.lat = cust.lng = null; saveCust(); addrW = null; quote = null; quoteFor = null; jtvSync(null, null); render(); };
     } else {
-    s.el.querySelectorAll("[data-jtv]").forEach(b => b.onclick = () => {
-      const p = PT.jtvPicks().find(x => String(x.id) === b.dataset.jtv); if(!p) return;
+    s.el.querySelectorAll("[data-jtvsel]").forEach(b => b.onchange = () => {
+      const p = PT.jtvPicks().find(x => String(x.id) === b.value); if(!p) return;
       chooseJtv(p); quote = null; quoteFor = null; if(jtvSync(cust.lat, cust.lng)) toast(T("JTV 매장 — 메뉴가 정가로 바뀌었어요","JTV venue — regular prices apply"), 3500); render();
     });
     if(!addrW) addrW = PTAddress.createAddressWidget({
