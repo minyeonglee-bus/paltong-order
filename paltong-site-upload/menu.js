@@ -161,7 +161,9 @@ window.PALTONG_MENU_IMG = {
   spicysoy_boneless:  BONELESS_IMG["땡초간장"],
 
   /* JTV 세트 — 단품 사진 합쳐서 만듦 (11/17). 옵션 고르면 사진 바뀜 */
-  set_lady:        { option:"치킨 맛", by:{ "간장":"images/menu/set_lady_soy.jpg", "양념":"images/menu/set_lady_yang.jpg" } },   // 레이디스 세트 (닭발 무뼈·치즈볼만 사진은 아직 없음)
+  set_lady:        { options:["치킨 맛","치즈볼"], by:{          // 레이디스 세트 — 치킨 맛 × 치즈볼 (닭발 무뼈 사진은 아직 없음)
+    "간장|치즈볼(4pcs)+치즈스틱+감튀":"images/menu/set_lady_soy_mix.jpg", "간장|치즈볼만 (8pcs)":"images/menu/set_lady_soy_8.jpg",
+    "양념|치즈볼(4pcs)+치즈스틱+감튀":"images/menu/set_lady_yang_mix.jpg", "양념|치즈볼만 (8pcs)":"images/menu/set_lady_yang_8.jpg" } },
   set_beerfit:     "images/menu/set_beerfit.jpg?v=2",       // 비어핏 세트
   set_redsamgyeop: { option:"주먹밥", by:{ "참치마요":"images/menu/set_redsamgyeop_tuna.jpg", "날치알":"images/menu/set_redsamgyeop_nalchi.jpg" } },  // 빨간 삼겹 세트
   set_jjikmeok:    "images/menu/set_jjikmeok.jpg?v=2",      // 찍먹세트
@@ -184,7 +186,7 @@ window.PALTONG_MENU_IMG = {
   odeng:              "images/menu/odeng.jpg",            // 오뎅탕
   sausage:            "images/menu/sausage.jpg",          // 모듬소세지
   jwipo:              "images/menu/jwipo.jpg",            // 쥐포
-  cheeseball:         "images/menu/cheeseball.jpg",       // 치즈볼
+  cheeseball:         { option:"선택", by:{ "치즈볼(4pcs)+치즈스틱+감튀":"images/menu/cheeseball.jpg", "치즈볼만 (8pcs)":"images/menu/cheeseball_only.jpg" } },  // 치즈볼 (선택 따라 사진)
   nurungji:           "images/menu/nurungji.jpg",         // 누룽지탕
   butterodari:        "images/menu/butterodari.jpg",      // 버터오다리
   gyeranjjim:         "images/menu/gyeranjjim.jpg",       // 계란찜
