@@ -196,7 +196,7 @@ function renderMenu(){
 
     const sec = document.createElement("section");
     sec.className = "menu-cat" + (cat.soldOutCat ? " soldout-cat" : "") + (cat.featured ? " featured-cat" : ""); sec.id = "cat" + ci; sec.dataset.idx = vi++;
-    sec.innerHTML = `<div class="cat-head"><h2>${esc(PT.LANG === "en" ? cat.catEn : cat.cat)}</h2>${PT.LANG === "both" ? `<span class="cat-en">${esc(cat.catEn)}</span>` : ""}</div>`;
+    sec.innerHTML = `<div class="cat-head"><h2>${esc(PT.LANG === "en" ? cat.catEn : cat.cat)}</h2>${PT.LANG === "both" ? `<span class="cat-en">${esc(cat.catEn)}</span>` : ""}</div>${cat.cat === "JTV" ? `<p class="cat-note" style="margin:-4px 0 10px;font-size:13px;color:#b3261e">${PT.LANG === "en" ? "Delivery to listed JTV venues only" : PT.LANG === "both" ? "지정 JTV 매장 배달 전용 · Delivery to listed JTV venues only" : "지정 JTV 매장 배달 전용"}</p>` : ""}`;
     items.forEach(item => {
       const out = !!soldOut[item.id] || closed;
       const row = document.createElement("div");

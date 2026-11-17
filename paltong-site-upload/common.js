@@ -502,6 +502,7 @@ function errMsg(e){
     [/coupon_code_member/, ["회원은 쿠폰 코드를 등록한 뒤 쿠폰함에서 골라 써주세요", "Members: add the code first, then pick it from your coupons"]],
     [/check_coupon_code|coupon_code.*(function|column)/i, ["가게에서 48단계 설치가 필요해요 (비회원 쿠폰 코드)", "Guest coupon codes are not set up yet"]],
     [/closing_time/, ["오전 7:50~8:00은 마감 정산 시간이라 주문을 받지 않아요. 8시부터 다시 주문할 수 있어요", "Orders pause 7:50–8:00 AM for daily closing. Please order again from 8:00 AM"]],
+    [/jtv_only/, ["JTV 메뉴는 지정된 JTV 매장 주소로만 주문할 수 있어요 (지도 위치 확인)", "JTV menu can only be ordered to the listed JTV venues (check the map pin)"]],
     [/store_closed/, ["지금은 영업 종료라 주문을 받을 수 없어요", "We are closed right now — orders are not available"]],
     [/sold_out/, ["품절된 메뉴가 있습니다", "Some items are sold out"]],
     [/review_too_many/, ["확인 대기 중인 리뷰가 3개 있어요. 가게에서 확인한 뒤 다시 올려주세요", "You have 3 reviews waiting. Please wait until the store checks them"]],
