@@ -161,7 +161,7 @@ window.PALTONG_MENU_IMG = {
   spicysoy_boneless:  BONELESS_IMG["땡초간장"],
 
   /* JTV 세트 (메뉴판 사진에서 자름, 11/17) */
-  set_lady:           "images/menu/set_lady.jpg",            // 레이디스 세트
+  set_lady:           "images/menu/set_lady.jpg?v=2",        // 레이디스 세트 (국물닭발 + 양념치킨 + 치즈볼 사진 합침)
   set_beerfit:        "images/menu/set_beerfit.jpg",         // 비어핏 세트
   set_redsamgyeop:    "images/menu/set_redsamgyeop.jpg",     // 빨간 삼겹 세트
   set_jjikmeok:       "images/menu/set_jjikmeok.jpg",        // 찍먹세트
