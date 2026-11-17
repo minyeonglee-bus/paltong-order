@@ -120,6 +120,9 @@ let cust = Object.assign({ name:"", phone:"", addr:"", memo:"", payment:"gcash",
 function jtvSync(lat, lng){
   const on = !!(cust.otype !== "pickup" && PT.isJtvAt(lat, lng));
   if(!PT.setNoSale(on)) return false;
+  if(!on){ const jtvIds = new Set(MENU.filter(c => c.cat === "JTV").flatMap(c => c.items.map(it => it.id)));
+    const before = cart.length; cart = cart.filter(l => !jtvIds.has(l.id));
+    if(cart.length < before) setTimeout(() => toast(T("JTV 주소가 아니라서 JTV 메뉴를 장바구니에서 뺐어요","JTV menu removed — not a JTV address"), 4000), 0); }
   cart.forEach(l => { const p = PT.repriceLine(l); if(p != null) l.unitPrice = p; });
   try{ saveCart(); }catch(e){}
   try{ renderMenu(); refreshCartBar(); }catch(e){}
@@ -219,10 +222,10 @@ function renderMenu(){
   const closed = isClosed(); paintClosed(closed);
   /* 품절 메뉴는 원래 카테고리에서 빼서 맨 아래 '품절' 카테고리에 모음 · 메뉴가 전부 품절인 카테고리는 탭까지 숨김 */
   let vi = 0;
-  const outItems = MENU.flatMap(c => c.items.filter(it => soldOut[it.id]));
-  const cats = MENU.map(c => ({ ...c, items: c.items.filter(it => !soldOut[it.id]) }));
+  const outItems = MENU.filter(c => c.cat !== "JTV" || PT.noSale).flatMap(c => c.items.filter(it => soldOut[it.id]));
+  const cats = MENU.filter(c => c.cat !== "JTV" || PT.noSale).map(c => ({ ...c, items: c.items.filter(it => !soldOut[it.id]) }));   // JTV 메뉴는 JTV 주소에서만 보임
   /* 맨 위: 🆕 신메뉴 · 🔥 인기메뉴 (관리자가 표시한 메뉴가 모임 — 원래 카테고리에도 그대로 있음) */
-  const all = MENU.flatMap(c => c.items).filter(it => !soldOut[it.id]);
+  const all = MENU.filter(c => c.cat !== "JTV" || PT.noSale).flatMap(c => c.items).filter(it => !soldOut[it.id]);
   cats.unshift({ cat:"🔥 인기메뉴", catEn:"🔥 BEST", items: all.filter(it => it.isHot), featured: true });
   cats.unshift({ cat:"🆕 신메뉴", catEn:"🆕 NEW", items: all.filter(it => it.isNew), featured: true });
   /* JTV 분류는 맨 위 (사장님 11/17) */
