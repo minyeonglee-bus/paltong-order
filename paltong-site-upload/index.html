@@ -125,6 +125,37 @@ function jtvSync(lat, lng){
   try{ renderMenu(); refreshCartBar(); }catch(e){}
   return true;
 }
+/* 처음 들어오면 주소부터 (사장님 11/17) — 그 주소 기준 가격으로 메뉴를 보여주고, 주문할 때 자동으로 들어감 */
+function openAddrGate(){
+  const s = sheet({}); let w = null;
+  s.setRender(function render(){
+    s.el.innerHTML = `
+      <div class="sheet-head"><h3>📍 ${L("배달 주소를 먼저 알려주세요","Where should we deliver?")}</h3><button class="close-x">✕</button></div>
+      <p class="hint" style="margin:-4px 0 10px">${L("주문할 때 이 주소가 자동으로 들어가요. 지도에 위치를 꼭 찍어주세요.","This address is filled in automatically when you order. Please mark it on the map.")}</p>
+      <div id="gateSlot"></div>
+      <button class="primary-btn" id="gateOk" style="margin-top:12px">${L("이 주소로 메뉴 보기","Show menu for this address")}</button>
+      <button class="ghost-btn" id="gatePick">🏃 ${L("매장에서 픽업할게요","I'll pick up at the store")}</button>`;
+    if(!w) w = PTAddress.createAddressWidget({
+      saved: acct ? (acct.member.addresses || []) : [], pins: acct ? { ...(acct.member.addr_pins || {}) } : {},
+      initial: cust.addr, initialPin: cust.lat != null ? { lat: cust.lat, lng: cust.lng } : null, onChange: () => {} });
+    s.el.querySelector("#gateSlot").replaceWith(w.el);
+    s.el.querySelector(".close-x").onclick = () => { try{ sessionStorage.setItem("paltong_addr_gate", "1"); }catch(e){} s.close(); };
+    s.el.querySelector("#gateOk").onclick = () => {
+      const v = w.value();
+      if(v.error){ toast(v.error, 3000); w.focus && w.focus(v.focus); return; }
+      if(v.lat == null){ toast(T("지도에서 위치를 찍어주세요","Please mark your location on the map"), 3000); const pm = s.el.querySelector(".addr-pinmap"); if(pm) pm.click(); return; }
+      cust.addr = v.addr; cust.lat = v.lat; cust.lng = v.lng; cust.otype = "delivery"; saveCust();
+      s.close(); jtvSync(cust.lat, cust.lng); renderMenu();
+    };
+    s.el.querySelector("#gatePick").onclick = () => { cust.otype = "pickup"; saveCust(); s.close(); jtvSync(null, null); renderMenu(); };
+  });
+}
+function addrBarHtml(){
+  const txt = cust.otype === "pickup" ? `🏃 ${L("매장 픽업","Store pickup")}` : cust.addr ? `📍 ${esc(cust.addr)}` : `📍 ${L("배달 주소를 입력해주세요","Enter delivery address")}`;
+  return `<div class="addr-bar" style="display:flex;align-items:center;gap:8px;margin:0 0 12px;padding:10px 12px;border:1px solid var(--line);border-radius:12px;font-size:13px;background:var(--surface)">
+    <span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${txt}</span>
+    <button class="link-btn" data-addrbar style="font-size:13px;font-weight:700;color:var(--red-deep)">${L("변경","Change")}</button></div>`;
+}
 const saveCust = () => ss.set("paltong_cust", cust);
 /* ---- 예약 주문 (선택) — 날짜·시간은 마닐라 시간 기준 ---- */
 const mnlDay = (plusDays = 0) => new Date(Date.now() + plusDays * 864e5).toLocaleDateString("en-CA", { timeZone:"Asia/Manila" });
@@ -183,7 +214,8 @@ function unmetRequirement(){
   return null;
 }
 function renderMenu(){
-  tabsEl.innerHTML = ""; rootEl.innerHTML = "";
+  tabsEl.innerHTML = ""; rootEl.innerHTML = addrBarHtml();
+  { const ab = rootEl.querySelector("[data-addrbar]"); if(ab) ab.onclick = openAddrGate; }
   const closed = isClosed(); paintClosed(closed);
   /* 품절 메뉴는 원래 카테고리에서 빼서 맨 아래 '품절' 카테고리에 모음 · 메뉴가 전부 품절인 카테고리는 탭까지 숨김 */
   let vi = 0;
@@ -1303,8 +1335,13 @@ loadSoldOut();
 api.onMenuStatus(loadSoldOut);
 renderActiveOrders();
 loadAccount().then(pollInquiry);
-api.jtvPlaces && api.jtvPlaces().then(list => { PT.setJtvPlaces(list); jtvSync(cust.lat, cust.lng); }).catch(() => {});
-api.getSettings().then(st => { if(st){ const was = isClosed(); shopSettings = st; PTAddress.setGoogle(st.google_maps_key, st.google_map_id); if(was !== isClosed()) renderMenu(); } }).catch(() => {});
+const jtvReady = api.jtvPlaces ? api.jtvPlaces().then(list => { PT.setJtvPlaces(list); jtvSync(cust.lat, cust.lng); }).catch(() => {}) : Promise.resolve();
+const settingsReady = api.getSettings().then(st => { if(st){ const was = isClosed(); shopSettings = st; PTAddress.setGoogle(st.google_maps_key, st.google_map_id); if(was !== isClosed()) renderMenu(); } }).catch(() => {});
+/* 처음 온 손님 (저장된 주소 없음) → 주소부터 */
+Promise.all([jtvReady, settingsReady]).then(() => {
+  let skipped = false; try{ skipped = sessionStorage.getItem("paltong_addr_gate") === "1"; }catch(e){}
+  if(!cust.addr && cust.otype !== "pickup" && !skipped && !new URLSearchParams(location.search).get("order")) openAddrGate();
+});
 try{ api.onSettings && api.onSettings(reloadStoreStatus); }catch(e){}
 setInterval(reloadStoreStatus, 60000);
 document.addEventListener("visibilitychange", () => { if(!document.hidden) reloadStoreStatus(); });
