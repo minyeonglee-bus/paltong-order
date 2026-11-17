@@ -20,6 +20,9 @@ const OPT_PART  = (d1=0) => ({ title:"부위", titleEn:"Type", choices:[{label:"
 const OPT_SPICE = { title:"맵기", titleEn:"Spice level", choices:[{label:"보통",en:"Regular",delta:0},{label:"덜맵게",en:"Less spicy",delta:0},{label:"더맵게",en:"Extra spicy",delta:0}] };
 const OPT_SIZE  = (d) => ({ title:"마리수", titleEn:"Size", choices:[{label:"반마리",en:"Half",delta:0},{label:"한마리",en:"Whole",delta:d}] });
 
+/* 주먹밥 날치알 추가 +₱50 (사장님 2026-11-17, 사이트 메뉴는 menu_config 에도 넣음) */
+const OPT_ROE = { title:"추가", titleEn:"Add", required:false, choices:[{label:"날치알",en:"Flying fish roe",delta:50}] };
+
 /* 셀프 볶음밥은 이 메뉴 중 하나를 같이 주문해야 합니다 (남은 양념에 볶아드리는 메뉴) */
 const FRIED_RICE_BASE = ["dakdoritang", "gukmuldakbal", "gomjangeo"];
 
@@ -83,8 +86,8 @@ window.PALTONG_MENU = [
   {
     cat: "주먹밥류", catEn: "RICE BALL",
     items: [
-      { id:"tunamayo", name:"참치 마요", en:"Tuna Mayo", price:250 },
-      { id:"redtuna", name:"빨간 참치", en:"Spicy Tuna", price:250 },
+      { id:"tunamayo", name:"참치 마요", en:"Tuna Mayo", price:250, options:[OPT_ROE] },
+      { id:"redtuna", name:"빨간 참치", en:"Spicy Tuna", price:250, options:[OPT_ROE] },
       { id:"nalchial", name:"날치알", en:"Flying Fish Roe", price:240 },
       { id:"selfball", name:"셀프 주먹밥", en:"DIY Rice Ball", price:200 },
       { id:"selfbokkeum", name:"셀프 볶음밥", en:"DIY Fried Rice", price:100, requires: FRIED_RICE_BASE },

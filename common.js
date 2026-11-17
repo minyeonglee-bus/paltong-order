@@ -241,8 +241,9 @@ function optList(l){
     const g = o.note ? null : gs[o.g ?? i];
     const c = g ? (o.c != null ? g.choices[o.c] : g.choices.find(c => c.label === o.ko || (c.en || c.label) === o.en)) : null;
     const n = o.n || 1;
-    return { ko: o.ko, en: o.en || o.ko, n, delta: (c && c.delta || 0) * n, gko: g ? g.title || "" : "", gen: g ? g.titleEn || g.title || "" : "", note: !!o.note,
-      extra: !!(c && c.delta) || (g && o.c != null && o.c > 0) };   // extra = 추가금 있거나 기본(첫 번째) 선택이 아님 → 눈에 띄게
+    const d = o.d != null ? +o.d || 0 : (c && c.delta || 0);   // o.d = 붙여넣은 플랫폼 주문의 옵션 금액
+    return { ko: o.ko, en: o.en || o.ko, n, delta: d * n, gko: g ? g.title || "" : "", gen: g ? g.titleEn || g.title || "" : "", note: !!o.note,
+      extra: !!d || (g && o.c != null && o.c > 0) || (!!o.note && o.d != null) };   // extra = 추가금 있거나 기본(첫 번째) 선택이 아님 → 눈에 띄게
   });
 }
 /* 화면용 옵션 한 줄: 순살 • 한마리 • 양념 (그룹 이름 없이) — 기본 아닌 선택·추가금은 주황색 굵게 (사장님 2026-11-17) */
@@ -255,9 +256,9 @@ function optChips(l, en){
 }
 /* 단가 풀이: 기본 ₱550 + 옵션 ₱420 = ₱970 × 4 */
 function unitBreak(l, en){
-  const it = ITEM_BY_ID[l.id], add = optList(l).reduce((s, o) => s + o.delta, 0);
-  if(!it || !add || isSvc(l) || l.unitPrice !== it.price + add) return l.qty > 1 && !isSvc(l) ? `${peso(l.unitPrice)} × ${l.qty}` : "";
-  return `${peso(it.price)} + ${en ? "option" : "옵션"} ${peso(add)} = ${peso(l.unitPrice)}${l.qty > 1 ? ` × ${l.qty}` : ""}`;
+  const it = ITEM_BY_ID[l.id], add = optList(l).reduce((s, o) => s + o.delta, 0), base = l.base != null ? +l.base : it ? it.price : null;
+  if(base == null || !add || isSvc(l) || l.unitPrice !== base + add) return l.qty > 1 && !isSvc(l) ? `${peso(l.unitPrice)} × ${l.qty}` : "";
+  return `${peso(base)} + ${en ? "option" : "옵션"} ${peso(add)} = ${peso(l.unitPrice)}${l.qty > 1 ? ` × ${l.qty}` : ""}`;
 }
 
 /* ---------------- 이미지 압축 (영수증 사진) ---------------- */

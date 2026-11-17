@@ -2945,6 +2945,31 @@ function parseMenuLine(raw, ADDRISH){
               : { id: "ext_" + Math.random().toString(36).slice(2, 9), name: nm, en: nm, opts: [], qty: q, unitPrice: u, custom: true, pasted: true };
   }
 }
+/* 배달 플랫폼 주문 줄: "🍲 순살 땡초간장 치킨 550 ₱ ( 한마리 +420 ₱ ) x 4" → 메뉴 + 옵션(금액) + 수량 (사장님 2026-11-17)
+   가격은 플랫폼 금액 그대로 (단가 = 기본 + 옵션), 메뉴판에 없는 옵션은 메모 옵션으로 금액과 같이 */
+const PLAT_SYN = [[/닭볶음탕/g, "닭도리탕"]];
+function parsePlatformLine(line, aliases){
+  const m = String(line).match(/^(.+?)\s+(\d[\d,]*)\s*₱\s*(?:\(\s*([^)]*?)\s*\))?\s*[x×]\s*(\d{1,3})\s*$/i);
+  if(!m) return null;
+  let name = m[1].replace(/\p{Extended_Pictographic}|\uFE0F/gu, " ").replace(/\s{2,}/g, " ").trim();
+  if(!/[A-Za-z가-힣]/.test(name)) return null;
+  const base = +m[2].replace(/,/g, ""), qty = Math.max(1, Math.min(99, +m[4]));
+  const raw = (m[3] || "").split(/\s*[,/]\s*(?![^(]*\))/).map(x => x.trim()).filter(Boolean)
+    .map(x => { const mm = x.match(/^(.*?)\s*\+\s*(\d[\d,]*)\s*₱?$/); return mm ? { label: mm[1].trim(), d: +mm[2].replace(/,/g, "") } : { label: x, d: 0 }; });
+  let look = name; PLAT_SYN.forEach(([re, to]) => { look = look.replace(re, to); });
+  let it = menuMatch(look);
+  if(!it){ const hits = menuScan(look, aliases).filter(Boolean).sort((a, b) => String(b.name).length - String(a.name).length); if(hits.length) it = MENU.flatMap(c => c.items).find(x => x.id === hits[0].id) || null; }
+  if(!it) return { id: "ext_" + Math.random().toString(36).slice(2, 9), name, en: name, qty, unitPrice: base + raw.reduce((a, o) => a + o.d, 0), base, custom: true, pasted: true,
+    opts: raw.map(o => ({ ko: o.label, en: o.label, note: true, d: o.d })) };
+  const { opts } = pickOpts(it, look + " " + raw.map(o => o.label).join(" "));
+  const used = new Set();
+  raw.forEach(o => {   // 플랫폼 옵션 → 메뉴판 선택지에 맞으면 그 선택지(금액은 플랫폼 것), 아니면 메모 옵션
+    const k = MN(o.label), hit = opts.find(x => !used.has(x) && [MN(x.ko), MN(x.en)].includes(k));
+    if(hit){ used.add(hit); hit.d = o.d; } else opts.push({ ko: o.label, en: o.label, note: true, d: o.d });
+  });
+  opts.forEach(x => { if(x.d == null) x.d = 0; });   // 이름에서 고른 옵션(무뼈·순살)은 플랫폼 가격에 이미 들어 있음
+  return { id: it.id, name: it.name, en: it.en || it.name, opts, qty, unitPrice: base + raw.reduce((a, o) => a + o.d, 0), base, pasted: true };
+}
 /* 카톡·문자·페이스북 메시지를 통째로 붙여넣으면 이름·연락처·주소·위치·금액·요청사항을 나눠 줌 */
 function parseOrderPaste(raw){
   const out = { memo: [] }, text = String(raw || "").replace(/\r/g, "");
@@ -2953,10 +2978,10 @@ function parseOrderPaste(raw){
   const LBL = [
     ["name",    /^(?:이름|성함|성명|고객명?|손님|받는\s*(?:분|사람)|수령인|주문자|name|customer|recipient|receiver)\s*[:：=\-]?\s*/i],
     ["phone",   /^(?:연락처|전화(?:번호)?|휴대폰|핸드폰|폰|번호|phone|mobile|contact(?:\s*no\.?)?|tel|cp|number|viber|whatsapp)\s*[:：=\-]?\s*/i],
-    ["addr",    /^(?:주소|배달\s*주소|배송지|도착지|위치|장소|호텔|콘도|address|addr|location|drop[\s-]?off|deliver(?:y)?\s*(?:to|address)|hotel|condo)\s*[:：=\-]?\s*/i],
+    ["addr",    /^(?:주소|입력\s*주소|배달\s*주소|배송지|도착지|위치|장소|호텔|콘도|address|addr|location|drop[\s-]?off|deliver(?:y)?\s*(?:to|address)|hotel|condo)\s*[:：=\-]?\s*/i],
     ["fee",     /^(?:배달\s*(?:비|료|팁)|배송비|delivery(?:\s*(?:fee|charge))?|del\.?\s*fee|rider\s*fee|fee|df)\s*[:：=\-]?\s*/i],
     ["amount",  /^(?:음식\s*(?:값|비|금액)|메뉴\s*(?:합계|금액)|food(?:\s*(?:total|amount))?|subtotal|sub-total)\s*[:：=\-]?\s*/i],
-    ["total",   /^(?:=\s*)?(?:금액|합계|총\s*(?:액|금액|합계)?|결제\s*금액|가격|grand\s*total|total(?:\s*amount)?|amount(?:\s*due)?|price)\s*[:：=\-]?\s*/i],
+    ["total",   /^(?:=\s*)?(?:최종\s*결제\s*금액|금액|합계|총\s*(?:액|금액|합계)?|결제\s*금액|가격|grand\s*total|total(?:\s*amount)?|amount(?:\s*due)?|price)\s*[:：=\-]?\s*/i],
     ["payment", /^(?:결제(?:\s*방법)?|지불|payment|pay(?:ment)?\s*method|mop)\s*[:：=\-]?\s*/i],
     ["memo",    /^(?:요청(?:사항)?|메모|비고|참고|기사님께|note|notes|remarks?|request|instructions?|landmark)\s*[:：=\-]?\s*/i],
   ];
@@ -2999,6 +3024,7 @@ function parseOrderPaste(raw){
     line = line.replace(/\b[23456789CFGHJMPQRVWX]{2,8}\+[23456789CFGHJMPQRVWX]{2,3}\b,?\s*/i, "").trim(); if(!line) continue;   // 플러스코드는 좌표로 씀
     if(/^(?:₱|php\.?|p)?\s?[\d,]+(?:\.\d+)?\s?(?:페소|pesos?)?$/i.test(line)) continue;   // 금액만 있는 줄
     if(!NOT_ITEM.test(line) && (!ADDRISH.test(line) || priceTokens(line).length)){
+      const pf = parsePlatformLine(line, aliases); if(pf){ out.items.push(pf); continue; }   // 배달 플랫폼 형식 "… 550 ₱ ( 한마리 +420 ₱ ) x 4"
       const found = menuScan(line, aliases);   // 메뉴판 메뉴 (이름이 조금 달라도 · 한 줄에 여러 개 · 가격 없어도)
       if(found.length){ out.items.push(...found); continue; }
     }
