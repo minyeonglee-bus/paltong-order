@@ -242,7 +242,7 @@ function optList(l){
     const c = g ? (o.c != null ? g.choices[o.c] : g.choices.find(c => c.label === o.ko || (c.en || c.label) === o.en)) : null;
     const n = o.n || 1;
     const d = o.d != null ? +o.d || 0 : (c && c.delta || 0);   // o.d = 붙여넣은 플랫폼 주문의 옵션 금액
-    return { ko: o.ko, en: o.en || o.ko, n, delta: d * n, gko: g ? g.title || "" : "", gen: g ? g.titleEn || g.title || "" : "", note: !!o.note,
+    return { ko: o.ko, en: o.en || o.ko, n, delta: d * n, gko: g ? g.title || "" : "", gen: g ? g.titleEn || g.title || "" : "", note: !!o.note && o.d == null,
       extra: !!d || (g && o.c != null && o.c > 0) || (!!o.note && o.d != null) };   // extra = 추가금 있거나 기본(첫 번째) 선택이 아님 → 눈에 띄게
   });
 }

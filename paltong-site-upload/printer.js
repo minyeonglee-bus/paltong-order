@@ -67,7 +67,7 @@ function drawReceipt(o, copyLabel, kitchen){
     hr();
     (o.items || []).forEach(l => {
       row(`${PT.isSvc(l) ? "[FREE] " : ""}${nameEn(l)}`, `×${l.qty}`, { size:34, bold:true });
-      if(l.opts && l.opts.length) text("  - " + l.opts.map(optEn).join(", "), { size:26 });
+      if(PT.optList(l).length) text("   >> " + PT.optList(l).map(x => { const t = x.en + (x.n > 1 ? " x" + x.n : ""); return x.extra ? t.toUpperCase() : t; }).join(" • "), { size:30, bold:true });   // 순살 • 한마리 • 양념 (2026-11-17)
       y += 4;
     });
     hr();
@@ -87,10 +87,9 @@ function drawReceipt(o, copyLabel, kitchen){
     const it = ITEM_BY_ID[l.id] || {};
     const svc = PT.isSvc(l);
     row(`${svc ? B("[서비스]", "[FREE]") + " " : ""}${en ? nameEn(l) : (l.name || it.name)} x${l.qty}`, svc ? "FREE" : peso(l.unitPrice * l.qty), { size:24, bold:true });
-    const sub = en
-      ? [...(l.opts || []).map(optEn), svc && l.origUnit ? `(${peso(l.origUnit * l.qty)})` : ""].filter(Boolean).join(" · ")
-      : [l.en || it.en || "", ...(l.opts || []).map(x => x.ko === x.en ? x.ko : `${x.ko}/${x.en}`), svc && l.origUnit ? `(${peso(l.origUnit * l.qty)})` : ""].filter(Boolean).join(" · ");
+    const sub = [en ? "" : l.en || it.en || "", svc && l.origUnit ? `(${peso(l.origUnit * l.qty)})` : ""].filter(Boolean).join(" · ");
     if(sub) text("  " + sub, { size:19 });
+    if(PT.optList(l).length) text("   ▶ " + PT.optLine(l, en) + (!en && PT.optLine(l, false, false) !== PT.optLine(l, true, false) ? " / " + PT.optLine(l, true, false) : ""), { size:21, bold:true });
   });
   hr();
   if((o.items || []).some(PT.isSvc)) row(B("서비스", "Service"), PT.svcValue(o) ? `${peso(PT.svcValue(o))} FREE` : "FREE", { bold:true });

@@ -240,6 +240,34 @@ function lineOpt(l){
   if(!l.opts || !l.opts.length) return "";
   return l.opts.map(o => T(o.ko, o.en)).join(", ");
 }
+/* 옵션을 한 줄씩: 그룹 이름(마리수·부위·맵기…) + 고른 것 + 추가 금액 — 직원들이 헷갈리지 않게 (사장님 2026-11-17) */
+function optList(l){
+  const it = ITEM_BY_ID[l.id] || {}, gs = it.options || [];
+  return (l.opts || []).map((o, i) => {
+    const g = o.note ? null : gs[o.g ?? i];
+    const c = g ? (o.c != null ? g.choices[o.c] : g.choices.find(c => c.label === o.ko || (c.en || c.label) === o.en)) : null;
+    const n = o.n || 1;
+    if(o.req) return { ko: "📝 " + o.req, en: "📝 " + o.req, n: 1, delta: 0, gko: "", gen: "", note: true, req: true, extra: true };
+    const d = o.d != null ? +o.d || 0 : (c && c.delta || 0);   // o.d = 붙여넣은 플랫폼 주문의 옵션 금액
+    return { ko: o.ko, en: o.en || o.ko, n, delta: d * n, gko: g ? g.title || "" : "", gen: g ? g.titleEn || g.title || "" : "", note: !!o.note && o.d == null,
+      extra: !!d || (g && o.c != null && o.c > 0) || (!!o.note && o.d != null) };   // extra = 추가금 있거나 기본(첫 번째) 선택이 아님 → 눈에 띄게
+  });
+}
+/* 화면용 옵션 한 줄: 순살 • 한마리 • 양념 (그룹 이름 없이) — 기본 아닌 선택·추가금은 주황색 굵게 (사장님 2026-11-17) */
+const optName = (o, en, amt = true) => (o.note && !o.req ? "📝 " : "") + (en ? o.en : o.ko) + (o.n > 1 ? ` ×${o.n}` : "") + (amt && o.delta ? `(+${peso(o.delta)})` : "");   // 순살(+₱50) · 추가금 없으면 금액 생략
+const optLine = (l, en, amt = true) => optList(l).map(o => optName(o, en, amt)).join(" • ");
+function optChips(l, en){
+  const os = optList(l); if(!os.length) return "";
+  return `<div class="optline" style="margin:3px 0 1px;padding:2px 9px;display:table;border-radius:8px;background:#fff6dd;border:1px solid #f0c25a;font-size:14px;line-height:1.5">${os.map(o =>
+    o.extra ? `<b style="color:#b85c00">${esc(optName(o, en))}</b>` : `<span style="color:#444">${esc(optName(o, en))}</span>`).join(`<span style="color:#c9a24a"> • </span>`)}</div>`;
+}
+/* 단가 풀이: 기본 ₱550 + 옵션 ₱420 = ₱970 × 4 */
+function unitBreak(l, en){
+  const it = ITEM_BY_ID[l.id], add = optList(l).reduce((s, o) => s + o.delta, 0), base = l.base != null ? +l.base : it ? it.price : null;
+  if(base == null || !add || isSvc(l) || l.unitPrice !== base + add) return l.qty > 1 && !isSvc(l) ? `${peso(l.unitPrice)} × ${l.qty}` : "";
+  return `${peso(base)} + ${en ? "option" : "옵션"} ${peso(add)} = ${peso(l.unitPrice)}${l.qty > 1 ? ` × ${l.qty}` : ""}`;
+}
+
 
 /* ---------------- 이미지 압축 (영수증 사진) ---------------- */
 async function compressImage(file, maxSide = 1600, quality = 0.82){
@@ -1312,7 +1340,7 @@ function kitchenHTML(o){
     <div class="c">${esc(fmt(o.created_at))}</div>
     <div class="hr"></div>
     ${(o.items || []).map(l => `<div class="row xl b"><span>${isSvc(l) ? "[FREE] " : ""}${esc(nameEnOf(l))}</span><span>×${l.qty}</span></div>
-      ${l.opts && l.opts.length ? `<div class="lg" style="margin:0 0 1.2mm 2mm">- ${esc(l.opts.map(x => x.en || x.ko).join(", "))}</div>` : ""}`).join("")}
+      ${optList(l).length ? `<div class="lg b" style="margin:0 0 1.2mm 3mm">&gt;&gt; ${esc(optList(l).map(x => x.extra ? String(optName(x, true, false)).toUpperCase() : optName(x, true, false)).join(" • "))}</div>` : ""}`).join("")}
     <div class="hr"></div>
     ${o.memo ? `<div class="memo lg"><span class="b">Note:</span> ${esc(o.memo_en || o.memo)}</div>` : ""}
     <div class="feed"></div></div>`;
@@ -1329,7 +1357,7 @@ function hallHTML(o, copyLabel, p){
     <div class="c">${esc(fmt(o.created_at))}</div>
     <div class="hr"></div>
     ${(o.items || []).map(l => `<div class="row"><span class="b">${isSvc(l) ? "[FREE] " : ""}${esc(nameEnOf(l))} x${l.qty}</span><span${isSvc(l) ? ' class="b"' : ""}>${isSvc(l) ? "FREE" : peso(l.unitPrice * l.qty)}</span></div>
-      ${l.opts && l.opts.length ? `<div class="sub">${esc(l.opts.map(x => x.en || x.ko).join(", "))}</div>` : ""}`).join("")}
+      ${optList(l).length ? `<div class="sub b">&nbsp;&nbsp;▶ ${esc(optLine(l, true))}</div>` : ""}`).join("")}
     <div class="hr"></div>
     ${svcValue(o) ? `<div class="row b"><span>Service</span><span>${peso(svcValue(o))} FREE</span></div>` : ""}
     <div class="row"><span>Subtotal</span><span>${peso(o.subtotal)}</span></div>
@@ -1368,7 +1396,8 @@ function receiptDoc(orders, copies = "auto"){
       ${(o.items||[]).map(l => {
         const it = ITEM_BY_ID[l.id] || {};
         return `<div class="row"><span class="b">${isSvc(l) ? "[서비스 SERVICE] " : l.added ? "[추가 ADD] " : ""}${esc(l.name || it.name)} x${l.qty}</span><span${isSvc(l) ? ' class="b"' : ""}>${isSvc(l) ? "FREE" : peso(l.unitPrice * l.qty)}</span></div>
-        <div class="sub">${esc(l.en || it.en || "")}${l.opts && l.opts.length ? " · " + esc(l.opts.map(x => x.ko === x.en ? x.ko : x.ko + "/" + x.en).join(", ")) : ""}${isSvc(l) && l.origUnit ? ` · (${peso(l.origUnit * l.qty)})` : ""}</div>`;
+        <div class="sub">${esc(l.en || it.en || "")}${isSvc(l) && l.origUnit ? ` · (${peso(l.origUnit * l.qty)})` : ""}</div>
+        ${optList(l).length ? `<div class="sub b">&nbsp;&nbsp;▶ ${esc(optLine(l, false))}${optLine(l, false, false) !== optLine(l, true, false) ? " / " + esc(optLine(l, true, false)) : ""}</div>` : ""}`;
       }).join("")}
       <div class="hr"></div>
       ${svcValue(o) ? `<div class="row b"><span>서비스 Service</span><span>${peso(svcValue(o))} FREE</span></div>` : (o.items || []).some(isSvc) ? `<div class="row b"><span>서비스 Service</span><span>FREE</span></div>` : ""}
@@ -1448,5 +1477,5 @@ function contactHTML(){
     CFG.VIBER_PHONE ? `Viber·WhatsApp: <a href="https://wa.me/${num(CFG.VIBER_PHONE)}" target="_blank" rel="noopener"><b>${esc(CFG.VIBER_PHONE)}</b></a>` : ""].filter(Boolean).join("<br>");
 }
 window.PT = { contactLines, contactHTML, PRINT_SETS, PRINT_SETS_EN, KIND_LABEL, printKinds, manilaDay, bizDay, bizStart, DAY_START_HOUR, orderDay, get menuCfgActive(){ return menuCfgActive; }, loadMenuData, exportMenu, priceSig, politeKo, CATS, get menuOv(){ return menuOv; }, applyMenuOverrides, cleanForTranslate, setTranslateKey, googleTranslate, splitKoEn, msgText, schedLabel, menuToEnglish, matchZone, zoneFee, phoneMask, phoneValue, phoneOk, phoneDigits, phoneFmt, englishOnly, EN_NAME, EN_ADDR, hasHangul, stampRewards, stampText, isMemberPhone, normPhone, phoneEmail, prettyPhone, couponDiscount, couponValue, couponFace, couponsFace, couponCond, couponUsable, COUPON_KINDS, couponKind, stackKey, stackMax, couponStackOk, couponsDiscount, bestCoupons, stackRulesText, repriceLine, errMsg, CFG, MENU, ITEM_BY_ID, esc, peso, ls, L, T, setLang, get LANG(){ return LANG; },
-  orderPrefix, orderCode, isDine, inClosingWindow, isSvc, svcValue, riderPhone, riderEmail, STATUS, payInfo, isOnlinePay, lineName, lineOpt, compressImage, api, DEMO, receiptDoc, printReceipt, toast };
+  orderPrefix, orderCode, isDine, inClosingWindow, isSvc, svcValue, riderPhone, riderEmail, STATUS, payInfo, isOnlinePay, lineName, lineOpt, optList, optLine, optChips, unitBreak, compressImage, api, DEMO, receiptDoc, printReceipt, toast };
 })();
