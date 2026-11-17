@@ -2,6 +2,8 @@
 create table if not exists public.jtv_places (
   id serial primary key, name text not null, addr text, lat double precision not null, lng double precision not null,
   radius_m integer not null default 80, map_url text, active boolean not null default true, created_at timestamptz default now());
+alter table public.jtv_places add column if not exists pick boolean not null default true;   -- 손님 선택 버튼에 보임
+alter table public.jtv_places add column if not exists sort int;
 alter table public.jtv_places enable row level security;
 drop policy if exists jtv_places_read on public.jtv_places;
 create policy jtv_places_read on public.jtv_places for select using (active);
@@ -20,6 +22,12 @@ begin
                  where e.it->>'id' in (select i->>'id' from menu_config m, jsonb_array_elements(m.data) c, jsonb_array_elements(c->'items') i where m.id=1 and c->>'cat'='JTV'))
     into v_has;
   if v_has and not v_at then raise exception 'jtv_only'; end if;
+  -- 1-2) JTV 장소 주문은 음료(분류 '주류 및 음료') 불가 (사장님 11/17 23:52) — 수정 때는 새로 들어온 음료만
+  if v_at and exists (select 1 from jsonb_array_elements(coalesce(new.items,'[]')) e(it)
+       where e.it->>'id' in (select i->>'id' from menu_config m, jsonb_array_elements(m.data) c, jsonb_array_elements(c->'items') i where m.id=1 and c->>'cat'='주류 및 음료')
+         and (tg_op = 'INSERT' or not exists (select 1 from jsonb_array_elements(coalesce(old.items,'[]')) o(it) where o.it->>'id' = e.it->>'id'))) then
+    raise exception 'jtv_drink';
+  end if;
   -- 2) 손님 웹 주문이 JTV 장소로 가면 기존 메뉴 할인 없이 정가 (사장님 11/17)
   if v_at and coalesce(new.source,'web') = 'web' then
     for l in select * from jsonb_array_elements(coalesce(new.items,'[]')) loop

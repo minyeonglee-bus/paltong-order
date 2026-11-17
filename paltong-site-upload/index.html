@@ -123,11 +123,17 @@ function jtvSync(lat, lng){
   if(!on){ const jtvIds = new Set(MENU.filter(c => c.cat === "JTV").flatMap(c => c.items.map(it => it.id)));
     const before = cart.length; cart = cart.filter(l => !jtvIds.has(l.id));
     if(cart.length < before) setTimeout(() => toast(T("JTV 주소가 아니라서 JTV 메뉴를 장바구니에서 뺐어요","JTV menu removed — not a JTV address"), 4000), 0); }
+  if(on){ const drinkIds = new Set(MENU.filter(c => c.cat === DRINK_CAT).flatMap(c => c.items.map(it => it.id)));
+    const before = cart.length; cart = cart.filter(l => !drinkIds.has(l.id));
+    if(cart.length < before) setTimeout(() => toast(T("JTV 주문은 음료를 살 수 없어서 장바구니에서 뺐어요","Drinks removed — not available for JTV orders"), 4000), 0); }
   cart.forEach(l => { const p = PT.repriceLine(l); if(p != null) l.unitPrice = p; });
   try{ saveCart(); }catch(e){}
   try{ renderMenu(); refreshCartBar(); }catch(e){}
   return true;
 }
+/* JTV 주문은 음료 구매 불가 (사장님 11/17 23:52) */
+const DRINK_CAT = "주류 및 음료";
+const jtvBlocked = item => item.cat === "JTV" ? !PT.noSale : (item.cat === DRINK_CAT && PT.noSale);
 /* JTV 매장 3곳은 주소 대신 골라서 선택 (사장님 11/17 23:35) */
 const jtvPick = () => cust.otype !== "pickup" && cust.jtvId != null ? PT.jtvPicks().find(p => p.id === cust.jtvId) || null : null;
 const jtvLabel = p => `${p.name} · ${p.addr}`;
@@ -412,7 +418,7 @@ function openItem(item){
     s.el.innerHTML = `
       <div class="sheet-head item-title"><div><h3 class="it-ko">${esc(item.name)}</h3>${itemSubLine(item) ? `<div class="it-en">${esc(itemSubLine(item))}</div>` : ""}</div><button class="close-x" aria-label="close">✕</button></div>
       ${itemImg(item, sel) ? `<div class="item-photo"><img src="${esc(itemImg(item, sel))}" alt="${esc(item.name)}" onerror="this.parentNode.remove()"></div>` : ""}
-      ${item.cat === "JTV" && !PT.noSale ? `<div style="margin:0 0 10px;padding:10px 12px;border-radius:12px;background:#b3261e;color:#fff;font-weight:700;font-size:14px">🚫 ${L("배달 지역이 아니에요 — JTV 매장 주소에서만 주문 가능","Not in delivery area — JTV venues only")}</div>` : ""}
+      ${jtvBlocked(item) ? `<div style="margin:0 0 10px;padding:10px 12px;border-radius:12px;background:#b3261e;color:#fff;font-weight:700;font-size:14px">🚫 ${item.cat === "JTV" ? L("배달 지역이 아니에요 — JTV 매장 주소에서만 주문 가능","Not in delivery area — JTV venues only") : L("JTV 주문은 음료를 살 수 없어요","Drinks are not available for JTV orders")}</div>` : ""}
       <div class="item-price detail-price">${item.onSale ? `<s class="was">${peso(item.listPrice)}</s> ` : ''}${peso(item.price)}${hasRange(item) ? ' ~' : ''}</div>
       ${groups.map((g,gi) => `
         <div class="opt-group"><div class="opt-title">${L(g.title, g.titleEn)}${tagHtml(g)}${isMulti(g) ? ` <span class="en">(${esc(T(`최대 ${g.max}개`, `up to ${g.max}`))})</span>` : ''}</div>
@@ -432,7 +438,9 @@ function openItem(item){
       <div class="qty-row"><div class="opt-title" style="margin:0">${L("수량","Quantity")}</div>
         <div class="qty-ctrl"><button data-a="dec">−</button><span>${qty}</span><button data-a="inc">+</button></div></div>
       <div class="sum-row total"><span>${L("금액","Amount")}</span><b>${peso(unit()*qty)}</b></div>
-      ${item.cat === "JTV" && !PT.noSale
+      ${jtvBlocked(item) && item.cat !== "JTV"
+        ? `<button class="primary-btn" style="margin-top:14px;background:#777">🚫 ${L("JTV 주문은 음료 구매 불가","No drinks for JTV orders")}</button>`
+        : jtvBlocked(item)
         ? `<button class="primary-btn" style="margin-top:14px;background:#777">🚫 ${L("배달 지역이 아니에요","Not in delivery area")}</button>
            <p class="hint" style="text-align:center;margin:8px 0 0">${L("JTV 메뉴는 JTV 매장을 선택해야 주문할 수 있어요 (메뉴 위 주소 → 변경)","Choose your JTV venue to order (address bar → Change)")}</p>`
         : `<button class="primary-btn" style="margin-top:14px">${L("장바구니 담기","Add to cart")}</button>`}`;
@@ -457,6 +465,7 @@ function openItem(item){
     s.el.querySelector('[data-a="inc"]').onclick = () => { qty++; render(); };
     s.el.querySelector(".close-x").onclick = s.close;
     s.el.querySelector(".primary-btn").onclick = () => {
+      if(jtvBlocked(item) && item.cat !== "JTV"){ toast(T("JTV 주문은 음료를 살 수 없어요","Drinks are not available for JTV orders"), 3500); return; }
       if(item.cat === "JTV" && !PT.noSale){   // JTV 메뉴: JTV 주소가 아니면 못 담음 (사장님 11/17)
         toast(T("배달 지역이 아니에요 — JTV 매장을 선택해주세요","Not in delivery area — please choose your JTV venue"), 3500);
         s.close(); openAddrGate();

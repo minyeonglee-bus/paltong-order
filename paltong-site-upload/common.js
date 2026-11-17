@@ -517,6 +517,7 @@ function errMsg(e){
     [/coupon_code_member/, ["회원은 쿠폰 코드를 등록한 뒤 쿠폰함에서 골라 써주세요", "Members: add the code first, then pick it from your coupons"]],
     [/check_coupon_code|coupon_code.*(function|column)/i, ["가게에서 48단계 설치가 필요해요 (비회원 쿠폰 코드)", "Guest coupon codes are not set up yet"]],
     [/closing_time/, ["오전 7:50~8:00은 마감 정산 시간이라 주문을 받지 않아요. 8시부터 다시 주문할 수 있어요", "Orders pause 7:50–8:00 AM for daily closing. Please order again from 8:00 AM"]],
+    [/jtv_drink/, ["JTV 매장 주문은 음료를 살 수 없어요. 장바구니에서 음료를 빼주세요", "Drinks are not available for JTV orders. Please remove them from your cart"]],
     [/jtv_price/, ["JTV 주소 주문은 정가로 계산돼요. 화면을 새로고침한 뒤 다시 주문해주세요", "Orders to JTV venues use regular prices. Please refresh and order again"]],
     [/jtv_only/, ["JTV 메뉴는 지정된 JTV 매장 주소로만 주문할 수 있어요 (지도 위치 확인)", "JTV menu can only be ordered to the listed JTV venues (check the map pin)"]],
     [/store_closed/, ["지금은 영업 종료라 주문을 받을 수 없어요", "We are closed right now — orders are not available"]],
