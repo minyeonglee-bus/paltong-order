@@ -246,8 +246,8 @@ function optList(l){
   });
 }
 /* 화면용 옵션 한 줄: 순살 • 한마리 • 양념 (그룹 이름 없이) — 기본 아닌 선택·추가금은 주황색 굵게 (사장님 2026-11-17) */
-const optName = (o, en) => (o.note ? "📝 " : "") + (en ? o.en : o.ko) + (o.n > 1 ? ` ×${o.n}` : "");
-const optLine = (l, en) => optList(l).map(o => optName(o, en)).join(" • ");
+const optName = (o, en, amt = true) => (o.note ? "📝 " : "") + (en ? o.en : o.ko) + (o.n > 1 ? ` ×${o.n}` : "") + (amt && o.delta ? `(+${peso(o.delta)})` : "");   // 순살(+₱50) · 추가금 없으면 금액 생략
+const optLine = (l, en, amt = true) => optList(l).map(o => optName(o, en, amt)).join(" • ");
 function optChips(l, en){
   const os = optList(l); if(!os.length) return "";
   return `<div class="optline" style="margin:3px 0 1px;padding:2px 9px;display:table;border-radius:8px;background:#fff6dd;border:1px solid #f0c25a;font-size:14px;line-height:1.5">${os.map(o =>
@@ -1236,7 +1236,7 @@ function kitchenHTML(o){
     <div class="c">${esc(fmt(o.created_at))}</div>
     <div class="hr"></div>
     ${(o.items || []).map(l => `<div class="row xl b"><span>${isSvc(l) ? "[FREE] " : l.added ? "[ADD] " : ""}${esc(nameEnOf(l))}</span><span>×${l.qty}</span></div>
-      ${optList(l).length ? `<div class="lg b" style="margin:0 0 1.2mm 3mm">&gt;&gt; ${esc(optList(l).map(x => x.extra ? String(optName(x, true)).toUpperCase() : optName(x, true)).join(" • "))}</div>` : ""}`).join("")}
+      ${optList(l).length ? `<div class="lg b" style="margin:0 0 1.2mm 3mm">&gt;&gt; ${esc(optList(l).map(x => x.extra ? String(optName(x, true, false)).toUpperCase() : optName(x, true, false)).join(" • "))}</div>` : ""}`).join("")}
     <div class="hr"></div>
     ${o.memo ? `<div class="memo lg"><span class="b">Note:</span> ${esc(o.memo_en || o.memo)}</div>` : ""}
     <div class="feed"></div></div>`;
@@ -1293,7 +1293,7 @@ function receiptDoc(orders, copies = "auto"){
         const it = ITEM_BY_ID[l.id] || {};
         return `<div class="row"><span class="b">${isSvc(l) ? "[서비스 SERVICE] " : l.added ? "[추가 ADD] " : ""}${esc(l.name || it.name)} x${l.qty}</span><span${isSvc(l) ? ' class="b"' : ""}>${isSvc(l) ? "FREE" : peso(l.unitPrice * l.qty)}</span></div>
         <div class="sub">${esc(l.en || it.en || "")}${isSvc(l) && l.origUnit ? ` · (${peso(l.origUnit * l.qty)})` : ""}</div>
-        ${optList(l).length ? `<div class="sub b">&nbsp;&nbsp;▶ ${esc(optLine(l, false))}${optLine(l, false) !== optLine(l, true) ? " / " + esc(optLine(l, true)) : ""}</div>` : ""}`;
+        ${optList(l).length ? `<div class="sub b">&nbsp;&nbsp;▶ ${esc(optLine(l, false))}${optLine(l, false, false) !== optLine(l, true, false) ? " / " + esc(optLine(l, true, false)) : ""}</div>` : ""}`;
       }).join("")}
       <div class="hr"></div>
       ${svcValue(o) ? `<div class="row b"><span>서비스 Service</span><span>${peso(svcValue(o))} FREE</span></div>` : (o.items || []).some(isSvc) ? `<div class="row b"><span>서비스 Service</span><span>FREE</span></div>` : ""}

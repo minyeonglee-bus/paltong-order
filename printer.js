@@ -88,7 +88,7 @@ function drawReceipt(o, copyLabel, kitchen){
     row(`${svc ? B("[서비스]", "[FREE]") + " " : l.added ? B("[추가]", "[ADD]") + " " : ""}${en ? nameEn(l) : (l.name || it.name)} x${l.qty}`, svc ? "FREE" : peso(l.unitPrice * l.qty), { size:24, bold:true });
     const sub = [en ? "" : l.en || it.en || "", svc && l.origUnit ? `(${peso(l.origUnit * l.qty)})` : ""].filter(Boolean).join(" · ");
     if(sub) text("  " + sub, { size:19 });
-    if(PT.optList(l).length) text("   ▶ " + PT.optLine(l, en) + (!en && PT.optLine(l, false) !== PT.optLine(l, true) ? " / " + PT.optLine(l, true) : ""), { size:21, bold:true });
+    if(PT.optList(l).length) text("   ▶ " + PT.optLine(l, en) + (!en && PT.optLine(l, false, false) !== PT.optLine(l, true, false) ? " / " + PT.optLine(l, true, false) : ""), { size:21, bold:true });
   });
   hr();
   if((o.items || []).some(PT.isSvc)) row(B("서비스", "Service"), PT.svcValue(o) ? `${peso(PT.svcValue(o))} FREE` : "FREE", { bold:true });
