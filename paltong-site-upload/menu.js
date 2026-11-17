@@ -160,6 +160,12 @@ window.PALTONG_MENU_IMG = {
   soy_boneless:       BONELESS_IMG["간장"],
   spicysoy_boneless:  BONELESS_IMG["땡초간장"],
 
+  /* JTV 세트 (메뉴판 사진에서 자름, 11/17) */
+  set_lady:           "images/menu/set_lady.jpg",            // 레이디스 세트
+  set_beerfit:        "images/menu/set_beerfit.jpg",         // 비어핏 세트
+  set_redsamgyeop:    "images/menu/set_redsamgyeop.jpg",     // 빨간 삼겹 세트
+  set_jjikmeok:       "images/menu/set_jjikmeok.jpg",        // 찍먹세트
+
   /* 메인 안주류 */
   jikhwa_dakbal:      "images/menu/jikhwa_dakbal.jpg",       // 직화 닭발 (무뼈 사진)
   gukmuldakbal:       "images/menu/gukmul_dakbal.jpg",       // 국물닭발 (뼈 사진)

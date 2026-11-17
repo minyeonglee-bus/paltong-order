@@ -184,6 +184,8 @@ function renderMenu(){
   const all = MENU.flatMap(c => c.items).filter(it => !soldOut[it.id]);
   cats.unshift({ cat:"🔥 인기메뉴", catEn:"🔥 BEST", items: all.filter(it => it.isHot), featured: true });
   cats.unshift({ cat:"🆕 신메뉴", catEn:"🆕 NEW", items: all.filter(it => it.isNew), featured: true });
+  /* JTV 분류는 맨 위 (사장님 11/17) */
+  { const ji = cats.findIndex(c => c.cat === "JTV"); if(ji > 0) cats.unshift(cats.splice(ji, 1)[0]); }
   if(outItems.length) cats.push({ cat:"품절", catEn:"SOLD OUT", items: outItems, soldOutCat: true });
   cats.forEach((cat, ci) => {
     const items = cat.items;
