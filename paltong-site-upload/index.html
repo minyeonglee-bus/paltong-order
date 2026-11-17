@@ -298,6 +298,12 @@ function itemImg(item, sel){
   if(typeof m === "string") return m;
   const by = m.by || {}, first = Object.values(by)[0] || "";
   if(!sel) return first;
+  /* 옵션 여러 개 조합: { options:["치킨 맛","치즈볼"], by:{ "간장|치즈볼만 (8pcs)": 사진, ... } } — 고른 선택지 이름을 | 로 이음 */
+  if(Array.isArray(m.options)){
+    const key = m.options.map(t => { const gi = (item.options || []).findIndex(g => g.title === t), g = (item.options || [])[gi], ci = gi >= 0 ? sel[gi] : -1;
+      return g && typeof ci === "number" && ci >= 0 ? g.choices[ci].label : ""; }).join("|");
+    return by[key] || first;
+  }
   const gi = (item.options || []).findIndex(g => g.title === m.option);
   const g = (item.options || [])[gi], ci = gi >= 0 ? sel[gi] : -1;
   const c = g && typeof ci === "number" && ci >= 0 ? g.choices[ci] : null;

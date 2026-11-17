@@ -160,11 +160,11 @@ window.PALTONG_MENU_IMG = {
   soy_boneless:       BONELESS_IMG["간장"],
   spicysoy_boneless:  BONELESS_IMG["땡초간장"],
 
-  /* JTV 세트 (메뉴판 사진에서 자름, 11/17) */
-  set_lady:           "images/menu/set_lady.jpg?v=2",        // 레이디스 세트 (국물닭발 + 양념치킨 + 치즈볼 사진 합침)
-  set_beerfit:        "images/menu/set_beerfit.jpg",         // 비어핏 세트
-  set_redsamgyeop:    "images/menu/set_redsamgyeop.jpg",     // 빨간 삼겹 세트
-  set_jjikmeok:       "images/menu/set_jjikmeok.jpg",        // 찍먹세트
+  /* JTV 세트 — 단품 사진 합쳐서 만듦 (11/17). 옵션 고르면 사진 바뀜 */
+  set_lady:        { option:"치킨 맛", by:{ "간장":"images/menu/set_lady_soy.jpg", "양념":"images/menu/set_lady_yang.jpg" } },   // 레이디스 세트 (닭발 무뼈·치즈볼만 사진은 아직 없음)
+  set_beerfit:     "images/menu/set_beerfit.jpg?v=2",       // 비어핏 세트
+  set_redsamgyeop: { option:"주먹밥", by:{ "참치마요":"images/menu/set_redsamgyeop_tuna.jpg", "날치알":"images/menu/set_redsamgyeop_nalchi.jpg" } },  // 빨간 삼겹 세트
+  set_jjikmeok:    "images/menu/set_jjikmeok.jpg?v=2",      // 찍먹세트
 
   /* 메인 안주류 */
   jikhwa_dakbal:      "images/menu/jikhwa_dakbal.jpg",       // 직화 닭발 (무뼈 사진)
