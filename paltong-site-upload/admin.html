@@ -774,7 +774,7 @@ function cardHTML(o){
   const itemsHTML = (o.items||[]).map((l, li) => { const add = l.added && !dine;   // ➕추가 = 주문 후에 더 넣은 메뉴 (다이닝은 계속 추가하니까 표시 안 함)
     return `<div class="sum-row"${PT.isSvc(l) ? ' style="background:#fde8e4;color:#3a2a20;border-radius:6px"' : add ? ' style="background:#fff1c9;color:#3a2a20;border-radius:6px"' : ""}><span>${PT.isSvc(l) ? (l.couponFree ? '<b style="color:var(--green)">🎟쿠폰 무료</b> ' : '<b style="color:#b42318">🎁서비스</b> ') : add ? '<b style="color:#b42318">➕추가</b> ' : ""}<span data-raw>${EN()
       ? `<b>${esc(l.en || l.name)}</b>`
-      : `<b>${esc(l.name)}</b> <span class="en">${esc(l.en||"")}</span>`}</span> <b style="font-size:1.08em">×${l.qty}</b>${PT.optChips(l, EN())}${PT.unitBreak(l, EN()) ? `<div class="hint" style="margin:0;font-size:12px">${PT.unitBreak(l, EN())}</div>` : ""}</span><span style="white-space:nowrap">${PT.isSvc(l) ? `${l.origUnit ? `<s class="hint">${peso(l.origUnit*l.qty)}</s> ` : ""}<b style="color:var(--red-deep)">${L("무료", "FREE")}</b>` : `${l.priceOrig != null ? `<s class="hint">${peso(l.priceOrig*l.qty)}</s> ` : ""}${peso(l.unitPrice*l.qty)}`}${svcOk && !l.ext
+      : `<b>${esc(l.name)}</b>`}</span> <b style="font-size:1.08em">×${l.qty}</b>${PT.optChips(l, EN())}${PT.unitBreak(l, EN()) ? `<div class="hint" style="margin:0;font-size:12px">${PT.unitBreak(l, EN())}</div>` : ""}</span><span style="white-space:nowrap">${PT.isSvc(l) ? `${l.origUnit ? `<s class="hint">${peso(l.origUnit*l.qty)}</s> ` : ""}<b style="color:var(--red-deep)">${L("무료", "FREE")}</b>` : `${l.priceOrig != null ? `<s class="hint">${peso(l.priceOrig*l.qty)}</s> ` : ""}${peso(l.unitPrice*l.qty)}`}${svcOk && !l.ext
       ? (PT.isSvc(l) ? (l.couponFree ? "" : ` <button class="chip" data-unsvc="${li}" title="${L("서비스 취소", "Undo service")}">↩</button>`) : ` <button class="chip" data-lprice="${li}" title="${L("가격 수정", "Edit price")}">✏️</button> <button class="chip" data-svc="${li}" title="${L("서비스로 처리", "Make it free")}">🎁</button>${l.byAdmin ? ` <button class="chip" data-rmadm="${li}" title="${L("관리자가 추가한 메뉴 빼기", "Remove (added by admin)")}">✕</button>` : ""}`) : ""}</span></div>`; }).join("")
     + (PT.svcValue(o) ? `<div class="sum-row" style="color:var(--red-deep);font-weight:800"><span>🎁 ${L("서비스", "Service")}</span><span>${peso(PT.svcValue(o))} ${L("상당 · 무료", "value · free")}</span></div>` : "")
     + (svcOk ? `<div class="btn-row" style="margin:4px 0"><button class="ghost-btn sm" data-itemadd>➕ ${L("메뉴 추가", "Add item")}</button><button class="ghost-btn sm" data-svcadd>🎁 ${L("서비스 추가", "Add free item")}</button><button class="ghost-btn sm" data-adddc>🏷 Add/DC</button></div>` : "");
@@ -1592,6 +1592,18 @@ async function lalamoveAdjust(o, url){
   catch(e){ toast("적용 실패: " + (e.message || e), 5000); }
 }
 
+/* 한글만 있는 메뉴 이름·옵션의 영어(en)를 번역해서 채움 (최대 4초, 실패하면 원문) — 붙여넣은 외부 주문을 영문 화면에서도 영어로 (사장님 2026-11-17) */
+async function itemsEnglish(items){
+  const tr = async t => { try{ return await Promise.race([trText(t), new Promise(r => setTimeout(() => r(null), 4000))]) || t; }catch(e){ return t; } };
+  const jobs = [];
+  (items || []).forEach(l => {
+    const it = ITEM_BY_ID[l.id] || {};
+    if(PT.hasHangul(l.en || it.en || l.name || "")) jobs.push(tr(l.en || l.name).then(v => { l.en = v; }));
+    (l.opts || []).forEach(x => { if(PT.hasHangul(x.en || x.ko || "")) jobs.push(tr(x.en || x.ko).then(v => { x.en = v; })); });
+  });
+  await Promise.all(jobs);
+  return items;
+}
 /* 주방·홀 영수증은 영어만 → 인쇄 전에 한글 요청사항·직접 입력 메뉴·메모를 영어로 (최대 4초, 실패하면 원문) */
 async function printEnglish(o){
   const c = JSON.parse(JSON.stringify(o)); if(o._cashGot != null) c._cashGot = o._cashGot;
@@ -3687,6 +3699,7 @@ async function extOrderModal(pre){   // pre = { text, ch, inboxId } — 📥 DK 
       let pin = pickup ? null : ov._pin;
       if(!pickup && !pin && f.addr){ const g = await geocodeAddr(f.addr); if(g && confirm(L(`지도 핀이 없어서 주소로 대략 위치를 찾았어요.\n${g.label || ""}\n이 위치를 손님 지도에 표시할까요? (취소 = 핀 없이 등록)`, `No pin, so we looked up the address:\n${g.label || ""}\nShow this on the customer map? (Cancel = no pin)`))) pin = g; }
       const stf = await staffPick(L("이 외부 주문을 받은 직원", "Who took this outside order?")); if(!stf) return false;
+      if(ov._items.length) await itemsEnglish(ov._items);   // 영문 화면용 영어 이름·옵션
       const r = await api.createExternalOrder({ name: f.name, phone: f.phone, addr: pickup ? "매장 픽업 / Store pickup" : f.addr, lat: pin ? pin.lat : "", lng: pin ? pin.lng : "",
         amount: Math.round(+f.amount), fee: pickup ? 0 : Math.round(+f.fee || 0), payment: f.payment, memo: f.memo, channel: ov._ch, rider_id: pickup ? "" : f.rider_id,
         ...(ov._items.length ? { items: ov._items.map(({ pasted, needPrice, ...l }) => l) } : {}) });
