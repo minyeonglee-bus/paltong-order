@@ -88,6 +88,8 @@ function setNoSale(on){ on = !!on; if(on === noSale) return false; noSale = on; 
 /* JTV 장소 (jtv_places) 안인지 — 반경 radius_m */
 let JTV_PLACES = [];
 function setJtvPlaces(list){ JTV_PLACES = Array.isArray(list) ? list : []; }
+/* 손님이 고르는 JTV 매장 3곳 (pick) */
+function jtvPicks(){ return JTV_PLACES.filter(p => p.pick !== false); }
 function isJtvAt(lat, lng){
   if(lat == null || lng == null) return false;
   const R = 6371000, rad = d => d * Math.PI / 180;
@@ -591,7 +593,7 @@ function makeSupabaseApi(){
       unwrap(await sb.storage.from("receipts").upload(path, blob, { contentType: blob.type || "image/jpeg", upsert: false }));
       unwrap(await sb.rpc("attach_extra_receipt", { p_id: id, p_path: path }));
     },
-    async jtvPlaces(){ return unwrap(await sb.from("jtv_places").select("lat,lng,radius_m").eq("active", true)); },
+    async jtvPlaces(){ return unwrap(await sb.from("jtv_places").select("id,name,addr,lat,lng,radius_m,pick,sort").eq("active", true).order("sort")); },
     async quoteDelivery(lat, lng, addr){ return unwrap(await sb.rpc("quote_delivery", { p_lat: lat, p_lng: lng, p_addr: addr || "" })); },
     async addItems(id, items, sub){ return unwrap(await sb.rpc("add_items", { p_id: id, p_items: items, p_sub: sub })); },
     priceUnlock: {},   // 🔓 완료된 주문 가격 수정: { 주문id: 가격 비밀번호 } (52단계)
@@ -1492,6 +1494,6 @@ function contactHTML(){
     CFG.STORE_PHONE ? `${T("전화·SMS", "Call·SMS")}: <a href="tel:${esc(CFG.STORE_PHONE.replace(/\s/g, ""))}"><b>${esc(CFG.STORE_PHONE)}</b></a>` : "",
     CFG.VIBER_PHONE ? `Viber·WhatsApp: <a href="https://wa.me/${num(CFG.VIBER_PHONE)}" target="_blank" rel="noopener"><b>${esc(CFG.VIBER_PHONE)}</b></a>` : ""].filter(Boolean).join("<br>");
 }
-window.PT = { contactLines, contactHTML, PRINT_SETS, PRINT_SETS_EN, KIND_LABEL, printKinds, manilaDay, bizDay, bizStart, DAY_START_HOUR, orderDay, get menuCfgActive(){ return menuCfgActive; }, loadMenuData, exportMenu, priceSig, politeKo, CATS, get menuOv(){ return menuOv; }, applyMenuOverrides, cleanForTranslate, setTranslateKey, googleTranslate, splitKoEn, msgText, schedLabel, menuToEnglish, matchZone, zoneFee, phoneMask, phoneValue, phoneOk, phoneDigits, phoneFmt, englishOnly, EN_NAME, EN_ADDR, hasHangul, stampRewards, stampText, isMemberPhone, normPhone, phoneEmail, prettyPhone, couponDiscount, couponValue, couponFace, couponsFace, couponCond, couponUsable, COUPON_KINDS, couponKind, stackKey, stackMax, couponStackOk, couponsDiscount, bestCoupons, stackRulesText, repriceLine, setNoSale, get noSale(){ return noSale; }, setJtvPlaces, isJtvAt, errMsg, CFG, MENU, ITEM_BY_ID, esc, peso, ls, L, T, setLang, get LANG(){ return LANG; },
+window.PT = { contactLines, contactHTML, PRINT_SETS, PRINT_SETS_EN, KIND_LABEL, printKinds, manilaDay, bizDay, bizStart, DAY_START_HOUR, orderDay, get menuCfgActive(){ return menuCfgActive; }, loadMenuData, exportMenu, priceSig, politeKo, CATS, get menuOv(){ return menuOv; }, applyMenuOverrides, cleanForTranslate, setTranslateKey, googleTranslate, splitKoEn, msgText, schedLabel, menuToEnglish, matchZone, zoneFee, phoneMask, phoneValue, phoneOk, phoneDigits, phoneFmt, englishOnly, EN_NAME, EN_ADDR, hasHangul, stampRewards, stampText, isMemberPhone, normPhone, phoneEmail, prettyPhone, couponDiscount, couponValue, couponFace, couponsFace, couponCond, couponUsable, COUPON_KINDS, couponKind, stackKey, stackMax, couponStackOk, couponsDiscount, bestCoupons, stackRulesText, repriceLine, setNoSale, get noSale(){ return noSale; }, setJtvPlaces, isJtvAt, jtvPicks, errMsg, CFG, MENU, ITEM_BY_ID, esc, peso, ls, L, T, setLang, get LANG(){ return LANG; },
   orderPrefix, orderCode, isDine, inClosingWindow, isSvc, svcValue, riderPhone, riderEmail, STATUS, payInfo, isOnlinePay, lineName, lineOpt, optList, optLine, optChips, unitBreak, compressImage, api, DEMO, receiptDoc, printReceipt, toast };
 })();

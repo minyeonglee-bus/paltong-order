@@ -128,6 +128,16 @@ function jtvSync(lat, lng){
   try{ renderMenu(); refreshCartBar(); }catch(e){}
   return true;
 }
+/* JTV 매장 3곳은 주소 대신 골라서 선택 (사장님 11/17 23:35) */
+const jtvPick = () => cust.otype !== "pickup" && cust.jtvId != null ? PT.jtvPicks().find(p => p.id === cust.jtvId) || null : null;
+const jtvLabel = p => `${p.name} · ${p.addr}`;
+function chooseJtv(p){ cust.jtvId = p.id; cust.addr = jtvLabel(p); cust.lat = p.lat; cust.lng = p.lng; cust.otype = "delivery"; saveCust(); }
+function jtvChipsHtml(){
+  const ps = PT.jtvPicks(); if(!ps.length) return "";
+  return `<div style="margin:0 0 12px"><div style="font-weight:800;font-size:14px;margin:0 0 6px">🎤 ${L("JTV 매장에서 주문하세요?","Ordering from a JTV venue?")}</div>
+    <div style="display:flex;flex-direction:column;gap:6px">${ps.map(p => `<button class="ghost-btn" data-jtv="${p.id}" style="margin:0;text-align:left;${cust.jtvId === p.id ? "border-color:var(--red);color:var(--red-deep);font-weight:800" : ""}">${cust.jtvId === p.id ? "✅ " : ""}<b>${esc(p.name)}</b> <span class="en" style="font-weight:400">${esc(p.addr)}</span></button>`).join("")}</div>
+    <p class="hint" style="margin:6px 0 0">${L("룸 번호는 요청사항에 적어주세요","Write your room number in the request")}</p></div>`;
+}
 /* 처음 들어오면 주소부터 (사장님 11/17) — 그 주소 기준 가격으로 메뉴를 보여주고, 주문할 때 자동으로 들어감 */
 function openAddrGate(){
   const s = sheet({}); let w = null;
@@ -135,26 +145,33 @@ function openAddrGate(){
     s.el.innerHTML = `
       <div class="sheet-head"><h3>📍 ${L("배달 주소를 먼저 알려주세요","Where should we deliver?")}</h3><button class="close-x">✕</button></div>
       <p class="hint" style="margin:-4px 0 10px">${L("주문할 때 이 주소가 자동으로 들어가요. 지도에 위치를 꼭 찍어주세요.","This address is filled in automatically when you order. Please mark it on the map.")}</p>
+      ${jtvChipsHtml()}
+      ${PT.jtvPicks().length ? `<div style="font-weight:800;font-size:14px;margin:4px 0 6px">🏠 ${L("그 외 주소","Other address")}</div>` : ""}
       <div id="gateSlot"></div>
       <button class="primary-btn" id="gateOk" style="margin-top:12px">${L("이 주소로 메뉴 보기","Show menu for this address")}</button>
       <button class="ghost-btn" id="gatePick">🏃 ${L("매장에서 픽업할게요","I'll pick up at the store")}</button>`;
     if(!w) w = PTAddress.createAddressWidget({
       saved: acct ? (acct.member.addresses || []) : [], pins: acct ? { ...(acct.member.addr_pins || {}) } : {},
-      initial: cust.addr, initialPin: cust.lat != null ? { lat: cust.lat, lng: cust.lng } : null, onChange: () => {} });
+      initial: cust.jtvId != null ? "" : cust.addr, initialPin: cust.jtvId == null && cust.lat != null ? { lat: cust.lat, lng: cust.lng } : null, onChange: () => {} });
     s.el.querySelector("#gateSlot").replaceWith(w.el);
     s.el.querySelector(".close-x").onclick = () => { try{ sessionStorage.setItem("paltong_addr_gate", "1"); }catch(e){} s.close(); };
     s.el.querySelector("#gateOk").onclick = () => {
       const v = w.value();
       if(v.error){ toast(v.error, 3000); w.focus && w.focus(v.focus); return; }
       if(v.lat == null){ toast(T("지도에서 위치를 찍어주세요","Please mark your location on the map"), 3000); const pm = s.el.querySelector(".addr-pinmap"); if(pm) pm.click(); return; }
-      cust.addr = v.addr; cust.lat = v.lat; cust.lng = v.lng; cust.otype = "delivery"; saveCust();
+      cust.addr = v.addr; cust.lat = v.lat; cust.lng = v.lng; cust.otype = "delivery"; cust.jtvId = null; saveCust();
       s.close(); jtvSync(cust.lat, cust.lng); renderMenu();
     };
-    s.el.querySelector("#gatePick").onclick = () => { cust.otype = "pickup"; saveCust(); s.close(); jtvSync(null, null); renderMenu(); };
+    s.el.querySelectorAll("[data-jtv]").forEach(b => b.onclick = () => {
+      const p = PT.jtvPicks().find(x => String(x.id) === b.dataset.jtv); if(!p) return;
+      chooseJtv(p); s.close(); jtvSync(cust.lat, cust.lng); renderMenu();
+    });
+    s.el.querySelector("#gatePick").onclick = () => { cust.otype = "pickup"; cust.jtvId = null; saveCust(); s.close(); jtvSync(null, null); renderMenu(); };
   });
 }
 function addrBarHtml(){
-  const txt = cust.otype === "pickup" ? `🏃 ${L("매장 픽업","Store pickup")}` : cust.addr ? `📍 ${esc(cust.addr)}` : `📍 ${L("배달 주소를 입력해주세요","Enter delivery address")}`;
+  const jp = jtvPick();
+  const txt = cust.otype === "pickup" ? `🏃 ${L("매장 픽업","Store pickup")}` : jp ? `🎤 <b>${esc(jp.name)}</b> <span class="en">${esc(jp.addr)}</span>` : cust.addr ? `📍 ${esc(cust.addr)}` : `📍 ${L("배달 주소를 입력해주세요","Enter delivery address")}`;
   return `<div class="addr-bar" style="display:flex;align-items:center;gap:8px;margin:0 0 12px;padding:10px 12px;border:1px solid var(--line);border-radius:12px;font-size:13px;background:var(--surface)">
     <span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${txt}</span>
     <button class="link-btn" data-addrbar style="font-size:13px;font-weight:700;color:var(--red-deep)">${L("변경","Change")}</button></div>`;
@@ -417,7 +434,7 @@ function openItem(item){
       <div class="sum-row total"><span>${L("금액","Amount")}</span><b>${peso(unit()*qty)}</b></div>
       ${item.cat === "JTV" && !PT.noSale
         ? `<button class="primary-btn" style="margin-top:14px;background:#777">🚫 ${L("배달 지역이 아니에요","Not in delivery area")}</button>
-           <p class="hint" style="text-align:center;margin:8px 0 0">${L("JTV 메뉴는 JTV 매장 주소에서만 주문할 수 있어요","JTV menu is only for JTV venue addresses")}</p>`
+           <p class="hint" style="text-align:center;margin:8px 0 0">${L("JTV 메뉴는 JTV 매장을 선택해야 주문할 수 있어요 (메뉴 위 주소 → 변경)","Choose your JTV venue to order (address bar → Change)")}</p>`
         : `<button class="primary-btn" style="margin-top:14px">${L("장바구니 담기","Add to cart")}</button>`}`;
     s.el.querySelector("#itReq").oninput = e => { req = e.target.value; };
     s.el.querySelectorAll(".opt-choice").forEach(b => b.onclick = () => {
@@ -441,8 +458,8 @@ function openItem(item){
     s.el.querySelector(".close-x").onclick = s.close;
     s.el.querySelector(".primary-btn").onclick = () => {
       if(item.cat === "JTV" && !PT.noSale){   // JTV 메뉴: JTV 주소가 아니면 못 담음 (사장님 11/17)
-        toast(T("배달 지역이 아니에요 (JTV 매장 주소에서만 주문할 수 있어요)","Not in our delivery area for this menu (JTV venues only)"), 3500);
-        if(!cust.addr && cust.otype !== "pickup"){ s.close(); openAddrGate(); }
+        toast(T("배달 지역이 아니에요 — JTV 매장을 선택해주세요","Not in delivery area — please choose your JTV venue"), 3500);
+        s.close(); openAddrGate();
         return;
       }
       const miss = groups.findIndex((g,gi) => isReq(g) && picked(gi) === 0);
@@ -589,7 +606,11 @@ function openCheckout(){
       ${isPickup() ? `<div class="notice" style="margin-bottom:12px">📍 ${L("픽업 장소","Pickup at")}: <b>${esc(storeAddr())}</b> <a href="${storeMap()}" target="_blank" rel="noopener">${L("지도","Map")}</a><br><small>${L("이름과 연락처만 적어주세요. 준비되면 이 화면과 채팅으로 알려드려요.","Just your name and number — we will tell you when it is ready.")}</small></div>` : ""}
       <div class="field"><label for="fName">${L("이름 (영문)","Name (English)")} *</label><input id="fName" autocomplete="name" maxlength="80" placeholder="e.g. Juan Dela Cruz"></div>
       <div class="field"><label for="fPhone">${L("연락처","Contact number")} *</label><input id="fPhone" type="tel" autocomplete="tel"></div>
-      <div class="field" id="addrField" ${isPickup() ? "hidden" : ""}><label>${L("배달 주소 (영문)","Delivery address")} *</label><div id="addrSlot"></div></div>
+      <div class="field" id="addrField" ${isPickup() ? "hidden" : ""}><label>${L("배달 주소 (영문)","Delivery address")} *</label>
+        ${jtvPick() ? `<div style="padding:12px;border:2px solid var(--red);border-radius:12px"><div style="font-weight:800">🎤 ${esc(jtvPick().name)}</div><div class="hint">${esc(jtvPick().addr)}</div>
+          <div class="hint" style="margin-top:4px">${L("룸 번호는 요청사항에 적어주세요","Write your room number in the request")}</div>
+          <button class="link-btn" id="jtvOff" style="margin-top:6px;font-weight:700;color:var(--red-deep)">${L("다른 주소로 변경","Use another address")}</button></div>`
+        : `${jtvChipsHtml()}<div id="addrSlot"></div>`}</div>
       <div class="field"><label>${L("결제 방법","Payment method")}</label>
         <div class="opt-choices" id="payChoices">
           ${Object.entries(CFG.PAYMENTS).map(([k,p]) => `<button type="button" class="opt-choice ${k===cust.payment?'sel':''}" data-pay="${k}">${payLabel(k, p)}</button>`).join('')}
@@ -613,12 +634,22 @@ function openCheckout(){
       <button class="primary-btn" id="placeBtn">${L("주문 요청하기","Place order")}</button>
       <p class="hint" id="placeHint" style="text-align:center"></p>`;
     const $ = id => s.el.querySelector(id);
+    if(jtvPick()){
+      const jp = jtvPick();
+      if(!quoteFor || quoteFor.lat !== jp.lat || quoteFor.lng !== jp.lng){ if(quote !== "loading") requestQuote({ lat: jp.lat, lng: jp.lng, addr: jtvLabel(jp) }); }
+      const off = $("#jtvOff"); if(off) off.onclick = () => { cust.jtvId = null; cust.addr = ""; cust.lat = cust.lng = null; saveCust(); addrW = null; quote = null; quoteFor = null; jtvSync(null, null); render(); };
+    } else {
+    s.el.querySelectorAll("[data-jtv]").forEach(b => b.onclick = () => {
+      const p = PT.jtvPicks().find(x => String(x.id) === b.dataset.jtv); if(!p) return;
+      chooseJtv(p); quote = null; quoteFor = null; if(jtvSync(cust.lat, cust.lng)) toast(T("JTV 매장 — 메뉴가 정가로 바뀌었어요","JTV venue — regular prices apply"), 3500); render();
+    });
     if(!addrW) addrW = PTAddress.createAddressWidget({
       saved: acct ? (acct.member.addresses || []) : [], pins: acct ? { ...(acct.member.addr_pins || {}) } : {},
-      initial: cust.addr, initialPin: cust.lat != null ? { lat: cust.lat, lng: cust.lng } : null,
-      onChange: pin => { requestQuote(pin); try{ const v = addrW.value(); if(v && v.addr){ cust.addr = v.addr; cust.lat = v.lat; cust.lng = v.lng; saveCust(); } }catch(e){}
+      initial: cust.jtvId != null ? "" : cust.addr, initialPin: cust.jtvId == null && cust.lat != null ? { lat: cust.lat, lng: cust.lng } : null,
+      onChange: pin => { if(jtvPick()) return; requestQuote(pin); try{ const v = addrW.value(); if(v && v.addr){ cust.addr = v.addr; cust.lat = v.lat; cust.lng = v.lng; cust.jtvId = null; saveCust(); } }catch(e){}
         if(pin && jtvSync(pin.lat, pin.lng)){ toast(PT.noSale ? T("JTV 주소 — 메뉴가 정가로 바뀌었어요","JTV venue — regular prices apply") : T("메뉴 가격이 다시 계산됐어요","Prices updated"), 3500); render(); } } });
     $("#addrSlot").replaceWith(addrW.el);
+    }
     $("#fName").value = (cust.name || "").replace(PT.EN_NAME, ""); $("#fPhone").value = cust.phone ? PT.phoneFmt(PT.phoneDigits(cust.phone)) : ""; $("#fMemo").value = cust.memo;
     PT.englishOnly($("#fName"), PT.EN_NAME); PT.phoneMask($("#fPhone"));
     const sync = () => { cust = { ...cust, name:$("#fName").value, phone:PT.phoneValue($("#fPhone")), memo:$("#fMemo").value, sDay:$("#fDay").value, sTime:$("#fTime").value }; saveCust(); };
@@ -721,7 +752,7 @@ function openCheckout(){
       sync();
       if(b.dataset.mode === "member" && !acct){ s.close(); openAuth(() => openCheckout()); }
       else if(b.dataset.mode === "guest" && acct){
-        if(confirm(T("로그아웃하고 비회원으로 주문할까요?","Log out and order as a guest?"))){ api.memberSignOut().then(() => { acct = null; paintAcctBtn(); couponIds = []; addrW = null; cust.addr = ""; cust.lat = cust.lng = null; render(); }); }
+        if(confirm(T("로그아웃하고 비회원으로 주문할까요?","Log out and order as a guest?"))){ api.memberSignOut().then(() => { acct = null; paintAcctBtn(); couponIds = []; addrW = null; cust.addr = ""; cust.lat = cust.lng = null; cust.jtvId = null; render(); }); }
       }
     });
     const ga = $("#goAuth"); if(ga) ga.onclick = () => { sync(); s.close(); openAuth(() => openCheckout()); };
@@ -731,7 +762,8 @@ function openCheckout(){
       { const bad = unmetRequirement(); if(bad){ toast(requireText(bad), 4500); return; } }
       if(!cust.name.trim()){ toast(T("이름을 입력해주세요","Please enter your name")); $("#fName").focus(); return; }
       if(!PT.phoneOk(cust.phone)){ toast(T("연락처는 09로 시작하는 11자리 숫자로 입력해주세요","Enter an 11-digit number starting with 09"), 3000); $("#fPhone").focus(); return; }
-      const av = isPickup() ? { addr: "", lat: null, lng: null } : addrW.value();
+      const jpk = !isPickup() && jtvPick();
+      const av = isPickup() ? { addr: "", lat: null, lng: null } : jpk ? { addr: jtvLabel(jpk), lat: jpk.lat, lng: jpk.lng } : addrW.value();
       if(av.error){ toast(av.error, 3000); addrW.focus(av.focus); return; }
       if(!isPickup()){ cust.addr = av.addr; cust.lat = av.lat; cust.lng = av.lng; }
       if(jtvSync(av.lat, av.lng)){ toast(PT.noSale ? T("JTV 주소 — 메뉴가 정가로 바뀌었어요. 금액 확인 후 다시 눌러주세요","JTV venue — regular prices apply. Check the total and tap again") : T("메뉴 가격이 다시 계산됐어요. 확인 후 다시 눌러주세요","Prices updated. Please check and tap again"), 4500); render(); return; }
