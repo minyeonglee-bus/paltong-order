@@ -506,7 +506,7 @@ function dnCard(o){
     <div class="ohead"><span class="no">${esc(PT.orderCode(o))}</span><span class="status-pill" style="background:#e5a731">${L("미결제", "Unpaid")}</span>
       <span class="time">${new Date(o.created_at).toLocaleTimeString(EN() ? "en-US" : "ko-KR", { hour:"numeric", minute:"2-digit", timeZone:"Asia/Manila" })} · ${m < 60 ? L(`${m}분째`, `${m} min`) : L(`${Math.floor(m/60)}시간 ${m%60}분째`, `${Math.floor(m/60)}h ${m%60}m`)}</span></div>
     <div class="items">${items.map((l, i) => `<div class="sum-row" style="align-items:center;gap:6px">
-        <span style="flex:1;min-width:0"><b>${esc(EN() ? (l.en || l.name) : l.name)}</b>${l.opts && l.opts.length ? ` <span class="hint" style="margin:0">${esc(l.opts.map(x => EN() ? (x.en || x.ko) : x.ko).join(", "))}</span>` : ""}${PT.isSvc(l) ? ` <b style="color:var(--red-deep)">${L("서비스", "FREE")}</b>` : ""}</span>
+        <span style="flex:1;min-width:0"><b>${esc(EN() ? (l.en || l.name) : l.name)}</b>${PT.isSvc(l) ? ` <b style="color:var(--red-deep)">${L("서비스", "FREE")}</b>` : ""}${PT.optChips(l, EN())}</span>
         <span style="white-space:nowrap;display:flex;align-items:center;gap:4px"><button class="chip" data-dq="${i}|-1">−</button><b>${l.qty}</b><button class="chip" data-dq="${i}|1">+</button>
         <span style="min-width:64px;text-align:right">${PT.isSvc(l) ? "₱0" : peso(l.unitPrice * l.qty)}</span>${PT.isSvc(l) ? "" : `<button class="chip" data-dprice="${i}" title="${L("가격 수정", "Edit price")}">✏️</button><button class="chip" data-dsvc="${i}" title="${L("서비스로", "Make free")}">🎁</button>`}</span></div>`).join("")}</div>
     <div class="calc-box">
@@ -800,8 +800,8 @@ function cardHTML(o){
   const warns = dine ? [] : priceWarnings(o);
   const svcOk = !["done","cancelled"].includes(o.status);
   const itemsHTML = (o.items||[]).map((l, li) => `<div class="sum-row"${PT.isSvc(l) ? ' style="background:#fde8e4;border-radius:6px"' : l.added ? ' style="background:#fff1c9;border-radius:6px"' : ""}><span>${PT.isSvc(l) ? '<b style="color:var(--red-deep)">🎁서비스</b> ' : l.added ? '<b style="color:var(--red-deep)">➕추가</b> ' : ""}<span data-raw>${EN()
-      ? `<b>${esc(l.en || l.name)}</b>${l.opts&&l.opts.length ? ` <span class="en">· ${esc(l.opts.map(x => x.en || x.ko).join(", "))}</span>` : ""}`
-      : `<b>${esc(l.name)}</b> <span class="en">${esc(l.en||"")}${l.opts&&l.opts.length ? " · " + esc(l.opts.map(x=>x.ko).join(", ")) : ""}</span>`}</span> ×${l.qty}</span><span style="white-space:nowrap">${PT.isSvc(l) ? `${l.origUnit ? `<s class="hint">${peso(l.origUnit*l.qty)}</s> ` : ""}<b style="color:var(--red-deep)">${L("무료", "FREE")}</b>` : `${l.priceOrig != null ? `<s class="hint">${peso(l.priceOrig*l.qty)}</s> ` : ""}${peso(l.unitPrice*l.qty)}`}${svcOk && !l.ext
+      ? `<b>${esc(l.en || l.name)}</b>`
+      : `<b>${esc(l.name)}</b> <span class="en">${esc(l.en||"")}</span>`}</span> <b style="font-size:1.08em">×${l.qty}</b>${PT.optChips(l, EN())}${PT.unitBreak(l, EN()) ? `<div class="hint" style="margin:0;font-size:12px">${PT.unitBreak(l, EN())}</div>` : ""}</span><span style="white-space:nowrap">${PT.isSvc(l) ? `${l.origUnit ? `<s class="hint">${peso(l.origUnit*l.qty)}</s> ` : ""}<b style="color:var(--red-deep)">${L("무료", "FREE")}</b>` : `${l.priceOrig != null ? `<s class="hint">${peso(l.priceOrig*l.qty)}</s> ` : ""}${peso(l.unitPrice*l.qty)}`}${svcOk && !l.ext
       ? (PT.isSvc(l) ? ` <button class="chip" data-unsvc="${li}" title="${L("서비스 취소", "Undo service")}">↩</button>` : ` <button class="chip" data-lprice="${li}" title="${L("가격 수정", "Edit price")}">✏️</button> <button class="chip" data-svc="${li}" title="${L("서비스로 처리", "Make it free")}">🎁</button>${l.byAdmin ? ` <button class="chip" data-rmadm="${li}" title="${L("관리자가 추가한 메뉴 빼기", "Remove (added by admin)")}">✕</button>` : ""}`) : ""}</span></div>`).join("")
     + (PT.svcValue(o) ? `<div class="sum-row" style="color:var(--red-deep);font-weight:800"><span>🎁 ${L("서비스", "Service")}</span><span>${peso(PT.svcValue(o))} ${L("상당 · 무료", "value · free")}</span></div>` : "")
     + (svcOk ? `<div class="btn-row" style="margin:4px 0"><button class="ghost-btn sm" data-itemadd>➕ ${L("메뉴 추가", "Add item")}</button><button class="ghost-btn sm" data-svcadd>🎁 ${L("서비스 추가", "Add free item")}</button><button class="ghost-btn sm" data-totaledit>✏️ ${L("최종 금액", "Final amount")}</button></div>` : "");
@@ -3156,7 +3156,7 @@ async function extOrderModal(){
   /* 메뉴 줄: 이름 · 수량 · 단가를 바로 고칠 수 있고, 줄마다 금액이 보임 */
   const paintItems = () => {
     const box = ov.querySelector("#exItems"), amt = F("amount");
-    const nm = l => esc(EN() ? l.en || l.name : l.name) + (l.opts && l.opts.length ? ` <span class="hint" style="margin:0">${esc(l.opts.map(x => EN() ? x.en || x.ko : x.ko).join(", "))}</span>` : "");
+    const nm = l => esc(EN() ? l.en || l.name : l.name) + PT.optChips(l, EN());
     box.innerHTML = ov._items.length ? `<div class="calc-box" style="margin:0 0 6px">${ov._items.map((l, i) => `<div class="sum-row" style="align-items:center;gap:6px;flex-wrap:wrap${l.unitPrice ? "" : ";background:#fff1c9;border-radius:6px"}">
         <span style="flex:1 1 140px;min-width:0">${l.custom ? "" : "✅ "}<b>${nm(l)}</b></span>
         <span style="display:flex;align-items:center;gap:4px;white-space:nowrap">

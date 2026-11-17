@@ -234,6 +234,32 @@ function lineOpt(l){
   if(!l.opts || !l.opts.length) return "";
   return l.opts.map(o => T(o.ko, o.en)).join(", ");
 }
+/* 옵션을 한 줄씩: 그룹 이름(마리수·부위·맵기…) + 고른 것 + 추가 금액 — 직원들이 헷갈리지 않게 (사장님 2026-11-17) */
+function optList(l){
+  const it = ITEM_BY_ID[l.id] || {}, gs = it.options || [];
+  return (l.opts || []).map((o, i) => {
+    const g = o.note ? null : gs[o.g ?? i];
+    const c = g ? (o.c != null ? g.choices[o.c] : g.choices.find(c => c.label === o.ko || (c.en || c.label) === o.en)) : null;
+    const n = o.n || 1;
+    return { ko: o.ko, en: o.en || o.ko, n, delta: (c && c.delta || 0) * n, gko: g ? g.title || "" : "", gen: g ? g.titleEn || g.title || "" : "", note: !!o.note,
+      extra: !!(c && c.delta) || (g && o.c != null && o.c > 0) };   // extra = 추가금 있거나 기본(첫 번째) 선택이 아님 → 눈에 띄게
+  });
+}
+/* 화면용 옵션 칩: [마리수 한마리 +₱420] — 기본 선택은 회색, 바뀐 선택·추가금은 주황색 굵게 */
+function optChips(l, en){
+  const os = optList(l); if(!os.length) return "";
+  return `<div class="optchips" style="display:flex;flex-wrap:wrap;gap:4px;margin:3px 0 1px">${os.map(o => {
+    const nm = en ? o.en : o.ko, gt = en ? o.gen : o.gko;
+    return `<span style="display:inline-flex;align-items:center;gap:3px;padding:2px 8px;border-radius:999px;font-size:13px;line-height:1.5;${o.extra
+      ? "background:#fff1c9;border:1.5px solid #e08a00;color:#7a3e00;font-weight:800" : "background:#f2f2f2;border:1px solid #d6d6d6;color:#555"}">${gt ? `<span style="font-weight:600;opacity:.75">${esc(gt)}</span> ` : ""}${o.note ? "📝 " : ""}${esc(nm)}${o.n > 1 ? ` ×${o.n}` : ""}${o.delta ? ` <span>+${peso(o.delta)}</span>` : ""}</span>`;
+  }).join("")}</div>`;
+}
+/* 단가 풀이: 기본 ₱550 + 옵션 ₱420 = ₱970 × 4 */
+function unitBreak(l, en){
+  const it = ITEM_BY_ID[l.id], add = optList(l).reduce((s, o) => s + o.delta, 0);
+  if(!it || !add || isSvc(l) || l.unitPrice !== it.price + add) return l.qty > 1 && !isSvc(l) ? `${peso(l.unitPrice)} × ${l.qty}` : "";
+  return `${peso(it.price)} + ${en ? "option" : "옵션"} ${peso(add)} = ${peso(l.unitPrice)}${l.qty > 1 ? ` × ${l.qty}` : ""}`;
+}
 
 /* ---------------- 이미지 압축 (영수증 사진) ---------------- */
 async function compressImage(file, maxSide = 1600, quality = 0.82){
@@ -1211,7 +1237,7 @@ function kitchenHTML(o){
     <div class="c">${esc(fmt(o.created_at))}</div>
     <div class="hr"></div>
     ${(o.items || []).map(l => `<div class="row xl b"><span>${isSvc(l) ? "[FREE] " : l.added ? "[ADD] " : ""}${esc(nameEnOf(l))}</span><span>×${l.qty}</span></div>
-      ${l.opts && l.opts.length ? `<div class="lg" style="margin:0 0 1.2mm 2mm">- ${esc(l.opts.map(x => x.en || x.ko).join(", "))}</div>` : ""}`).join("")}
+      ${optList(l).map(x => `<div class="lg${x.extra ? " b" : ""}" style="margin:0 0 .6mm 3mm">${x.extra ? "&gt;&gt; " : "- "}${x.gen ? esc(x.gen) + ": " : ""}${esc(x.extra ? String(x.en).toUpperCase() : x.en)}${x.n > 1 ? " x" + x.n : ""}</div>`).join("")}`).join("")}
     <div class="hr"></div>
     ${o.memo ? `<div class="memo lg"><span class="b">Note:</span> ${esc(o.memo_en || o.memo)}</div>` : ""}
     <div class="feed"></div></div>`;
@@ -1228,7 +1254,7 @@ function hallHTML(o, copyLabel, p){
     <div class="c">${esc(fmt(o.created_at))}</div>
     <div class="hr"></div>
     ${(o.items || []).map(l => `<div class="row"><span class="b">${isSvc(l) ? "[FREE] " : l.added ? "[ADD] " : ""}${esc(nameEnOf(l))} x${l.qty}</span><span${isSvc(l) ? ' class="b"' : ""}>${isSvc(l) ? "FREE" : peso(l.unitPrice * l.qty)}</span></div>
-      ${l.opts && l.opts.length ? `<div class="sub">${esc(l.opts.map(x => x.en || x.ko).join(", "))}</div>` : ""}`).join("")}
+      ${optList(l).map(x => `<div class="sub${x.extra ? " b" : ""}">&nbsp;&nbsp;${x.extra ? "▶" : "·"} ${x.gen ? esc(x.gen) + ": " : ""}${esc(x.en)}${x.n > 1 ? " x" + x.n : ""}${x.delta ? " +" + peso(x.delta) : ""}</div>`).join("")}`).join("")}
     <div class="hr"></div>
     ${svcValue(o) ? `<div class="row b"><span>Service</span><span>${peso(svcValue(o))} FREE</span></div>` : ""}
     <div class="row"><span>Subtotal</span><span>${peso(o.subtotal)}</span></div>
@@ -1267,7 +1293,8 @@ function receiptDoc(orders, copies = "auto"){
       ${(o.items||[]).map(l => {
         const it = ITEM_BY_ID[l.id] || {};
         return `<div class="row"><span class="b">${isSvc(l) ? "[서비스 SERVICE] " : l.added ? "[추가 ADD] " : ""}${esc(l.name || it.name)} x${l.qty}</span><span${isSvc(l) ? ' class="b"' : ""}>${isSvc(l) ? "FREE" : peso(l.unitPrice * l.qty)}</span></div>
-        <div class="sub">${esc(l.en || it.en || "")}${l.opts && l.opts.length ? " · " + esc(l.opts.map(x => x.ko === x.en ? x.ko : x.ko + "/" + x.en).join(", ")) : ""}${isSvc(l) && l.origUnit ? ` · (${peso(l.origUnit * l.qty)})` : ""}</div>`;
+        <div class="sub">${esc(l.en || it.en || "")}${isSvc(l) && l.origUnit ? ` · (${peso(l.origUnit * l.qty)})` : ""}</div>
+        ${optList(l).map(x => `<div class="sub${x.extra ? " b" : ""}">&nbsp;&nbsp;${x.extra ? "▶" : "·"} ${x.gko ? esc(x.gko) + ": " : ""}${esc(x.ko === x.en ? x.ko : x.ko + " " + x.en)}${x.n > 1 ? " x" + x.n : ""}${x.delta ? " +" + peso(x.delta) : ""}</div>`).join("")}`;
       }).join("")}
       <div class="hr"></div>
       ${svcValue(o) ? `<div class="row b"><span>서비스 Service</span><span>${peso(svcValue(o))} FREE</span></div>` : (o.items || []).some(isSvc) ? `<div class="row b"><span>서비스 Service</span><span>FREE</span></div>` : ""}
@@ -1337,5 +1364,5 @@ function toast(msg, ms = 2200){
 }
 
 window.PT = { PRINT_SETS, printKinds, manilaDay, bizDay, bizStart, DAY_START_HOUR, orderDay, get menuCfgActive(){ return menuCfgActive; }, loadMenuData, exportMenu, priceSig, politeKo, CATS, get menuOv(){ return menuOv; }, applyMenuOverrides, cleanForTranslate, setTranslateKey, googleTranslate, splitKoEn, msgText, schedLabel, menuToEnglish, matchZone, zoneFee, phoneMask, phoneValue, phoneOk, phoneDigits, phoneFmt, englishOnly, EN_NAME, EN_ADDR, hasHangul, stampRewards, stampText, isMemberPhone, normPhone, phoneEmail, prettyPhone, couponDiscount, couponValue, couponCond, couponUsable, COUPON_KINDS, couponKind, stackKey, stackMax, couponStackOk, couponsDiscount, bestCoupons, stackRulesText, repriceLine, errMsg, CFG, MENU, ITEM_BY_ID, esc, peso, ls, L, T, setLang, get LANG(){ return LANG; },
-  orderPrefix, orderCode, isDine, inClosingWindow, isSvc, svcValue, riderPhone, riderEmail, STATUS, payInfo, isOnlinePay, lineName, lineOpt, compressImage, api, DEMO, receiptDoc, printReceipt, toast };
+  orderPrefix, orderCode, isDine, inClosingWindow, isSvc, svcValue, riderPhone, riderEmail, STATUS, payInfo, isOnlinePay, lineName, lineOpt, optList, optChips, unitBreak, compressImage, api, DEMO, receiptDoc, printReceipt, toast };
 })();
