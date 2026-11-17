@@ -166,10 +166,10 @@ window.PALTONG_MENU_IMG = {
     "뼈|간장|치즈볼만 (8pcs)":"images/menu/set_lady_bone_soy_8.jpg",
     "뼈|양념|치즈볼(4pcs)+치즈스틱+감튀":"images/menu/set_lady_bone_yang_mix.jpg",
     "뼈|양념|치즈볼만 (8pcs)":"images/menu/set_lady_bone_yang_8.jpg",
-    "무뼈|간장|치즈볼(4pcs)+치즈스틱+감튀":"images/menu/set_lady_nobone_soy_mix.jpg",
-    "무뼈|간장|치즈볼만 (8pcs)":"images/menu/set_lady_nobone_soy_8.jpg",
-    "무뼈|양념|치즈볼(4pcs)+치즈스틱+감튀":"images/menu/set_lady_nobone_yang_mix.jpg",
-    "무뼈|양념|치즈볼만 (8pcs)":"images/menu/set_lady_nobone_yang_8.jpg",
+    "무뼈|간장|치즈볼(4pcs)+치즈스틱+감튀":"images/menu/set_lady_nobone_soy_mix.jpg?v=2",
+    "무뼈|간장|치즈볼만 (8pcs)":"images/menu/set_lady_nobone_soy_8.jpg?v=2",
+    "무뼈|양념|치즈볼(4pcs)+치즈스틱+감튀":"images/menu/set_lady_nobone_yang_mix.jpg?v=2",
+    "무뼈|양념|치즈볼만 (8pcs)":"images/menu/set_lady_nobone_yang_8.jpg?v=2",
   } },
   set_beerfit:     "images/menu/set_beerfit.jpg?v=2",       // 비어핏 세트
   set_redsamgyeop: { option:"주먹밥", by:{ "참치마요":"images/menu/set_redsamgyeop_tuna.jpg", "날치알":"images/menu/set_redsamgyeop_nalchi.jpg" } },  // 빨간 삼겹 세트
@@ -177,7 +177,7 @@ window.PALTONG_MENU_IMG = {
 
   /* 메인 안주류 */
   jikhwa_dakbal:      "images/menu/jikhwa_dakbal.jpg",       // 직화 닭발 (무뼈 사진)
-  gukmuldakbal:       { option:"부위", by:{ "뼈":"images/menu/gukmul_dakbal.jpg", "무뼈":"images/menu/gukmul_dakbal_boneless.jpg" } },  // 국물닭발 (무뼈 사진은 직화 무뼈를 국물로 합성)
+  gukmuldakbal:       { option:"부위", by:{ "뼈":"images/menu/gukmul_dakbal.jpg", "무뼈":"images/menu/gukmul_dakbal_boneless.jpg?v=2" } },  // 국물닭발 (무뼈 사진은 직화 무뼈를 국물로 합성)
   gomjangeo:          "images/menu/gomjangeo.jpg",           // 꼼장어
   redwing:            "images/menu/redwing.jpg",             // 빨간 날개
   dakdoritang:        "images/menu/dakdoritang.jpg",         // 닭도리탕
