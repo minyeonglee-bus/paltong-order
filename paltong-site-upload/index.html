@@ -222,10 +222,10 @@ function renderMenu(){
   const closed = isClosed(); paintClosed(closed);
   /* 품절 메뉴는 원래 카테고리에서 빼서 맨 아래 '품절' 카테고리에 모음 · 메뉴가 전부 품절인 카테고리는 탭까지 숨김 */
   let vi = 0;
-  const outItems = MENU.filter(c => c.cat !== "JTV" || PT.noSale).flatMap(c => c.items.filter(it => soldOut[it.id]));
-  const cats = MENU.filter(c => c.cat !== "JTV" || PT.noSale).map(c => ({ ...c, items: c.items.filter(it => !soldOut[it.id]) }));   // JTV 메뉴는 JTV 주소에서만 보임
+  const outItems = MENU.flatMap(c => c.items.filter(it => soldOut[it.id]));
+  const cats = MENU.map(c => ({ ...c, items: c.items.filter(it => !soldOut[it.id]) }));
   /* 맨 위: 🆕 신메뉴 · 🔥 인기메뉴 (관리자가 표시한 메뉴가 모임 — 원래 카테고리에도 그대로 있음) */
-  const all = MENU.filter(c => c.cat !== "JTV" || PT.noSale).flatMap(c => c.items).filter(it => !soldOut[it.id]);
+  const all = MENU.flatMap(c => c.items).filter(it => !soldOut[it.id]);
   cats.unshift({ cat:"🔥 인기메뉴", catEn:"🔥 BEST", items: all.filter(it => it.isHot), featured: true });
   cats.unshift({ cat:"🆕 신메뉴", catEn:"🆕 NEW", items: all.filter(it => it.isNew), featured: true });
   /* JTV 분류는 맨 위 (사장님 11/17) */
@@ -436,6 +436,11 @@ function openItem(item){
     s.el.querySelector('[data-a="inc"]').onclick = () => { qty++; render(); };
     s.el.querySelector(".close-x").onclick = s.close;
     s.el.querySelector(".primary-btn").onclick = () => {
+      if(item.cat === "JTV" && !PT.noSale){   // JTV 메뉴: JTV 주소가 아니면 못 담음 (사장님 11/17)
+        toast(T("배달 지역이 아니에요 (JTV 매장 주소에서만 주문할 수 있어요)","Not in our delivery area for this menu (JTV venues only)"), 3500);
+        if(!cust.addr && cust.otype !== "pickup"){ s.close(); openAddrGate(); }
+        return;
+      }
       const miss = groups.findIndex((g,gi) => isReq(g) && picked(gi) === 0);
       if(miss >= 0){ const g = groups[miss]; toast(T(`'${g.title}' 옵션을 선택해주세요 (필수)`, `Please choose '${g.titleEn || g.title}' (required)`)); return; }
       const opts = chosen().map(x => ({ g:x.g, c:x.ci, n:x.n,
