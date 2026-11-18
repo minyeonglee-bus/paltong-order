@@ -73,6 +73,7 @@ function exportMenu(){
     const o = { id: it.id, name: it.name, en: it.en || "", price: it.listPrice };
     if(it.onSale) o.sale = it.price;
     if(it.saleDine) o.saleDine = true;   // 🍽 다이닝에도 할인가 적용 (R15)
+    if(+it.dinePx > 0) o.dinePx = +it.dinePx;   // 🍺 다이닝 고정가 (11/19)
     if(it.isNew) o.isNew = true; if(it.isHot) o.isHot = true; if(it.isLimited) o.isLimited = true; if(it.hidden) o.hidden = true;
     if(it.rom) o.rom = it.rom; if(it.desc) o.desc = it.desc;   // 상세 창 이름 표기 (로마자 · 영어 설명)
     if(it.requires && it.requires.length) o.requires = it.requires.slice();

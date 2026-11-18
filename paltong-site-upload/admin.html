@@ -1411,7 +1411,8 @@ const reqOpt = t => { t = String(t || "").replace(/\s+/g, " ").trim().slice(0, 1
 const lineReq = l => { const x = (l.opts || []).find(o => o.req); return x ? x.req : ""; };
 function setLineReq(l, t){ l.opts = (l.opts || []).filter(o => !o.req); const x = reqOpt(t); if(x) l.opts.push(x); }
 /* 🍽 다이닝 가격: 메뉴 관리에서 '다이닝 포함'을 체크한 메뉴만 할인가, 나머지는 정가 (R15) */
-const dinePrice = it => it.onSale && !it.saleDine ? it.listPrice : it.price;
+/* 🍺 다이닝 고정가 (dinePx): 메뉴에 dinePx 가 있으면 다이닝(T)은 그 가격 (예: 생맥주 400 → 다이닝 180, 사장님 11/19) */
+const dinePrice = it => +it.dinePx > 0 ? +it.dinePx : it.onSale && !it.saleDine ? it.listPrice : it.price;
 function addItemModal(o, svc){
   const all = MENU.flatMap(c => c.items);
   const isCount = g => g.type === "count", isMulti = g => !isCount(g) && (g.max || 1) > 1;
@@ -1489,6 +1490,7 @@ function addItemModal(o, svc){
       }
       if(note) opts.push(reqOpt(note));
       line = { id: it.id, name: it.name, en: it.en || it.name, opts, unitPrice: unit };
+      if(dineMode && +it.dinePx > 0 && +it.dinePx !== it.price){ line.priceOrig = unit - +it.dinePx + it.price; line.priceByAdmin = true; line.dinePx = true; }   // 정가 대비 다이닝가 표시 · 메뉴판 가격 검사 통과
     } else {
       const name = ov.querySelector("#svName").value.trim(), price = Math.round(+ov.querySelector("#svPrice").value || 0);
       if(!name) return fail(L("메뉴 이름을 넣어주세요", "Enter a name"));
