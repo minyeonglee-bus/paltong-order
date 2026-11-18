@@ -435,29 +435,44 @@ function memoHTML(o){
   return `<br>📝 <b data-raw>${esc(main)}</b>${main !== m ? `<br><span class="hint">${L("원문", "Original")}: <span data-raw>${esc(m)}</span></span>` : wait ? ` <span class="hint">(${L("번역 중…", "translating…")})</span>` : ""}`;
 }
 /* 한글 화면: 외부 주문에 영어로 적힌 메뉴 이름 → 한글 (메뉴판 이름 → 단어 사전 → 못 바꾸면 원문) (사장님 2026-11-18) */
+/* 메뉴판 이름보다 먼저 바꿀 것 (Red wings → 빨간 날개) */
+const KO_WORDS_PRE = [
+  [/\bred\s*wings?\b/gi, "빨간 날개"], [/\bred\s*tuna(?:\s*rice\s*balls?)?\b/gi, "빨간 참치"], [/\btuna\s*mayo(?:\s*rice\s*balls?)?\b/gi, "참치 마요"], [/\bred\s*samgyeop(?:sal)?\b/gi, "빨간 삼겹"],
+  [/\bchicken\s*feet\s*soup\b|\bdakbal\s*soup\b/gi, "국물닭발"], [/\bflying\s*fish\s*roe\b|\bnalchial\b/gi, "날치알"],
+];
 const KO_WORDS = [
   [/\bsteamed\s*eggs?\b/gi, "계란찜"], [/\brice\s*balls?\b/gi, "주먹밥"], [/\bfried\s*rice\b/gi, "볶음밥"], [/\bchicken\s*feet\b/gi, "닭발"], [/\bdakbal\b/gi, "닭발"],
   [/\bbaby\s*octopus\b/gi, "쭈꾸미"], [/\boctopus\b/gi, "낙지"], [/\bpork\s*belly\b/gi, "삼겹살"], [/\bgizzards?\b/gi, "닭똥집"], [/\bcartilage\b/gi, "오돌뼈"], [/\beel\b/gi, "꼼장어"],
   [/\bfish\s*cake\s*soup\b/gi, "오뎅탕"], [/\bfish\s*cakes?\b/gi, "오뎅"], [/\bsausages?\b/gi, "소세지"], [/\bcheese\s*balls?\b/gi, "치즈볼"], [/\bcheese\s*sticks?\b/gi, "치즈스틱"],
   [/\b(?:french\s*)?fries\b/gi, "감자튀김"], [/\btteokbokki\b/gi, "떡볶이"], [/\bram(?:en|yeon|yun)\b/gi, "라면"], [/\bsteamed\s*rice\b/gi, "공기밥"], [/\bwings?\b/gi, "날개"],
   [/\bself\b|\bdiy\b/gi, "셀프"], [/\bgrilled\b/gi, "직화"], [/\bsoup\b/gi, "국물"], [/\bfried\b/gi, "후라이드"], [/\byangnyeom\b/gi, "양념"], [/\bgarlic\b/gi, "마늘"], [/\bsoy\b/gi, "간장"],
-  [/\bspicy\b/gi, "매운"], [/\bhalf\b/gi, "반마리"], [/\bwhole\b/gi, "한마리"], [/\bbone[\s-]*in\b/gi, "뼈"], [/\bchicken\b/gi, "치킨"],
+  [/\bless\s*spicy\b/gi, "덜맵게"], [/\bextra\s*spicy\b/gi, "더맵게"], [/\bspicy\b/gi, "매운"], [/\bhalf\b/gi, "반마리"], [/\bwhole\b/gi, "한마리"], [/\bbone[\s-]*in\b|\bbones?\b/gi, "뼈"], [/\bred\b/gi, "빨간"], [/\btuna\b/gi, "참치"], [/\broe\b/gi, "날치알"], [/\bchicken\b/gi, "치킨"],
   [/\bcoke\s*zero\b/gi, "콜라 제로"], [/\bcoke\b/gi, "콜라"], [/\bsprite\b/gi, "사이다"], [/\bwater\b/gi, "생수"], [/\bbeer\b/gi, "맥주"],
 ];
 const nzEn = s => String(s || "").toLowerCase().replace(/[^a-z0-9]/g, "").replace(/s$/, "");
+/* 메뉴판 영어 이름 조각들: "Gukmul Dakbal (Chicken Feet Soup)" → 전체 · 괄호 앞 · 괄호 안 */
+function enKeys(en){
+  const s = String(en || ""), out = [s], m = s.match(/^(.*?)\s*\((.*?)\)\s*(.*)$/);
+  if(m){ out.push(m[1], m[2], (m[1] + " " + m[3]).trim()); }
+  return out.map(x => x.trim()).filter(x => x.length >= 3);
+}
 function koItemName(name){
   if(!name || PT.hasHangul(name) || !/[A-Za-z]/.test(name)) return "";
   const all = MENU.flatMap(c => c.items), n = nzEn(name);
-  const hit = all.find(it => it.en && nzEn(it.en) === n); if(hit) return hit.name;
+  const hit = all.find(it => enKeys(it.en).some(k => nzEn(k) === n)); if(hit) return hit.name;
+  for(const it of all) for(const g of it.options || []) for(const c of g.choices || []) if(c.en && nzEn(c.en) === n) return c.label;   // 옵션 이름 (Bone-in → 뼈)
   let t = String(name);
-  all.filter(it => it.en && it.en.length >= 4).sort((a, b) => b.en.length - a.en.length)
-    .forEach(it => { t = t.replace(new RegExp(`\\b${it.en.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b`, "gi"), it.name); });
-  const chick = /chicken|치킨/i.test(t);
+  KO_WORDS_PRE.forEach(([re, ko]) => { t = t.replace(re, ko); });
+  all.flatMap(it => enKeys(it.en).filter(k => k.length >= 6 && /\s/.test(k) && !/[\/·]/.test(k)).map(k => [k, it.name])).sort((a, b) => b[0].length - a[0].length)
+    .forEach(([k, ko]) => { t = t.replace(new RegExp(`\\b${k.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b`, "gi"), ko); });
+  const chick = /chicken|치킨/i.test(t) && !/feet|wing/i.test(t);
   t = t.replace(/\bboneless\b/gi, chick ? "순살" : "무뼈");
   KO_WORDS.forEach(([re, ko]) => { t = t.replace(re, ko); });
-  t = t.replace(/\s{2,}/g, " ").trim();
+  t = [...new Set(t.split(/\s+/))].join(" ").trim();   // "순살 순살 후라이드 치킨" → 한 번만
   return PT.hasHangul(t) && t !== name ? t : "";
 }
+/* 한글 화면: 옵션·메모 옵션도 영어면 한글로 (Bone → 뼈, flying fish roe → 날치알) */
+const koLine = l => EN() || !(l.opts || []).length ? l : { ...l, opts: l.opts.map(o => { const ko = !PT.hasHangul(o.ko || "") && koItemName(o.ko || o.en); return ko ? { ...o, ko } : o; }) };
 /* 메뉴 줄 이름 HTML — 한글 화면에서 영어 이름이면 한글로 + 원래 이름 작게 */
 function lineNameHTML(l){
   const nm = PT.shortName(l, EN());
@@ -570,7 +585,7 @@ function dnCard(o){
     <div class="ohead"><span class="no">${esc(PT.orderCode(o))}</span><span class="status-pill" style="background:#e5a731">${L("미결제", "Unpaid")}</span>
       <span class="time">${new Date(o.created_at).toLocaleTimeString(EN() ? "en-US" : "ko-KR", { hour:"numeric", minute:"2-digit", timeZone:"Asia/Manila" })} · ${m < 60 ? L(`${m}분째`, `${m} min`) : L(`${Math.floor(m/60)}시간 ${m%60}분째`, `${Math.floor(m/60)}h ${m%60}m`)}</span></div>
     <div class="items">${items.map((l, i) => `<div class="sum-row" style="align-items:center;gap:6px">
-        <span style="flex:1;min-width:0"><b>${esc(PT.shortName(l, EN()))}</b>${PT.isSvc(l) ? ` <b style="color:var(--red-deep)">${L("서비스", "FREE")}</b>` : ""}${PT.optChips(l, EN())}</span>
+        <span style="flex:1;min-width:0"><b>${esc(PT.shortName(l, EN()))}</b>${PT.isSvc(l) ? ` <b style="color:var(--red-deep)">${L("서비스", "FREE")}</b>` : ""}${PT.optChips(koLine(l), EN())}</span>
         <span style="white-space:nowrap;display:flex;align-items:center;gap:4px"><button class="chip" data-dq="${i}|-1">−</button><b>${l.qty}</b><button class="chip" data-dq="${i}|1">+</button>
         <span style="min-width:64px;text-align:right">${PT.isSvc(l) ? "₱0" : peso(l.unitPrice * l.qty)}</span>${PT.isSvc(l) ? "" : `<button class="chip" data-dprice="${i}" title="${L("가격 수정", "Edit price")}">✏️</button><button class="chip" data-dsvc="${i}" title="${L("서비스로", "Make free")}">🎁</button>`}</span></div>`).join("")}</div>
     <div class="calc-box">
@@ -828,7 +843,7 @@ function cardHTML(o){
   const warns = dine ? [] : priceWarnings(o);
   const svcOk = !["done","cancelled"].includes(o.status) || priceUnlocked(o);   // 완료된 주문은 🔓 관리자 비밀번호로 열었을 때만
   const itemsHTML = (o.items||[]).map((l, li) => { const add = l.added && !dine;   // ➕추가 = 주문 후에 더 넣은 메뉴 (다이닝은 계속 추가하니까 표시 안 함)
-    return `<div class="sum-row"${PT.isSvc(l) ? ' style="background:#fde8e4;color:#3a2a20;border-radius:6px"' : add ? ' style="background:#fff1c9;color:#3a2a20;border-radius:6px"' : ""}><span>${PT.isSvc(l) ? (l.couponFree ? '<b style="color:var(--green)">🎟쿠폰 무료</b> ' : '<b style="color:#b42318">🎁서비스</b> ') : add ? '<b style="color:#b42318">➕추가</b> ' : ""}<span data-raw>${lineNameHTML(l)}</span> <b style="font-size:1.08em">×${l.qty}</b>${PT.optChips(l, EN())}${PT.unitBreak(l, EN()) ? `<div class="hint" style="margin:0;font-size:12px">${PT.unitBreak(l, EN())}</div>` : ""}</span><span style="white-space:nowrap">${PT.isSvc(l) ? `${l.origUnit ? `<s class="hint">${peso(l.origUnit*l.qty)}</s> ` : ""}<b style="color:var(--red-deep)">${L("무료", "FREE")}</b>` : `${l.priceOrig != null ? `<s class="hint">${peso(l.priceOrig*l.qty)}</s> ` : ""}${peso(l.unitPrice*l.qty)}`}${svcOk && !l.ext
+    return `<div class="sum-row"${PT.isSvc(l) ? ' style="background:#fde8e4;color:#3a2a20;border-radius:6px"' : add ? ' style="background:#fff1c9;color:#3a2a20;border-radius:6px"' : ""}><span>${PT.isSvc(l) ? (l.couponFree ? '<b style="color:var(--green)">🎟쿠폰 무료</b> ' : '<b style="color:#b42318">🎁서비스</b> ') : add ? '<b style="color:#b42318">➕추가</b> ' : ""}<span data-raw>${lineNameHTML(l)}</span> <b style="font-size:1.08em">×${l.qty}</b>${PT.optChips(koLine(l), EN())}${PT.unitBreak(l, EN()) ? `<div class="hint" style="margin:0;font-size:12px">${PT.unitBreak(l, EN())}</div>` : ""}</span><span style="white-space:nowrap">${PT.isSvc(l) ? `${l.origUnit ? `<s class="hint">${peso(l.origUnit*l.qty)}</s> ` : ""}<b style="color:var(--red-deep)">${L("무료", "FREE")}</b>` : `${l.priceOrig != null ? `<s class="hint">${peso(l.priceOrig*l.qty)}</s> ` : ""}${peso(l.unitPrice*l.qty)}`}${svcOk && !l.ext
       ? (PT.isSvc(l) ? (l.couponFree ? "" : ` <button class="chip" data-unsvc="${li}" title="${L("서비스 취소", "Undo service")}">↩</button>`) : ` <button class="chip" data-lprice="${li}" title="${L("가격 수정", "Edit price")}">✏️</button> <button class="chip" data-svc="${li}" title="${L("서비스로 처리", "Make it free")}">🎁</button>${l.byAdmin ? ` <button class="chip" data-rmadm="${li}" title="${L("관리자가 추가한 메뉴 빼기", "Remove (added by admin)")}">✕</button>` : ""}`) : ""}</span></div>`; }).join("")
     + (PT.svcValue(o) ? `<div class="sum-row" style="color:var(--red-deep);font-weight:800"><span>🎁 ${L("서비스", "Service")}</span><span>${peso(PT.svcValue(o))} ${L("상당 · 무료", "value · free")}</span></div>` : "")
     + (svcOk ? `<div class="btn-row" style="margin:4px 0"><button class="ghost-btn sm" data-itemadd>➕ ${L("메뉴 추가", "Add item")}</button><button class="ghost-btn sm" data-svcadd>🎁 ${L("서비스 추가", "Add free item")}</button><button class="ghost-btn sm" data-adddc>🏷 ${L("추가/할인", "Add/DC")}</button></div>` : "");
