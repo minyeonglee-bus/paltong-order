@@ -10,7 +10,7 @@ const DICT = [
   ["빨통 관리자 로그인", "PAL TONG Admin sign-in"], ["빨통 관리자 · Admin", "PAL TONG Admin"], ["빨통 관리자", "PAL TONG Admin"],
   ["아이디", "ID"], ["비밀번호", "Password"], ["로그인 실패:", "Sign-in failed:"], ["로그인", "Sign in"], ["로그아웃", "Log out"],
   ["데모 모드: 아무 값이나 입력해도 로그인됩니다.", "Demo mode: any ID/password works."],
-  ["주문 관리 · Orders", "Orders"], ["🔔 알림 켜기", "🔔 Turn on alerts"], ["🔔 알림 켜짐", "🔔 Alerts on"], ["🔔 알림 ON", "🔔 Alerts ON"], ["🔕 알림 OFF", "🔕 Alerts OFF"],
+  ["주문 관리 · Orders", "Orders"], ["주문 관리", "Orders"], ["추가/할인", "Add/DC"], ["🔔 알림 켜기", "🔔 Turn on alerts"], ["🔔 알림 켜짐", "🔔 Alerts on"], ["🔔 알림 ON", "🔔 Alerts ON"], ["🔕 알림 OFF", "🔕 Alerts OFF"],
   ["🔔 알림 소리를 켜려면 화면을 아무 곳이나 한 번 눌러주세요", "🔔 Tap anywhere once to turn on alert sounds"], ["알림 소리를 껐습니다", "Alert sound off"],
   ["🖨 프린터 연결", "🖨 Connect printer"], ["🖨 프린터", "🖨 Printer"], ["🖨 인쇄창", "🖨 Print dialog"], ["💬 채팅", "💬 Chat"], ["📸 리뷰 인증", "📸 Reviews"],
   ["👥 회원·쿠폰", "👥 Members·Coupons"], ["🙋 직원", "🙋 Staff"], ["🍽 다이닝", "🍽 Dining"], ["블루투스 바로 연결 (아이폰은 Bluefy)", "Bluetooth direct (iPhone: Bluefy app)"], ["▸기기", "▸Device"], ["▸손님·주문", "▸Customers"], ["▸직원", "▸Staff"], ["▸가게", "▸Store"], ["🛵 기사", "🛵 Riders"], ["품절 관리", "Sold out"], ["🍽 메뉴 관리", "🍽 Menu"], ["📦 재고", "📦 Stock"],
