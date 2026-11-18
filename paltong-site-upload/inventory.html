@@ -78,10 +78,10 @@ const BOXCATS = ["dry", "korea"];
 /* 세는 법 설명 (실사 화면) */
 const CAT_HINT = {
   korea:"📦 box + plastic 으로 세기 (1 plastic = 용기 100개) · Count boxes + plastics (1 plastic = 100 pcs)",
-  container:"🥡 pack + 낱개로 세기 (1 pack = 50개) · Count packs + loose pcs (1 pack = 50 pcs)",
+  container:"🥡 묶음(plastic·pack) + 낱개로 세기 · Count bundles + loose pcs",
   dry:"📦 box + plastic(pack) 으로 세기 · Count boxes + plastics/packs",
   frozen:"🧊 팩으로 세기 · Count in PACKS. <b>뜯은 팩은 0.5</b> · <b>Opened pack = 0.5</b><br>삼겹살 · 로컬 쭈꾸미 · 똥집 · 순살 닭고기 · <b>닭발(뼈·무뼈)</b>은 <b>kg</b> (저울, 예: 2.5, 해동한 것도 같이) · Pork belly, local pusit, gizzard, boneless chicken, <b>dakbal</b> in <b>kg</b> (weigh, e.g. 2.5, include thawed)<br>🥣 양념 버무린 것(날개 · 뼈 닭발)도 <b>kg</b> — 볼 여러 개면 무게 합쳐서 (예: 1.8 + 0.7 = 2.5) — <b>이것부터 먼저 나감</b> · Mixed-with-sauce also in <b>kg</b> (add up all bowls) — <b>used first</b><br>먹태는 개수 · Maktae in pcs",
-  chicken:"☑️ 주문해야 하면 체크 · Tick if it needs ordering (바로 저장 · saves right away)",
+  chicken:"☑️ 소스는 주문해야 하면 체크 (바로 저장) · Tick sauces that need ordering (saves right away) · 치킨 파우더는 plastic 개수 · Chicken powder: count plastics",
   drink:"🥫 캔 개수 · Count cans"
 };
 const rowHint = i => i.unit === "bowl" ? "🥣 볼 개수, 반 볼 0.5 · bowls, half = 0.5" : i.unit === "kg" ? "⚖️ kg (예 2.5 · e.g. 2.5)" : (i.cat === "frozen" && i.unit === "pack") ? "뜯은 팩 0.5 · opened = 0.5" : "";
@@ -195,7 +195,7 @@ function bindFlags(){
 function copyReport(){
   const act = items.filter(i => i.active && i.counted_at), line = i => `${i.name} - ${qtyTxt(i)}`;
   const need = items.filter(i => i.active && isFlag(i) && i.need_order);
-  const txt = Object.keys(CATS).filter(c => c !== "chicken").map(c => { const l = act.filter(i => i.cat === c && !isFlag(i) && i.qty > 0); return l.length ? `(${REP_T[c]})\n${l.map(line).join("\n")}\n\n` : ""; }).join("") +
+  const txt = Object.keys(CATS).map(c => { const l = act.filter(i => i.cat === c && !isFlag(i) && i.qty > 0); return l.length ? `(${REP_T[c]})\n${l.map(line).join("\n")}\n\n` : ""; }).join("") +
     (need.length ? `(Need to order)\n${need.map(i => i.name).join("\n")}\n\n` : "") +
     `(No stock)\n${act.filter(i => !isFlag(i) && i.qty <= 0).map(i => i.name).join("\n")}`;
   navigator.clipboard.writeText(txt).then(() => toast("복사됨 · Copied")).catch(() => prompt("Copy:", txt));
