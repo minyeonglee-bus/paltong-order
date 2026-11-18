@@ -666,9 +666,19 @@ const recvHTML = o => o.received_amount == null ? "" : o.received_diff
 /* ---------------- 💰 받은 금액 확인 (46단계) ----------------
    계산 완료 때: 현금 = 받은 돈 입력 선택(비우면 딱 맞게), GCash·Maya·계좌 = 받은 금액 꼭 입력.
    받을 금액과 다르면 '왜 다른지' + '왜 미리 안내 안 했는지'를 써야 완료 */
-const PAY_NAME = m => m === "cash" ? L("현금", "Cash") : m === "gcash" ? "GCash" : m === "maya" ? "Maya" : m === "bank" ? L("계좌이체", "Bank") : (m || "");
-function recvBoxHTML(due){
-  return `<div id="rvCash">${cashBoxHTML(due)}</div>
+const PAY_NAME = m => m === "cash" ? L("현금", "Cash") : m === "gcash" ? "GCash" : m === "maya" ? "Maya" : m === "bank" ? L("계좌이체", "Bank") : m === "split" ? L("나눠 받음", "Split") : (m || "");
+/* 🔀 나눠내기 (다이닝 결제 완료) — 현금·GCash·Maya 금액을 따로 넣으면 캐시북에 결제수단마다 1줄 */
+const DP_SPLIT = [["cash", () => L("💵 현금", "💵 Cash")], ["gcash", () => "GCash"], ["maya", () => "Maya"]];
+function recvBoxHTML(due, opts){
+  const split = opts && opts.split;
+  return `${split ? `<div id="rvSplit" class="calc-box" style="margin:0 0 12px" hidden>
+      <p class="hint" style="margin:0 0 8px">${L("결제수단마다 받은 금액을 넣으세요. 현금은 거스름돈 주고 <b>남는 금액</b>.", "Enter what you got by each method (cash = what you keep after change).")}</p>
+      ${DP_SPLIT.map(([k, n]) => `<div class="field" style="margin:0 0 8px;display:flex;gap:8px;align-items:center">
+        <label style="margin:0;min-width:84px">${n()}</label>
+        <input data-sp="${k}" type="number" min="0" inputmode="numeric" placeholder="0" style="flex:1;min-width:0;font-size:18px;font-weight:800">
+        <button type="button" class="chip" data-sprest="${k}" style="padding:7px 10px;font-size:12.5px;white-space:nowrap">= ${L("나머지", "rest")}</button></div>`).join("")}
+      <div class="sum-row total" id="rvSplitSum" style="margin:4px 0 0"><span>${L("합계", "Total")}</span><b>—</b></div></div>` : ""}
+    <div id="rvCash">${cashBoxHTML(due)}</div>
     <div id="rvOnline" class="calc-box" style="margin:0 0 12px" hidden>
       <div class="field" style="margin:0"><label>💳 <span id="rvWay"></span> ${L("받은 금액 (입금 내역에서 확인한 금액) — 꼭 입력", "Amount received (check the transfer) — required")}</label>
         <input id="rvGot" type="number" min="0" inputmode="numeric" placeholder="${due}" style="font-size:22px;font-weight:800"></div>
@@ -683,27 +693,46 @@ function recvBoxHTML(due){
 function bindRecv(ov, due, getMethod){
   bindCashBox(ov, due);   // 빠른 버튼 · 거스름돈 표시
   const q = x => ov.querySelector(x), cashIn = q("#cashGot"), onIn = q("#rvGot");
+  const spIns = [...ov.querySelectorAll("[data-sp]")];
+  const spVals = () => { const o = {}; spIns.forEach(i => { const v = i.value === "" ? 0 : Math.round(+i.value); if(v > 0) o[i.dataset.sp] = v; }); return o; };
   const calc = () => {
     const m = getMethod();
+    if(m === "split"){
+      if(spIns.some(i => i.value !== "" && (isNaN(+i.value) || +i.value < 0))) return null;
+      const parts = spVals(), keys = Object.keys(parts); if(!keys.length) return null;
+      const sum = keys.reduce((a, k) => a + parts[k], 0);
+      return { got: sum, kept: sum, diff: sum - due, change: 0, split: keys.length > 1 ? parts : null, one: keys.length === 1 ? keys[0] : null };
+    }
     if(m === "cash"){ const v = cashIn.value === "" ? due : Math.round(+cashIn.value); if(isNaN(v)) return null; return { got: v, kept: Math.min(v, due), diff: v >= due ? 0 : v - due, change: Math.max(0, v - due) }; }
     if(onIn.value === "") return null;
     const v = Math.round(+onIn.value); if(isNaN(v) || v < 0) return null;
     return { got: v, kept: v, diff: v - due, change: 0 };
   };
   const paint = () => {
-    const m = getMethod(); q("#rvCash").hidden = m !== "cash"; q("#rvOnline").hidden = m === "cash"; q("#rvWay").textContent = PAY_NAME(m);
+    const m = getMethod(), sp = m === "split"; q("#rvCash").hidden = sp || m !== "cash"; q("#rvOnline").hidden = sp || m === "cash"; q("#rvWay").textContent = PAY_NAME(m);
+    if(q("#rvSplit")){ q("#rvSplit").hidden = !sp;
+      const sum = Object.values(spVals()).reduce((a, v) => a + v, 0), rest = due - sum;
+      q("#rvSplitSum").innerHTML = `<span>${L("합계", "Total")} ${peso(sum)}</span><b style="color:${rest === 0 ? "var(--green)" : "var(--red-deep)"}">${rest === 0 ? "✓ " + L("딱 맞음", "exact") : rest > 0 ? L("남은 금액 ", "Left ") + peso(rest) : L("초과 ", "Over ") + peso(-rest)}</b>`; }
     const c = calc(), d = c ? c.diff : 0; q("#rvDiff").hidden = !d;
     if(d){ q("#rvDiffLbl").textContent = d < 0 ? L("⚠️ 덜 받음", "⚠️ Short") : L("⚠️ 더 받음", "⚠️ Over"); q("#rvDiffAmt").textContent = (d < 0 ? "−" : "+") + peso(Math.abs(d)); }
   };
   cashIn.addEventListener("input", paint); onIn.addEventListener("input", paint);
+  spIns.forEach(i => i.addEventListener("input", paint));
+  ov.querySelectorAll("[data-sprest]").forEach(b => b.onclick = () => {
+    const k = b.dataset.sprest, other = spIns.filter(i => i.dataset.sp !== k).reduce((a, i) => a + (Math.round(+i.value) || 0), 0);
+    ov.querySelector(`[data-sp="${k}"]`).value = Math.max(0, due - other); paint(); });
   ov.querySelectorAll("[data-cq]").forEach(b => b.addEventListener("click", paint));
   q("#rvSame").onclick = () => { onIn.value = due; paint(); };
   paint();
   return {
     paint,
-    focus(){ const el = getMethod() === "cash" ? cashIn : onIn; setTimeout(() => el.focus(), 60); },
+    focus(){ const m = getMethod(), el = m === "split" ? spIns[0] : m === "cash" ? cashIn : onIn; if(el) setTimeout(() => el.focus(), 60); },
     read(){   // 잘못되면 안내하고 null
-      const m = getMethod(), c = calc();
+      let m = getMethod(); const c = calc();
+      if(m === "split"){
+        if(!c){ toast(L("결제수단마다 받은 금액을 넣어주세요", "Enter the amount for each method"), 3500); spIns[0].focus(); return null; }
+        if(!c.split) m = c.one;   // 한 가지만 넣으면 그 결제수단으로
+      }
       if(!c){ toast(m === "cash" ? L("받은 돈을 숫자로 넣어주세요", "Enter the cash received") : L(`${PAY_NAME(m)}로 받은 금액을 꼭 넣어주세요`, `Enter the amount received by ${PAY_NAME(m)}`), 3500); (m === "cash" ? cashIn : onIn).focus(); return null; }
       const reason = q("#rvReason").value.trim(), unrep = q("#rvUnrep").value.trim();
       if(c.diff && reason.length < 2){ toast(L("금액이 달라요 — 왜 다른지 적어주세요", "Amount differs — explain why"), 3500); q("#rvReason").focus(); return null; }
@@ -730,6 +759,7 @@ function payCheckModal(o, { due, method, title, okLabel, hint }){
 /* 받은 금액을 주문에 저장 — 46단계 SQL 전이면 경고만 하고 계속 */
 async function saveRecv(o, r, base){
   const patch = { received_amount: (base || 0) + r.kept, received_method: r.method, received_at: new Date().toISOString() };
+  if(r.split) patch.split_pay = r.split;   // 나눠내기 → 캐시북에 결제수단마다 1줄
   if(r.diff){ patch.received_diff = (o.received_diff || 0) + r.diff; patch.received_reason = [o.received_reason, r.reason].filter(Boolean).join(" / "); patch.received_unreported = [o.received_unreported, r.unreported].filter(Boolean).join(" / "); }
   else if(o.received_diff == null) patch.received_diff = 0;
   try{ const n = await api.updateOrder(o.id, patch); Object.assign(o, n || patch); return true; }
@@ -742,18 +772,20 @@ function dinePayModal(o){
   let pay = "cash";
   const ov = modal(`💳 ${esc(PT.orderCode(o))} ${L("결제 완료", "Mark paid")}`, `
     <div class="sum-row total" style="font-size:22px;margin:0 0 12px"><span>${L("받을 금액", "Amount")}</span><b>${peso(o.total)}</b></div>
-    <div class="field"><label>${L("결제 수단", "Paid with")}</label><div class="chips" id="dpWay">${[["cash", L("현금", "Cash")], ["gcash", "GCash"], ["maya", "Maya"], ["bank", "Metrobank"]].map(([k, n]) => `<button type="button" class="chip ${k === pay ? "sel" : ""}" data-w="${k}" style="padding:10px 14px;font-size:14px">${n}</button>`).join("")}</div></div>
-    ${recvBoxHTML(o.total)}
+    <div class="field"><label>${L("결제 수단", "Paid with")}</label><div class="chips" id="dpWay">${[["cash", L("현금", "Cash")], ["gcash", "GCash"], ["maya", "Maya"], ["split", L("🔀 나눠내기", "🔀 Split")]].map(([k, n]) => `<button type="button" class="chip ${k === pay ? "sel" : ""}" data-w="${k}" style="padding:10px 14px;font-size:14px">${n}</button>`).join("")}</div></div>
+    ${recvBoxHTML(o.total, { split: true })}
     <label class="hint" style="display:flex;gap:6px;align-items:center;margin:0 0 12px"><input type="checkbox" id="dpPrint" checked> ${L("영수증 인쇄", "Print receipt")}</label>
     <p class="hint" style="margin:0 0 8px">${L("결제 완료하면 이 주문은 잠겨서 더 고칠 수 없고, 바로 Cash Book 매출로 들어가요.", "After this the order is locked and goes to the Cash Book right away.")}</p>`,
     async ov => {
       const rec = rv.read(); if(!rec) return false;
-      const got = pay === "cash" ? rec.got : null;
+      const got = rec.method === "cash" ? rec.got : null;
+      // 나눠내면 주문의 결제수단 = 가장 큰 금액 (캐시북은 나눠진 대로 들어감)
+      const payAs = rec.split ? Object.entries(rec.split).sort((a, b) => b[1] - a[1])[0][0] : rec.method;
       // 🙋 다이닝은 최종 계산할 때만 직원 확인 (결제 받은 직원으로 기록) — 잠기기 전에 저장
       const stf = await staffPick(L(`${PT.orderCode(o)} ${peso(o.total)} 결제를 받는 직원`, `Who is taking payment for ${PT.orderCode(o)}?`)); if(!stf) return false;
       if(stf.id){ try{ const r = await api.setOrderStaff(o.id, stf.id, stf.pin); o.staff_id = r.id; o.staff_name = r.name; }catch(e){ toast(staffErr(e), 4000); return false; } }
       if(!(await saveRecv(o, rec, 0))) return false;
-      try{ const n = await api.dinePay(o.id, pay); Object.assign(o, n || {});
+      try{ const n = await api.dinePay(o.id, payAs); Object.assign(o, n || {});
         if(got != null && rec.change){ o._cashGot = got; toast(L(`${PT.orderCode(o)} 결제 완료 · 거스름돈 ${peso(rec.change)}`, `${PT.orderCode(o)} paid · change ${peso(rec.change)}`), 6000); }
         else toast(L(`${PT.orderCode(o)} 결제 완료 · ${peso(o.total)}`, `${PT.orderCode(o)} paid`), 3500);
         if(ov.querySelector("#dpPrint").checked) doPrint(o); await loadOrders(); }
