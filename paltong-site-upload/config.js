@@ -30,7 +30,6 @@ window.PALTONG_CONFIG = {
     cash:  { label: "만나서 현금결제", labelEn: "Cash on Delivery" },
     gcash: { label: "GCash",     labelEn: "GCash",     accountName: "M****G L.", accountNo: "0945 427 8255",    qr: "images/GCASH.JPG" },
     maya:  { label: "Maya",      labelEn: "Maya",      accountName: "M****G L",  accountNo: "0960 324 9922",    qr: "images/MAYA.PNG" },
-    bank:  { label: "Metrobank", labelEn: "Metrobank", accountName: "M****G L",  accountNo: "292-392-357-0137", qr: "images/METROBANK.JPG" },
   },
 
   /* ---- 영수증 프린터 ----  58 또는 80 (mm) */

@@ -2139,7 +2139,7 @@ function openCatManager(){
 function editPayModal(o){
   const total = o.total ?? o.subtotal ?? 0, done = o.status === "done" || o.received_amount != null || o.paid_total != null;
   const cur = o.received_method === "split" ? "split" : (o.payment || "cash");
-  const WAYS = [["cash", L("💵 현금", "💵 Cash")], ["gcash", "GCash"], ["maya", "Maya"], ["bank", L("🏦 계좌이체", "🏦 Bank")]];
+  const WAYS = [["cash", L("💵 현금", "💵 Cash")], ["gcash", "GCash"], ["maya", "Maya"]];   // Metrobank(계좌이체) 결제는 없앰
   const sp = o.split_pay && typeof o.split_pay === "object" ? o.split_pay : {};
   const ov = modal(`💳 ${esc(PT.orderCode(o))} ${L("결제 방법 바꾸기", "Change payment method")}`, `
     <p class="hint" style="margin-top:0">${L("지금", "Now")}: <b>${esc(cur === "split" ? L("나눠 받음", "Split") : PAY_NAME(cur))}</b> · ${L("금액", "Amount")} <b>${peso(total)}</b>${done ? ` · <span style="color:#b45309">${L("완료·결제된 주문 — 비밀번호 필요", "Done/paid order — password needed")}</span>` : ""}</p>
@@ -3818,7 +3818,7 @@ async function extOrderModal(pre){   // pre = { text, ch, inboxId } — 📥 DK 
     <label class="cp-row" style="margin:0 0 8px"><input type="checkbox" id="exPwd"><span><b>♿ ${L("PWD 할인 20%", "PWD discount 20%")}</b> <small>${L("(음식값에서)", "(on food)")}</small></span></label>
     <div class="sum-row total" id="exTotal" style="margin:0 0 12px"></div>
     <div class="field"><label>${L("결제", "Payment")}</label><select data-f="payment" class="note-in" style="margin:0">
-      <option value="cash" data-cashopt>${L("현금 (기사가 받음)", "Cash (rider collects)")}</option><option value="gcash">GCash ${L("결제 완료", "paid")}</option><option value="maya">Maya ${L("결제 완료", "paid")}</option><option value="bank">${L("계좌이체 결제 완료", "Bank transfer paid")}</option></select></div>
+      <option value="cash" data-cashopt>${L("현금 (기사가 받음)", "Cash (rider collects)")}</option><option value="gcash">GCash ${L("결제 완료", "paid")}</option><option value="maya">Maya ${L("결제 완료", "paid")}</option></select></div>
     <div class="field"><label>${L("요청사항 (기사에게 보임)", "Notes (shown to rider)")}</label><textarea data-f="memo" rows="2" class="note-in" style="margin:0"></textarea></div>
     <div class="field ex-dlv"><label>🛵 ${L("기사", "Rider")}</label><select data-f="rider_id" class="note-in" style="margin:0"><option value="">${L("— 나중에 배정 —", "— Assign later —")}</option>${act.map(r => `<option value="${r.user_id}">${r.on_duty ? "🟢" : "⚪"} ${esc(r.name)}</option>`).join("")}</select></div>`,
     async ov => {
