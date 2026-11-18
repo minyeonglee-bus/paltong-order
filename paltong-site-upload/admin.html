@@ -802,12 +802,32 @@ async function cashbookModal(day){
     b.disabled = false; };
   const go = ov.querySelector("#cbGo"); if(go) go.onclick = () => window.open(url, "paltong_cashbook");
 }
+/* 💳 하루 매출 = 캐시북과 같은 날짜 기준 (사장님 11/19 "주문톡이랑 캐시북 일치"): 돈 받은 영업일로 셈.
+   11/17 영업일 주문부터, 다음 영업일에 결제된 주문은 결제한 날 매출 (SQL cashbook_paid_day.sql 과 같은 규칙, 예: T-23·11/17 → 11/18).
+   결제 완료 = 완료(현금·다이닝) 또는 온라인 결제 확인 (캐시북으로 보내는 기준과 같음). 주문 건수는 그대로 주문한 날 기준. */
+const cbPaid = o => o.status === "done" || (["confirmed", "delivering"].includes(o.status) && o.paid_total != null && (o.payment || "cash") !== "cash");
+const cbAmt = o => Math.round(+(o.status === "done" ? o.total : o.paid_total) || 0);
+function cbPayDay(o){ const od = PT.orderDay(o), at = o.received_at || o.receipt_at; if(!at) return od; const pd = PT.bizDay(at); return pd > od && od >= "2026-11-17" ? pd : od; }
+let edgeDay = null, edgeList = [];   // 보는 날의 전날 주문 (전날 주문을 이날 결제한 것 찾기용)
+function edgeOrders(d){
+  const p = shiftDay(d, -1); if(inCache(p)) return [];
+  if(edgeDay !== p){ edgeDay = p; edgeList = []; api.listOrdersByDay(p).then(l => { if(edgeDay === p){ edgeList = l || []; renderOrders(); } }).catch(() => {}); }
+  return edgeList;
+}
 function dayHead(d, all){
   const live = all.filter(o => PT.orderDay(o) === d), ok = live.filter(o => o.status !== "cancelled");
-  const done = live.filter(o => o.status === "done"), sales = done.reduce((a, o) => a + (o.total || 0), 0);
+  const done = live.filter(o => o.status === "done");
+  const pool = new Map(); [...orders, ...(dayOrders || []), ...edgeOrders(d), ...all].forEach(o => pool.set(o.id, o));
+  const paid = [...pool.values()].filter(o => o.status !== "cancelled" && cbPaid(o) && cbPayDay(o) === d);
+  const sales = paid.reduce((a, o) => a + cbAmt(o), 0);
+  const tag = o => `${esc(PT.orderPrefix(o))}-${esc(o.order_no)}`, md = x => `${+x.slice(5, 7)}/${+x.slice(8, 10)}`;
+  const inn = paid.filter(o => PT.orderDay(o) !== d), out = ok.filter(o => cbPaid(o) && cbPayDay(o) !== d);
+  const moved = [...inn.map(o => `+ ${tag(o)}·${md(PT.orderDay(o))} ${peso(cbAmt(o))}`),
+                 ...out.map(o => `${tag(o)} ${peso(cbAmt(o))} → ${md(cbPayDay(o))}`)];
   const nos = ok.map(o => +o.order_no).filter(n => n > 0);
   return `<div class="dayhead"><b>📅 ${esc(dayLabel(d))}</b> <span class="hint" style="margin:0">${L("08:00 ~ 다음날 07:59", "8:00 AM – 7:59 AM")}</span>
-    <span class="hint">${L(`주문 ${ok.length}건`, `${ok.length} orders`)}${nos.length ? ` (#${Math.min(...nos)}~#${Math.max(...nos)})` : ""} · ${L(`완료 ${done.length}건`, `${done.length} done`)} · ${L("완료 매출", "Sales")} <b>${peso(sales)}</b>${live.length - ok.length ? ` · ${L(`취소 ${live.length - ok.length}건`, `${live.length - ok.length} cancelled`)}` : ""}</span></div>`;
+    <span class="hint">${L(`주문 ${ok.length}건`, `${ok.length} orders`)}${nos.length ? ` (#${Math.min(...nos)}~#${Math.max(...nos)})` : ""} · ${L(`완료 ${done.length}건`, `${done.length} done`)} · ${L("완료 매출", "Sales")} <b>${peso(sales)}</b>${live.length - ok.length ? ` · ${L(`취소 ${live.length - ok.length}건`, `${live.length - ok.length} cancelled`)}` : ""}</span>
+    ${moved.length ? `<span class="hint" style="margin:0" title="${L("캐시북과 같게: 돈 받은 날 매출", "Same as Cash Book: counted on the day paid")}">💳 ${L("결제일 기준", "by pay day")}: ${moved.join(" · ")}</span>` : ""}</div>`;
 }
 function renderOrders(){
   renderDaybar();
