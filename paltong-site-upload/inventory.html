@@ -71,13 +71,17 @@ const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&":"&amp;","<":"&l
 const un = ({ data, error }) => { if(error) throw error; return data; };
 const toast = (m, ms = 2400) => { const t = $("toast"); t.textContent = m; t.style.display = "block"; clearTimeout(t._h); t._h = setTimeout(() => t.style.display = "none", ms); };
 const fmt = n => { n = Number(n); if(!isFinite(n)) return "–"; const r = Math.round(n * 10) / 10; return (Object.is(r, -0) ? 0 : r).toString(); };
-const CATS = { korea:"🇰🇷 From Korea · 한국에서 오는 용기", dry:"Dry stock · 건자재", frozen:"Frozen stock · 냉동", drink:"Drinks · 음료" };
+const CATS = { korea:"🇰🇷 한국주문 컨테이너 · Korea order containers", container:"🥡 컨테이너 · Containers", dry:"Dry stock · 건자재", frozen:"Frozen stock · 냉동", chicken:"🍗 치킨 냉동 · Chicken frozen", drink:"Drinks · 음료" };
+/* 보고(주문톡) 제목 */
+const REP_T = { korea:"From Korea", container:"Containers", dry:"Dry stock", frozen:"Frozen stock", chicken:"Chicken frozen", drink:"Drinks" };
 const BOXCATS = ["dry", "korea"];
 /* 세는 법 설명 (실사 화면) */
 const CAT_HINT = {
   korea:"📦 box + plastic 으로 세기 (1 plastic = 용기 100개) · Count boxes + plastics (1 plastic = 100 pcs)",
+  container:"🥡 pack + 낱개로 세기 (1 pack = 50개) · Count packs + loose pcs (1 pack = 50 pcs)",
   dry:"📦 box + plastic(pack) 으로 세기 · Count boxes + plastics/packs",
   frozen:"🧊 팩으로 세기 · Count in PACKS. <b>뜯은 팩은 0.5</b> · <b>Opened pack = 0.5</b><br>삼겹살 · 로컬 쭈꾸미 · 똥집 · 순살 닭고기 · <b>닭발(뼈·무뼈)</b>은 <b>kg</b> (저울, 예: 2.5, 해동한 것도 같이) · Pork belly, local pusit, gizzard, boneless chicken, <b>dakbal</b> in <b>kg</b> (weigh, e.g. 2.5, include thawed)<br>🥣 양념 버무린 것(날개 · 뼈 닭발)도 <b>kg</b> — 볼 여러 개면 무게 합쳐서 (예: 1.8 + 0.7 = 2.5) — <b>이것부터 먼저 나감</b> · Mixed-with-sauce also in <b>kg</b> (add up all bowls) — <b>used first</b><br>먹태는 개수 · Maktae in pcs",
+  chicken:"☑️ 주문해야 하면 체크 · Tick if it needs ordering (바로 저장 · saves right away)",
   drink:"🥫 캔 개수 · Count cans"
 };
 const rowHint = i => i.unit === "bowl" ? "🥣 볼 개수, 반 볼 0.5 · bowls, half = 0.5" : i.unit === "kg" ? "⚖️ kg (예 2.5 · e.g. 2.5)" : (i.cat === "frozen" && i.unit === "pack") ? "뜯은 팩 0.5 · opened = 0.5" : "";
@@ -134,6 +138,7 @@ $("refresh").onclick = async () => { await load(); render(); toast("↻"); };
 document.querySelectorAll(".tabb").forEach(b => b.onclick = () => { tab = b.dataset.t; document.querySelectorAll(".tabb").forEach(x => x.classList.toggle("sel", x === b)); render(); });
 
 const isBundle = i => i.count_mode === "bundle_pcs" && Number(i.per_unit) > 0;   // 직접 사는 것: plastic(bundle) + pcs
+const isFlag = i => i.count_mode === "flag";   // 체크박스만: 주문필요
 const hasBox = i => !isBundle(i) && BOXCATS.includes(i.cat) && Number(i.box_size) > 0;
 /* Dry: "2 box 3 plastic" */
 function qtyTxt(i, q = i.qty, html = false){
@@ -148,19 +153,20 @@ function qtyTxt(i, q = i.qty, html = false){
   return html ? `${fmt(q)} <small>${esc(i.unit)}</small>` : `${fmt(q)} ${i.unit}`;
 }
 const auto = i => (i.per_unit != null || !i.use_unit) && recipes.some(r => r.item_id === i.id);
-const isLow = i => i.low_at != null && Number(i.qty) <= Number(i.low_at);
+const isLow = i => !isFlag(i) && i.low_at != null && Number(i.qty) <= Number(i.low_at);
 function render(){ ({ stock:renderStock, count:renderCount, hist:renderHist, recipe:renderRecipe })[tab](); }
 
 /* ---------- 재고 ---------- */
 function renderStock(){
-  const act = items.filter(i => i.active), out = act.filter(i => Number(i.qty) <= 0 && i.counted_at), low = act.filter(i => isLow(i) && Number(i.qty) > 0);
+  const act = items.filter(i => i.active), out = act.filter(i => !isFlag(i) && Number(i.qty) <= 0 && i.counted_at), low = act.filter(i => isLow(i) && Number(i.qty) > 0), need = act.filter(i => isFlag(i) && i.need_order);
   let h = "";
-  if(out.length || low.length) h += `<div class="alert">${out.length ? `<b>❌ No stock:</b> ${out.map(i => esc(i.name)).join(", ")}<br>` : ""}${low.length ? `<b>⚠️ 부족 · Low:</b> ${low.map(i => `${esc(i.name)} ${fmt(i.qty)}`).join(", ")}` : ""}</div>`;
+  if(out.length || low.length || need.length) h += `<div class="alert">${need.length ? `<b>🛒 주문필요 · Need to order:</b> ${need.map(i => esc(i.name)).join(", ")}<br>` : ""}${out.length ? `<b>❌ No stock:</b> ${out.map(i => esc(i.name)).join(", ")}<br>` : ""}${low.length ? `<b>⚠️ 부족 · Low:</b> ${low.map(i => `${esc(i.name)} ${fmt(i.qty)}`).join(", ")}` : ""}</div>`;
   h += `<div style="display:flex;gap:6px;flex-wrap:wrap;margin:6px 0"><button class="btn" id="copyRep">📋 주문톡용 복사 · Copy report</button><button class="btn" id="goCount">✍️ 지금 세기 · Count now</button></div>
     <p class="hint">🔄 = 주문 들어오면 자동으로 빠짐 · auto-deducted by orders. 나머지는 실사로만 바뀜 · others change only by count.</p>`;
   for(const c of Object.keys(CATS)){
     const list = act.filter(i => i.cat === c); if(!list.length) continue;
     h += `<div class="sec">${CATS[c]}</div><div class="card">` + list.map(i => {
+      if(isFlag(i)) return flagRow(i);
       const used = since[i.id] || 0, a = auto(i);
       return `<div class="row ${isLow(i) ? "low" : ""} ${Number(i.qty) <= 0 && i.counted_at ? "zero" : ""}">
         <div class="nm"><b>${esc(i.name)}</b>${a ? ' <span title="auto">🔄</span>' : ""}${!i.counted_at ? '<span class="tag g">아직 안 셈 · not counted</span>' : ""}${Number(i.qty) <= 0 && i.counted_at ? '<span class="tag r">No stock</span>' : isLow(i) ? '<span class="tag y">Low</span>' : ""}
@@ -173,12 +179,25 @@ function renderStock(){
   $("copyRep").onclick = copyReport; $("goCount").onclick = () => document.querySelector('[data-t="count"]').click();
   document.querySelectorAll("[data-in]").forEach(b => b.onclick = () => quickMove(b.dataset.in, 1));
   document.querySelectorAll("[data-out]").forEach(b => b.onclick = () => quickMove(b.dataset.out, -1));
+  bindFlags();
+}
+/* ☑️ 주문필요 체크박스 (치킨 냉동 등) — 누르면 바로 저장 */
+const flagRow = i => `<div class="row" style="grid-template-columns:1fr auto"><div class="nm"><b>${esc(i.name)}</b>${i.need_order ? '<span class="tag r">주문필요</span>' : ""}<div class="s">${esc(i.name_ko || "")}${i.counted_by && i.counted_at ? ` · ${new Date(i.counted_at).toLocaleString("ko-KR", { month:"numeric", day:"numeric", hour:"2-digit", minute:"2-digit" })} ${esc(i.counted_by)}` : ""}</div></div>
+  <label style="display:flex;gap:6px;align-items:center;font-weight:700;white-space:nowrap;cursor:pointer"><input type="checkbox" data-flag="${i.id}" ${i.need_order ? "checked" : ""} style="width:22px;height:22px"> 주문필요 · Need</label></div>`;
+function bindFlags(){
+  document.querySelectorAll("[data-flag]").forEach(cb => cb.onchange = async () => {
+    const n = who() || askWho(); if(!n){ cb.checked = !cb.checked; return; }
+    try{ un(await sb.from("inv_items").update({ need_order:cb.checked, counted_at:new Date().toISOString(), counted_by:n, updated_at:new Date().toISOString() }).eq("id", cb.dataset.flag));
+      await load(); render(); toast(cb.checked ? "🛒 주문필요 · Need to order" : "✓ 해제 · Cleared"); }
+    catch(e){ cb.checked = !cb.checked; toast("실패 · " + (e.message || e), 4000); }
+  });
 }
 function copyReport(){
   const act = items.filter(i => i.active && i.counted_at), line = i => `${i.name} - ${qtyTxt(i)}`;
-  const txt = (act.some(i => i.cat === "korea") ? `(From Korea)\n${act.filter(i => i.cat === "korea" && i.qty > 0).map(line).join("\n")}\n\n` : "") + `(Dry stock)\n${act.filter(i => i.cat === "dry" && i.qty > 0).map(line).join("\n")}\n\n(Frozen stock)\n${act.filter(i => i.cat === "frozen" && i.qty > 0).map(line).join("\n")}\n\n` +
-    (act.some(i => i.cat === "drink") ? `(Drinks)\n${act.filter(i => i.cat === "drink" && i.qty > 0).map(line).join("\n")}\n\n` : "") +
-    `(No stock)\n${act.filter(i => i.qty <= 0).map(i => i.name).join("\n")}`;
+  const need = items.filter(i => i.active && isFlag(i) && i.need_order);
+  const txt = Object.keys(CATS).filter(c => c !== "chicken").map(c => { const l = act.filter(i => i.cat === c && !isFlag(i) && i.qty > 0); return l.length ? `(${REP_T[c]})\n${l.map(line).join("\n")}\n\n` : ""; }).join("") +
+    (need.length ? `(Need to order)\n${need.map(i => i.name).join("\n")}\n\n` : "") +
+    `(No stock)\n${act.filter(i => !isFlag(i) && i.qty <= 0).map(i => i.name).join("\n")}`;
   navigator.clipboard.writeText(txt).then(() => toast("복사됨 · Copied")).catch(() => prompt("Copy:", txt));
 }
 async function quickMove(id, sign){
@@ -206,7 +225,7 @@ function renderCount(){
     <label class="f">이름 · Name</label><input class="t" id="cWho" value="${esc(who())}">`;
   for(const c of Object.keys(CATS)){
     const list = items.filter(i => i.active && i.cat === c); if(!list.length) continue;
-    h += `<div class="sec">${CATS[c]}</div>${CAT_HINT[c] ? `<div class="alert" style="background:var(--surface);border-color:var(--line);margin:4px 0 8px">${CAT_HINT[c]}</div>` : ""}<div class="card">` + list.map(i => isBundle(i) ? `<div class="row" style="grid-template-columns:1fr auto"><div class="nm"><b>${esc(i.name)}</b><div class="s">${esc(i.name_ko || "")} · 지금 앱 · app ${esc(qtyTxt(i))}</div>${usesTxt(i) ? `<div class="s">🍽 ${esc(usesTxt(i))}</div>` : ""}
+    h += `<div class="sec">${CATS[c]}</div>${CAT_HINT[c] ? `<div class="alert" style="background:var(--surface);border-color:var(--line);margin:4px 0 8px">${CAT_HINT[c]}</div>` : ""}<div class="card">` + list.map(i => isFlag(i) ? flagRow(i) : isBundle(i) ? `<div class="row" style="grid-template-columns:1fr auto"><div class="nm"><b>${esc(i.name)}</b><div class="s">${esc(i.name_ko || "")} · 지금 앱 · app ${esc(qtyTxt(i))}</div>${usesTxt(i) ? `<div class="s">🍽 ${esc(usesTxt(i))}</div>` : ""}
         <div class="s" style="color:var(--ink-soft);font-weight:700">🛒 1 ${esc(i.unit)} (bundle) = ${fmt(i.per_unit)} ${esc(i.use_unit || "pcs")} · 묶음 + 낱개로 세기 · count bundles + loose pcs</div></div>
       <div style="display:flex;gap:4px;align-items:center;flex-wrap:wrap;justify-content:flex-end"><input class="n" style="width:64px" inputmode="decimal" data-cbu="${i.id}" placeholder="0"><span class="hint">${esc(i.unit)}</span>
         <input class="n" style="width:64px" inputmode="numeric" data-cpc="${i.id}" placeholder="0"><span class="hint">${esc(i.use_unit || "pcs")}</span></div></div>`
@@ -217,13 +236,14 @@ function renderCount(){
       : `<div class="row"><div class="nm"><b>${esc(i.name)}</b><div class="s">${esc(i.name_ko || "")} · 지금 앱 · app ${fmt(i.qty)} ${esc(i.unit)}</div>${rowHint(i) ? `<div class="s" style="color:var(--ink-soft);font-weight:700">${rowHint(i)}</div>` : ""}</div>
       <input class="n" inputmode="decimal" data-c="${i.id}" placeholder="${fmt(i.qty)}"><div style="font-size:12px;color:var(--muted);width:44px">${esc(i.unit)}</div></div>`).join("") + `</div>`;
   }
+  setTimeout(bindFlags, 0);
   h += `<button class="btn red" id="cSave" style="width:100%;margin-top:14px;padding:13px">저장 · Save count</button><div id="cRes"></div>`;
   $("view").innerHTML = h;
   $("cSave").onclick = async () => {
     const n = $("cWho").value.trim(); if(!n) return toast("이름 · Name"); localStorage.setItem("inv_name", n);
     const val = sel => { const el = document.querySelector(sel); return el && el.value.trim() !== "" ? Number(el.value) : null; };
     const rows = [];
-    for(const i of items.filter(x => x.active)){
+    for(const i of items.filter(x => x.active && !isFlag(x))){
       if(isBundle(i)){
         const bu = val(`[data-cbu="${i.id}"]`), pc = val(`[data-cpc="${i.id}"]`);
         if([bu, pc].some(v => v != null && !(v >= 0))) return toast(`${i.name}: 숫자만 · numbers only`);
