@@ -46,7 +46,7 @@ begin
   perform public.order_staff_put(r);
   rd := (v_at at time zone 'Asia/Manila')::date; rt := date_trunc('minute', (v_at at time zone 'Asia/Manila')::time);
   bd := public.receipt_biz_date(rd, rt);
-  if v_paid and bd > p_day then
+  if v_paid and bd > p_day and p_day >= date '2026-11-17' then   -- from the 11/17 business day on (owner 11/18; older days stay as they are)
     -- paid on a later business day than the order (owner 2026-11-18): book it on the payment day, mark the order day
     code := code || '·' || to_char(p_day, 'FMMM/FMDD');
   else
