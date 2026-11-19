@@ -895,7 +895,7 @@ function cardHTML(o){
   const warns = dine ? [] : priceWarnings(o);
   const svcOk = !["done","cancelled"].includes(o.status) || priceUnlocked(o);   // 완료된 주문은 🔓 관리자 비밀번호로 열었을 때만
   const itemsHTML = (o.items||[]).map((l, li) => { const add = l.added && !dine;   // ➕추가 = 주문 후에 더 넣은 메뉴 (다이닝은 계속 추가하니까 표시 안 함)
-    return `<div class="sum-row"${PT.isSvc(l) ? ' style="background:#fde8e4;color:#3a2a20;border-radius:6px"' : add ? ' style="background:#fff1c9;color:#3a2a20;border-radius:6px"' : ""}><span>${PT.isSvc(l) ? (l.couponFree ? '<b style="color:var(--green)">🎟쿠폰 무료</b> ' : '<b style="color:#b42318">🎁서비스</b> ') : add ? '<b style="color:#b42318">➕추가</b> ' : ""}<span data-raw>${lineNameHTML(l)}</span> <b style="font-size:1.08em">×${l.qty}</b>${PT.optChips(koLine(l), EN())}${PT.unitBreak(l, EN()) ? `<div class="hint" style="margin:0;font-size:12px">${PT.unitBreak(l, EN())}</div>` : ""}</span><span style="white-space:nowrap">${PT.isSvc(l) ? `${l.origUnit ? `<s class="hint">${peso(l.origUnit*l.qty)}</s> ` : ""}<b style="color:var(--red-deep)">${L("무료", "FREE")}</b>` : `${l.priceOrig != null ? `<s class="hint">${peso(l.priceOrig*l.qty)}</s> ` : ""}${peso(l.unitPrice*l.qty)}`}${svcOk && !l.ext
+    return `<div class="sum-row"${PT.isSvc(l) ? ' style="background:#fde8e4;color:#3a2a20;border-radius:6px"' : add ? ' style="background:#fff1c9;color:#3a2a20;border-radius:6px"' : ""}><span>${PT.isSvc(l) ? (l.couponFree ? '<b style="color:var(--green)">🎟쿠폰 무료</b> ' : '<b style="color:#b42318">🎁서비스</b> ') : add ? '<b style="color:#b42318">➕추가</b> ' : ""}<span data-raw>${lineNameHTML(l)}</span> <b style="font-size:1.08em">×${l.qty}</b>${PT.optChips(koLine(l), EN())}${PT.unitBreak(l, EN()) ? `<div class="hint" style="margin:0;font-size:12px">${PT.unitBreak(l, EN())}</div>` : ""}${editedHTML(l)}</span><span style="white-space:nowrap">${PT.isSvc(l) ? `${l.origUnit ? `<s class="hint">${peso(l.origUnit*l.qty)}</s> ` : ""}<b style="color:var(--red-deep)">${L("무료", "FREE")}</b>` : `${l.priceOrig != null ? `<s class="hint">${peso(l.priceOrig*l.qty)}</s> ` : ""}${peso(l.unitPrice*l.qty)}`}${svcOk && !PT.isSvc(l) ? ` <button class="chip" data-ledit="${li}" title="${L("메뉴·옵션·수량 수정", "Edit item / options / qty")}" style="font-weight:800">🔄 ${L("수정", "Edit")}</button>` : ""}${svcOk && !l.ext
       ? (PT.isSvc(l) ? (l.couponFree ? "" : ` <button class="chip" data-unsvc="${li}" title="${L("서비스 취소", "Undo service")}">↩</button>`) : ` <button class="chip" data-lprice="${li}" title="${L("가격 수정", "Edit price")}">✏️</button> <button class="chip" data-svc="${li}" title="${L("서비스로 처리", "Make it free")}">🎁</button>${l.byAdmin ? ` <button class="chip" data-rmadm="${li}" title="${L("관리자가 추가한 메뉴 빼기", "Remove (added by admin)")}">✕</button>` : ""}`) : ""}</span></div>`; }).join("")
     + (PT.svcValue(o) ? `<div class="sum-row" style="color:var(--red-deep);font-weight:800"><span>🎁 ${L("서비스", "Service")}</span><span>${peso(PT.svcValue(o))} ${L("상당 · 무료", "value · free")}</span></div>` : "")
     + (svcOk ? `<div class="btn-row" style="margin:4px 0"><button class="ghost-btn sm" data-itemadd>➕ ${L("메뉴 추가", "Add item")}</button><button class="ghost-btn sm" data-svcadd>🎁 ${L("서비스 추가", "Add free item")}</button><button class="ghost-btn sm" data-adddc>🏷 ${L("추가/할인", "Add/DC")}</button></div>` : "");
@@ -1046,6 +1046,7 @@ function bindCard(o){
   el.querySelectorAll("[data-unsvc]").forEach(b => b.onclick = () => unsvcLine(o, +b.dataset.unsvc));
   el.querySelectorAll("[data-svcadd]").forEach(b => b.onclick = () => addSvcItem(o));
   el.querySelectorAll("[data-lprice]").forEach(b => b.onclick = () => editLinePrice(o, +b.dataset.lprice));
+  el.querySelectorAll("[data-ledit]").forEach(b => b.onclick = () => editLineStart(o, +b.dataset.ledit));
   el.querySelectorAll("[data-adddc]").forEach(b => b.onclick = () => addDcModal(o));
   el.querySelectorAll("[data-itemadd]").forEach(b => b.onclick = () => addItemModal(o, false));
   el.querySelectorAll("[data-rmadm]").forEach(b => b.onclick = async () => {
@@ -1458,6 +1459,32 @@ async function unsvcLine(o, i){
 /* ➕ 메뉴 추가 / 🎁 서비스 추가 — 관리자가 주문에 메뉴를 넣음 (옵션 선택 포함)
    svc=false → 정상 가격으로 추가 (영수증 [추가 ADD]), svc=true → ₱0 서비스 */
 function addSvcItem(o){ return addItemModal(o, true); }
+/* 🔄 주문 메뉴 수정 (사장님 11/20): 주문(그 메뉴를 넣은 때) 후 10분 안에는 바로 수정.
+   10분이 지나면 "조리 중인지 주방에 확인 후 수정하세요" + 확인한 주방 직원 이름(필수) → 줄에 남김 (마감 전에 확인: "조리전 수정하였음") */
+const EDIT_FREE_MIN = 10;
+const lineAgeMin = (o, l) => (Date.now() - new Date((l && l.added_at) || o.created_at)) / 60000;
+const editedHTML = l => !l.edited_at ? "" : `<div class="hint" style="margin:2px 0 0;font-size:12px;color:#b45309">🔄 ${L("수정됨", "Edited")} ${fmtTime(l.edited_at)}${l.edited_from ? ` · ${L("원래", "was")}: <span data-raw>${L(l.edited_from, l.edited_from_en || l.edited_from)}</span>` : ""}${l.edit_kitchen ? ` · <b>👨‍🍳 ${L("주방 확인", "Kitchen OK")}: <span data-raw>${esc(l.edit_kitchen)}</span></b> (${L("조리전 수정하였음", "edited before cooking")})` : ""}</div>`;
+async function editLineStart(o, i){
+  const l = (o.items || [])[i]; if(!l || PT.isSvc(l)) return;
+  const age = lineAgeMin(o, l);
+  if(age <= EDIT_FREE_MIN) return addItemModal(o, false, i, null);
+  const staff = await loadStaff(false).catch(() => []);
+  const last = ls.get("paltong_last_kitchen", "");
+  modal(`⚠️ ${L(`${PT.orderCode(o)} 주문 후 ${Math.floor(age)}분 지남`, `${PT.orderCode(o)} ordered ${Math.floor(age)} min ago`)}`, `
+    <div class="warn" style="margin:0 0 12px;font-size:16px">👨‍🍳 ${L("조리 중인지 주방에 확인 후 수정하세요", "Check with the kitchen that it isn't being cooked yet, then edit")}</div>
+    <p class="hint" style="margin:0 0 10px"><span data-raw>${L(l.name, l.en || l.name)}</span> ×${l.qty} — ${L("확인한 주방 직원 이름이 이 메뉴에 \"조리전 수정하였음\"으로 남아요 (마감 전에 확인).", "The kitchen staff name is saved on this item as \"edited before cooking\" (checked at closing).")}</p>
+    <div class="field"><label>${L("확인한 주방 직원 이름 (필수)", "Kitchen staff who confirmed (required)")}</label>
+      <input id="kName" maxlength="30" list="kList" value="${esc(last)}" autocomplete="off" style="font-size:18px">
+      <datalist id="kList">${(staff || []).map(x => `<option value="${esc(x.name)}">`).join("")}</datalist></div>
+    <label style="display:flex;gap:8px;align-items:center;font-weight:700;margin:0 0 12px"><input type="checkbox" id="kOk" style="width:22px;height:22px"> ${L("주방 확인: 아직 조리 전이에요", "Kitchen confirmed: not cooked yet")}</label>`,
+    ov => {
+      const name = ov.querySelector("#kName").value.replace(/\s+/g, " ").trim();
+      if(!name){ toast(L("확인한 주방 직원 이름을 넣어주세요", "Enter the kitchen staff name")); return false; }
+      if(!ov.querySelector("#kOk").checked){ toast(L("주방에 조리 전인지 확인하고 체크해주세요", "Check with the kitchen and tick the box")); return false; }
+      ls.set("paltong_last_kitchen", name);
+      setTimeout(() => addItemModal(o, false, i, name), 0);
+    }, `👨‍🍳 ${L("확인했어요 → 수정", "Confirmed → Edit")}`);
+}
 /* 📝 메뉴별 요청사항: opts 안에 note 줄로 저장 (가격 없음 → 영수증·주방·손님 화면에 그대로 보임) */
 const reqOpt = t => { t = String(t || "").replace(/\s+/g, " ").trim().slice(0, 100); return t ? { ko: "요청: " + t, en: "Request: " + t, note: true, req: t } : null; };
 const lineReq = l => { const x = (l.opts || []).find(o => o.req); return x ? x.req : ""; };
@@ -1465,13 +1492,20 @@ function setLineReq(l, t){ l.opts = (l.opts || []).filter(o => !o.req); const x 
 /* 🍽 다이닝 가격: 메뉴 관리에서 '다이닝 포함'을 체크한 메뉴만 할인가, 나머지는 정가 (R15) */
 /* 🍺 다이닝 고정가 (dinePx): 메뉴에 dinePx 가 있으면 다이닝(T)은 그 가격 (예: 생맥주 400 → 다이닝 180, 사장님 11/19) */
 const dinePrice = it => +it.dinePx > 0 ? +it.dinePx : it.onSale && !it.saleDine ? it.listPrice : it.price;
-function addItemModal(o, svc){
+function addItemModal(o, svc, editIdx, kitchen){
   const all = MENU.flatMap(c => c.items);
+  const edit = editIdx != null, el0 = edit ? (o.items || [])[editIdx] : null;   // 🔄 기존 메뉴 수정 모드
+  if(edit && !el0) return;
   const isCount = g => g.type === "count", isMulti = g => !isCount(g) && (g.max || 1) > 1;
   const isReq = g => g.required != null ? !!g.required : !isCount(g) && !isMulti(g);
   const code = o.dineNew ? "T" : o.pickOnly ? "" : PT.orderCode(o), dineMode = !o.pickOnly && (!!o.dineNew || PT.isDine(o));
-  const priceOf = it => dineMode ? dinePrice(it) : it.price;
-  const ov = modal(o.pickOnly ? `🍽 ${L("메뉴 넣기", "Add a menu item")}` : o.dineNew ? `🍽 ${L("새 다이닝 주문 — 첫 메뉴", "New dine-in order — first item")}` : svc ? `🎁 ${L(`${code} 서비스 추가`, `${code} add a free item`)}` : `➕ ${L(`${code} 메뉴 추가`, `${code} add items`)}`, `
+  // 수정: 원래 줄이 정가(할인 전)로 들어간 주문이면 (외부 주문 등) 바꾼 메뉴도 정가로
+  const optsSum = (it, opts) => (opts || []).reduce((t, x) => { const g = (it.options || [])[x.g], c = g && g.choices[x.c]; return t + (c ? (c.delta || 0) * (x.n || 1) : 0); }, 0);
+  const editList = edit && !dineMode && (() => { const it0 = all.find(x => x.id === el0.id), base = el0.priceOrig != null ? el0.priceOrig : el0.unitPrice;
+    if(it0 && it0.onSale){ const os = optsSum(it0, el0.opts); if(base === it0.listPrice + os) return true; if(base === it0.price + os) return false; }
+    return o.source === "external"; })();
+  const priceOf = it => dineMode ? dinePrice(it) : editList && it.listPrice ? it.listPrice : it.price;
+  const ov = modal(edit ? `🔄 ${L(`${code} 메뉴 수정`, `${code} edit item`)}${kitchen ? ` · 👨‍🍳 ${esc(kitchen)}` : ""}` : o.pickOnly ? `🍽 ${L("메뉴 넣기", "Add a menu item")}` : o.dineNew ? `🍽 ${L("새 다이닝 주문 — 첫 메뉴", "New dine-in order — first item")}` : svc ? `🎁 ${L(`${code} 서비스 추가`, `${code} add a free item`)}` : `➕ ${L(`${code} 메뉴 추가`, `${code} add items`)}`, `
     <div class="field"><label>${L("메뉴", "Item")}</label><select id="svMenu" class="note-in" style="margin:0">
       <option value="">✏️ ${L("직접 입력 (메뉴판에 없는 것)", "Type a name (not on the menu)")}</option>
       ${MENU.map(c => `<optgroup label="${esc(c.cat)}">${c.items.map(it => `<option value="${esc(it.id)}">${esc(it.name)} · ${esc(it.en || "")} (${peso(priceOf(it))})${soldOut[it.id] ? " — " + L("품절", "sold out") : ""}</option>`).join("")}</optgroup>`).join("")}
@@ -1484,8 +1518,10 @@ function addItemModal(o, svc){
     <div class="fee-row" style="gap:8px;margin:0 0 8px">
       <div class="field" style="flex:1;margin:0"><label>📝 ${L("이 메뉴 요청사항 (선택, 영수증·주방에 보임)", "Request for this item (optional, on receipt)")}</label><input id="svOpt" maxlength="100" placeholder="${L("예: 덜 맵게, 양파 빼기", "e.g. less spicy, no onions")}"></div>
       <div class="field" style="width:90px;margin:0"><label>${L("수량", "Qty")}</label><input id="svQty" type="number" min="1" value="1" inputmode="numeric"></div></div>
-    <div class="sum-row total" style="margin:0 0 6px"><span>${svc ? L("서비스 (₱0)", "Free (₱0)") : L("추가 금액", "Amount added")}</span><b id="svSum">—</b></div>
-    <p class="hint" style="margin:0 0 10px" ${o.pickOnly ? "hidden" : ""}>${svc
+    <div class="sum-row total" style="margin:0 0 6px"><span>${edit ? L("수정 후 금액", "After edit") : svc ? L("서비스 (₱0)", "Free (₱0)") : L("추가 금액", "Amount added")}</span><b id="svSum">—</b></div>
+    <p class="hint" style="margin:0 0 10px" ${o.pickOnly ? "hidden" : ""}>${edit
+      ? L(`지금: ${el0.name} ×${el0.qty} (${peso(el0.unitPrice * el0.qty)}). 저장하면 이 줄이 바뀌고 최종 금액이 다시 계산돼요. 주방에 다시 알려주세요 (🖨 다시 인쇄).`, `Now: ${el0.en || el0.name} ×${el0.qty} (${peso(el0.unitPrice * el0.qty)}). Saving replaces this line and recalculates the total. Tell the kitchen (🖨 reprint).`)
+      : svc
       ? L("₱0 으로 추가되고 영수증·손님 주문 내역에 [서비스]로 표시됩니다. 손님 채팅에도 안내가 갑니다.", "Added at ₱0 and shown as [Service] on the receipt and the customer's order. The customer gets a chat message.")
       : L("주문에 추가되고 최종 금액이 바뀝니다. 영수증에 [추가 ADD]로 찍히고, 손님 채팅에 바뀐 금액이 안내됩니다. 이미 입금한 주문이면 손님에게 추가 결제 안내가 뜹니다.", "Added to the order and the total changes. Printed as [ADD] on the receipt; the customer is told the new total in chat. If already paid, the customer is asked to pay the difference.")}</p>`,
   async () => {
@@ -1496,6 +1532,24 @@ function addItemModal(o, svc){
       delete line.added; delete line.added_at; delete line.byAdmin;
       try{ const n = await api.createDineOrder([line], null); toast(L(`🍽 T-${n.order_no} 다이닝 주문을 열었어요`, `🍽 T-${n.order_no} opened`), 3500); await loadOrders(); return; }
       catch(e){ toast(PT.errMsg(e), 5000); return false; }
+    }
+    if(edit){
+      const items = JSON.parse(JSON.stringify(o.items || [])), old = items[editIdx];
+      const desc = (l, en) => `${en ? (l.en || l.name) : l.name}${(l.opts || []).filter(x => !x.req).length ? ` (${(l.opts || []).filter(x => !x.req).map(x => en ? x.en : x.ko).join(", ")})` : ""} ×${l.qty}`;
+      ["added", "added_at", "byAdmin"].forEach(k => { if(old[k] !== undefined) line[k] = old[k]; else delete line[k]; });
+      line.edited_at = new Date().toISOString();
+      line.edited_from = old.edited_from || desc(old, false); line.edited_from_en = old.edited_from_en || desc(old, true);   // 처음 주문 내용 유지
+      if(kitchen) line.edit_kitchen = kitchen; else if(old.edit_kitchen) line.edit_kitchen = old.edit_kitchen;
+      const core = l => JSON.stringify([l.id, l.name, l.qty, l.unitPrice, (l.opts || []).map(x => [x.g, x.c, x.n, x.ko])]);
+      if(core(old) === core(line)){ toast(L("바뀐 것이 없어요", "Nothing changed")); return false; }
+      items[editIdx] = line;
+      const ok = await saveSvcItems(o, items, null);
+      if(ok){
+        toast(L(`🔄 ${PT.orderCode(o)} 수정 · 주방에 알려주세요${["confirmed", "delivering"].includes(o.status) ? " (🖨 다시 인쇄)" : ""}`, `🔄 ${PT.orderCode(o)} edited · tell the kitchen`), 4500);
+        if(notifyCustomer(o)) api.adminBotPost(o.id, `🔄 가게에서 ${desc(old, false)} → ${desc(line, false)} 로 주문을 수정했어요.${o.total != null ? ` 최종 금액은 ${peso(o.total)}입니다.` : ""}`,
+          `🔄 The store changed ${desc(old, true)} → ${desc(line, true)} in your order.${o.total != null ? ` New total: ${peso(o.total)}.` : ""}`).catch(() => {});
+      }
+      return ok ? undefined : false;
     }
     const items = [...JSON.parse(JSON.stringify(o.items || [])), line];
     const before = o.total;
@@ -1508,7 +1562,7 @@ function addItemModal(o, svc){
       api.adminBotPost(o.id, msg[0], msg[1]).catch(() => {});
     }
     return ok ? undefined : false;
-  }, svc ? `🎁 ${L("서비스 추가", "Add")}` : o.pickOnly ? `➕ ${L("넣기", "Add")}` : `➕ ${L("주문에 추가", "Add to order")}`);
+  }, edit ? `🔄 ${L("수정 저장", "Save edit")}` : svc ? `🎁 ${L("서비스 추가", "Add")}` : o.pickOnly ? `➕ ${L("넣기", "Add")}` : `➕ ${L("주문에 추가", "Add to order")}`);
   const sel = ov.querySelector("#svMenu"), cus = ov.querySelector("#svCustom"), box = ov.querySelector("#svOpts");
   const cur = () => sel.value ? all.find(x => x.id === sel.value) : null;
   function paintOpts(){
@@ -1550,12 +1604,27 @@ function addItemModal(o, svc){
       line = { id: (svc ? "svc_" : "adm_") + Date.now().toString(36), name, en: ov.querySelector("#svEn").value.trim() || name, opts: note ? [reqOpt(note)] : [], unitPrice: Math.max(0, price), custom: true };
     }
     line.qty = qty; line.added = true; line.added_at = new Date().toISOString(); line.byAdmin = true;
+    if(edit){ delete line.added; delete line.added_at; delete line.byAdmin; }
     if(svc){ line.origUnit = line.unitPrice; line.unitPrice = 0; line.svc = true; line.svcAdded = true; delete line.added; delete line.added_at; }
-    ov.querySelector("#svSum").textContent = svc ? (line.origUnit ? `${peso(line.origUnit * qty)} → ₱0` : "₱0") : "+" + peso(line.unitPrice * qty);
+    ov.querySelector("#svSum").textContent = edit ? `${peso(el0.unitPrice * el0.qty)} → ${peso(line.unitPrice * qty)}` : svc ? (line.origUnit ? `${peso(line.origUnit * qty)} → ₱0` : "₱0") : "+" + peso(line.unitPrice * qty);
     return { line, qty };
   }
   sel.onchange = paintOpts;
   ["#svQty", "#svOpt", "#svName", "#svPrice"].forEach(q => ov.querySelector(q).oninput = () => build(false));
+  if(edit){   // 지금 내용으로 채우기
+    const q = x => ov.querySelector(x), it0 = all.find(x => x.id === el0.id);
+    q("#svQty").value = el0.qty; q("#svOpt").value = lineReq(el0);
+    if(it0) sel.value = it0.id;
+    else { q("#svName").value = el0.name || ""; q("#svEn").value = el0.en || ""; q("#svPrice").value = el0.unitPrice; }
+    paintOpts();
+    if(it0) (el0.opts || []).filter(x => x.g != null && x.c != null).forEach(x => {
+      const gEl = box.querySelector(`[data-og="${x.g}"]`); if(!gEl) return;
+      const cnt = gEl.querySelector(`[data-cnt="${x.c}"]`), chk = gEl.querySelector(`[data-chk="${x.c}"]`), one = gEl.querySelector("[data-one]");
+      if(cnt) cnt.value = x.n || 1; else if(chk) chk.checked = true; else if(one) one.value = x.c;
+    });
+    build(false);
+    return;
+  }
   paintOpts();
 }
 
