@@ -322,5 +322,31 @@ function createAddressWidget(opts = {}){
   };
 }
 
-window.PTAddress = { createAddressWidget, loadLeaflet, setGoogle, get google(){ return useGoogle(); }, get enabled(){ return ENABLED && !failed; } };
+/* ⭐ 구글 평점 · 리뷰 (11/20): Places API 는 리뷰를 최대 5개만 줌. placeId 가 없으면 가게 근처에서 이름으로 찾음 */
+async function googleStoreReviews(placeId, near){
+  const { Place } = await loadGoogle();
+  const c = near && near.lat ? near : CENTER;
+  const dist = p => { const l = p.location; if(!l) return 1e9; const R = 6371000, r = x => x * Math.PI / 180, la = l.lat(), ln = l.lng();
+    const a = Math.sin(r(la - c.lat) / 2) ** 2 + Math.cos(r(c.lat)) * Math.cos(r(la)) * Math.sin(r(ln - c.lng) / 2) ** 2; return 2 * R * Math.asin(Math.sqrt(a)); };
+  let id = String(placeId || "").trim();
+  if(!id){
+    const seen = new Map();
+    for(const q of ["Pal Tong", "Paltong", "빨통"]){
+      try{ const { places } = await Place.searchByText({ textQuery: q, fields: ["id", "displayName", "location"], locationBias: c, maxResultCount: 10 });
+        (places || []).forEach(p => seen.set(p.id, p)); }catch(e){}
+      if([...seen.values()].some(p => /pal\s*tong|빨통/i.test(p.displayName || "") && dist(p) < 300)) break;
+    }
+    const list = [...seen.values()].sort((x, y) => dist(x) - dist(y));
+    const best = list.find(p => /pal\s*tong|빨통/i.test(p.displayName || "") && dist(p) < 300);
+    if(!best) throw new Error("google_place_not_found");
+    id = best.id;
+  }
+  const p = new Place({ id });
+  await p.fetchFields({ fields: ["displayName", "formattedAddress", "rating", "userRatingCount", "reviews", "googleMapsURI"] });
+  return { id, auto: !placeId, name: p.displayName || "", addr: p.formattedAddress || "", rating: p.rating || null, count: p.userRatingCount || 0, url: p.googleMapsURI || "",
+    writeUrl: "https://search.google.com/local/writereview?placeid=" + encodeURIComponent(id),
+    reviews: (p.reviews || []).map(r => ({ author: (r.authorAttribution && r.authorAttribution.displayName) || "Google user", uri: (r.authorAttribution && r.authorAttribution.uri) || "",
+      photo: (r.authorAttribution && r.authorAttribution.photoURI) || "", rating: r.rating || 0, text: r.text || "", time: r.relativePublishTimeDescription || "" })) };
+}
+window.PTAddress = { createAddressWidget, loadLeaflet, setGoogle, googleStoreReviews, get google(){ return useGoogle(); }, get enabled(){ return ENABLED && !failed; } };
 })();

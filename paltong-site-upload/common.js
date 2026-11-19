@@ -540,7 +540,7 @@ function errMsg(e){
     [/store_closed/, ["지금은 영업 종료라 주문을 받을 수 없어요", "We are closed right now — orders are not available"]],
     [/sold_out/, ["품절된 메뉴가 있습니다", "Some items are sold out"]],
     [/review_already/, ["이 주문은 이미 리뷰를 남기셨어요. 감사합니다!", "You already reviewed this order. Thank you!"]],
-    [/review_not_allowed/, ["완료된 주문만 14일 안에 리뷰를 쓸 수 있어요", "You can review completed orders within 14 days"]],
+    [/review_not_allowed/, ["주문이 접수된 뒤 14일 안에만 리뷰를 쓸 수 있어요", "Reviews can be written within 14 days of your order"]],
     [/review_rating/, ["별점을 골라주세요", "Please choose a star rating"]],
     [/review_too_many/, ["확인 대기 중인 리뷰가 3개 있어요. 가게에서 확인한 뒤 다시 올려주세요", "You have 3 reviews waiting. Please wait until the store checks them"]],
     [/review_disabled/, ["지금은 리뷰 인증을 받지 않습니다", "Review rewards are currently off"]],
@@ -755,12 +755,12 @@ function makeSupabaseApi(){
     async reviewList(before){ return unwrap(await sb.rpc("review_list", { p_limit: 20, p_before: before || null })); },
     async reviewStatus(orderId){ return unwrap(await sb.rpc("review_status", { p_order: orderId })); },
     reviewPhotoUrl(path){ return path ? sb.storage.from("review_photos").getPublicUrl(path).data.publicUrl : ""; },
-    async reviewSubmit(orderId, rating, body, blob){
+    async reviewSubmit(orderId, rating, body, blob, nick){
       let path = null;
       if(blob){ path = `${orderId}/${Date.now()}.jpg`;
         try{ unwrap(await sb.storage.from("review_photos").upload(path, blob, { contentType: blob.type || "image/jpeg", upsert: false })); }
         catch(e){ if(/row-level security|unauthorized|403/i.test(String(e.message || e))) throw new Error("review_not_allowed"); throw e; } }
-      return unwrap(await sb.rpc("review_submit", { p_order: orderId, p_rating: rating, p_body: body || "", p_photo: path }));
+      return unwrap(await sb.rpc("review_submit", { p_order: orderId, p_rating: rating, p_body: body || "", p_photo: path, p_nick: nick || null }));
     },
     async adminStoreReviews(){ return unwrap(await sb.rpc("admin_store_reviews")); },
     async adminStoreReviewSet(id, hidden, reply){ unwrap(await sb.rpc("admin_store_review_set", { p_id: id, p_hidden: hidden, p_reply: reply })); },

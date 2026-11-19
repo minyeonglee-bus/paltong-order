@@ -126,3 +126,10 @@ $$;
 drop policy if exists "review photo upload" on storage.objects;
 create policy "review photo upload" on storage.objects for insert to anon, authenticated
   with check (bucket_id = 'review_photos' and public.can_upload_review_photo(name));
+
+-- ===== 11/20 추가: 영수증 QR 리뷰 (모든 주문) · 닉네임 · 구글 Place ID =====
+-- review_order_ok: 웹·외부·다이닝 모두, status not in (new, accepted, cancelled), 14일 안
+-- review_status: + at, source, member, items (주문 화면 없이 QR 로 리뷰 창 열 때)
+-- review_submit(p_order, p_rating, p_body, p_photo, p_nick): 닉네임(20자) 우선, 다이닝 = 'Dine-in guest', 숫자 이름 외부 주문 = 'Guest', 그 외 앞 2글자***
+-- (DB 에 직접 적용됨: migration store_reviews_all_sources · 함수 본문은 Supabase 에서 확인)
+alter table public.shop_settings add column if not exists google_place_id text;   -- 구글 리뷰 연결 가게 (비우면 'Pal Tong' 자동 찾기)

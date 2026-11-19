@@ -117,6 +117,20 @@ function drawReceipt(o, copyLabel, kitchen){
     g.strokeStyle = "#000"; g.lineWidth = 2; g.strokeRect(pad - 2, top, W - pad*2 + 4, y - top + 2); y += 6; }
   if(o.staff_name) text(`${en ? "Staff" : "받은 직원 Staff"}: ${o.staff_name}`, { size:20 });
   hr();
+  /* ★ 리뷰 QR (11/20): 손님이 찍으면 이 주문 리뷰 쓰기 화면 (웹·외부·다이닝 모두). qrcode.js 가 없거나 CFG.RECEIPT_REVIEW_QR === false 면 안 찍음 */
+  if(typeof qrcode === "function" && o.id && CFG.RECEIPT_REVIEW_QR !== false){
+    try{
+      const site = /^https?:/.test(location.origin) ? location.origin : "https://paltong-order.com";
+      const q = qrcode(0, "M"); q.addData(site + "/?review=" + o.id); q.make();
+      const n = q.getModuleCount(), cell = Math.max(3, Math.floor(Math.min(200 * S, W - pad * 2) / n)), size = cell * n, x0 = Math.floor((W - size) / 2);
+      text(en ? "★ Please review us! ★" : "★ 리뷰 남겨주세요 Review us! ★", { size:22, bold:true, align:"center" });
+      y += 4;
+      for(let r = 0; r < n; r++) for(let c2 = 0; c2 < n; c2++) if(q.isDark(r, c2)) g.fillRect(x0 + c2 * cell, y + r * cell, cell, cell);
+      y += size + 8;
+      text(en ? "Scan with your phone camera" : "카메라로 찍어주세요 Scan with camera", { size:18, align:"center" });
+      hr();
+    }catch(e){ console.warn("[빨통] 리뷰 QR", e); }
+  }
   text(en ? "Thank you!" : "감사합니다! Thank you!", { size:22, align:"center" });
   PT.contactLines().forEach(t => text(t, { size:20, align:"center" }));
   y += 10;
