@@ -2651,6 +2651,10 @@ let rvLoadedOnce = false;
 async function loadReviews(){
   const V = $("reviewsView");
   if(!rvList.length) V.innerHTML = `<div class="empty-box">불러오는 중…</div>`;
+  if(rvFilter === "app"){   // ⭐ 손님 웹 앱 리뷰 (sql/store_reviews.sql)
+    try{ rvList = await api.adminStoreReviews(); }catch(e){ V.innerHTML = `<div class="notice" style="margin-top:14px">${esc(PT.errMsg(e))}</div>`; return; }
+    return renderReviews();
+  }
   try{ rvList = await api.listReviews(rvFilter === "all" ? "" : rvFilter); }
   catch(e){ V.innerHTML = `<div class="notice" style="margin-top:14px">리뷰 기능을 불러오지 못했습니다. Supabase에서 <b>sql/9-stamp-review.sql</b> 을 실행했는지 확인하세요.<br>(${esc(e.message || e)})</div>`; return; }
   if(rvFilter === "pending"){ rvPending = rvList.length; paintReviewsBtn(); }
@@ -2662,7 +2666,8 @@ async function loadReviews(){
 }
 function renderReviews(){
   const V = $("reviewsView");
-  const F = [["pending","확인 대기"],["approved","승인"],["rejected","반려"],["all","전체"]];
+  const F = [["pending","확인 대기"],["approved","승인"],["rejected","반려"],["all","전체"],["app","⭐ 앱 리뷰"]];
+  if(rvFilter === "app") return renderAppReviews(V, F);
   const lab = { pending:"⏳ 확인 대기", approved:"✅ 승인 (스탬프 +1)", rejected:"❌ 반려" };
   V.innerHTML = `
     <div class="filters">${F.map(([k,l]) => `<button class="pill ${rvFilter === k ? "sel" : ""}" data-rvf="${k}">${l}${k === "pending" && rvPending ? `<span class="n">${rvPending}</span>` : ""}</button>`).join("")}</div>
@@ -2685,6 +2690,39 @@ function renderReviews(){
     if(note === null) return;
     b.disabled = true;
     try{ await api.decideReview(b.dataset.rvno, false, note); toast("반려했습니다"); }catch(e){ toast("실패: " + (e.message || e), 4000); }
+    loadReviews();
+  });
+}
+/* ⭐ 앱 리뷰 (손님 웹 '리뷰 보기'에 보이는 리뷰): 숨기기 · 답글 */
+function renderAppReviews(V, F){
+  const stars = n => "★".repeat(n) + "☆".repeat(5 - n);
+  const shown = rvList.filter(r => !r.hidden), avg = shown.length ? (shown.reduce((t, r) => t + r.rating, 0) / shown.length).toFixed(1) : "—";
+  V.innerHTML = `
+    <div class="filters">${F.map(([k,l]) => `<button class="pill ${rvFilter === k ? "sel" : ""}" data-rvf="${k}">${l}${k === "pending" && rvPending ? `<span class="n">${rvPending}</span>` : ""}</button>`).join("")}</div>
+    <p class="hint" style="margin:0 0 10px">${L(`손님 웹 '⭐ 리뷰 보기'에 보이는 리뷰예요 (웹 주문 완료 후 14일 안, 주문 1건당 1개 · 회원은 스탬프 +1 자동). 평균 <b>${avg}</b> · 보이는 리뷰 ${shown.length}개. <b>숨기기</b>를 누르면 손님 화면에서 사라지고, <b>답글</b>은 리뷰 아래 '사장님 답글'로 보여요.`, `Reviews shown on the customer site. Avg ${avg} · ${shown.length} visible. Hide removes it from the site; replies appear under the review.`)}</p>
+    <div class="grid">${rvList.length ? rvList.map(r => `<div class="ocard" style="${r.hidden ? "opacity:.55" : ""}">
+        <div class="ohead"><b style="color:#f5b301;font-size:18px">${stars(r.rating)}</b> <span class="status-pill" style="background:#334155">#${r.order_no}</span>${r.hidden ? `<span class="status-pill" style="background:#6b6b6b">🙈 ${L("숨김", "Hidden")}</span>` : ""}<span class="time">${fmtTime(r.created_at)}</span></div>
+        <div class="hint"><span data-raw>${esc(r.cust_name || "")}</span> · ${esc(PT.prettyPhone(r.cust_phone || ""))} · ${L("손님 화면 이름", "Shown as")} <b data-raw>${esc(r.name)}</b></div>
+        ${(r.items || []).length ? `<div class="hint" style="margin-top:4px">🍗 <span data-raw>${esc(r.items.map(x => L(x.name, x.en || x.name)).join(", "))}</span></div>` : ""}
+        ${r.body ? `<p style="margin:8px 0;white-space:pre-wrap" data-raw>${esc(r.body)}</p>` : `<p class="hint" style="margin:8px 0">${L("(글 없음, 별점만)", "(stars only)")}</p>`}
+        ${r.photo_path ? `<img class="rc-thumb" data-appimg src="${esc(api.reviewPhotoUrl(r.photo_path))}" alt="photo">` : ""}
+        ${r.reply ? `<div class="calc-box" style="margin:8px 0"><b>🐔 ${L("사장님 답글", "Reply")}</b><div style="white-space:pre-wrap" data-raw>${esc(r.reply)}</div></div>` : ""}
+        <div class="btn-row"><button class="ghost-btn sm" data-apreply="${r.id}">💬 ${r.reply ? L("답글 수정", "Edit reply") : L("답글 쓰기", "Reply")}</button>
+          <button class="ghost-btn sm" data-aphide="${r.id}">${r.hidden ? `👁 ${L("다시 보이기", "Show")}` : `🙈 ${L("숨기기", "Hide")}`}</button></div>
+      </div>`).join("") : `<div class="empty-box">${L("아직 앱 리뷰가 없습니다", "No app reviews yet")}</div>`}</div>`;
+  V.querySelectorAll("[data-rvf]").forEach(b => b.onclick = () => { rvFilter = b.dataset.rvf; rvList = []; loadReviews(); });
+  V.querySelectorAll("[data-appimg]").forEach(img => img.onclick = () => openViewer(img.src));
+  V.querySelectorAll("[data-aphide]").forEach(b => b.onclick = async () => {
+    const r = rvList.find(x => String(x.id) === b.dataset.aphide); if(!r) return;
+    if(!r.hidden && !confirm(L("이 리뷰를 손님 화면에서 숨길까요?", "Hide this review from the customer site?"))) return;
+    b.disabled = true;
+    try{ await api.adminStoreReviewSet(r.id, !r.hidden, null); toast(r.hidden ? L("다시 보이게 했어요", "Shown again") : L("숨겼어요", "Hidden")); }catch(e){ toast(PT.errMsg(e), 4000); }
+    loadReviews();
+  });
+  V.querySelectorAll("[data-apreply]").forEach(b => b.onclick = async () => {
+    const r = rvList.find(x => String(x.id) === b.dataset.apreply); if(!r) return;
+    const v = prompt(L("사장님 답글 (손님 화면 리뷰 아래에 보여요 · 비우면 삭제)", "Reply (shown under the review · empty = delete)"), r.reply || ""); if(v == null) return;
+    try{ await api.adminStoreReviewSet(r.id, null, v.slice(0, 500)); toast(v.trim() ? L("답글을 올렸어요", "Reply posted") : L("답글을 지웠어요", "Reply removed")); }catch(e){ toast(PT.errMsg(e), 4000); }
     loadReviews();
   });
 }

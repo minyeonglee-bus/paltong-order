@@ -51,6 +51,36 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Black+Han+Sans&family=Noto+Sans+KR:wght@400;500;700;800&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="style.css?v=20261110b">
+<style>
+/* ⭐ 메뉴 보기 / 리뷰 보기 (11/20) */
+.view-seg{margin:10px 0 4px;}
+.view-seg button{font-size:15px;padding:11px 8px;}
+.rv-mini{font-size:12px;font-weight:700;color:#e5a731;}
+.rv-stars span{color:var(--line);letter-spacing:1px;}
+.rv-stars span.on{color:#f5b301;}
+.rv-sum{display:flex;gap:16px;align-items:center;}
+.rv-avg{display:flex;flex-direction:column;align-items:center;min-width:96px;}
+.rv-avg b{font-size:40px;line-height:1;font-weight:900;}
+.rv-avg small{color:var(--ink-soft);margin-top:4px;}
+.rv-dist{flex:1;}
+.rv-bar{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--ink-soft);}
+.rv-bar i{flex:1;height:7px;background:var(--surface-2);border-radius:9px;overflow:hidden;}
+.rv-bar i b{display:block;height:100%;background:#f5b301;}
+.rv-head{display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
+.rv-head .hint{margin:0 0 0 auto;}
+.rv-items{display:flex;flex-wrap:wrap;gap:4px;margin:6px 0 0;}
+.rv-items span{font-size:11px;background:var(--surface-2);border:1px solid var(--line);border-radius:999px;padding:2px 8px;color:var(--ink-soft);}
+.rv-body{margin:8px 0 0;white-space:pre-wrap;line-height:1.5;}
+.rv-photo{display:block;width:100%;max-height:320px;object-fit:cover;border-radius:12px;margin-top:8px;cursor:zoom-in;}
+.rv-reply{margin-top:10px;background:var(--surface-2);border-left:4px solid var(--red);border-radius:8px;padding:8px 10px;}
+.rv-reply p{margin:4px 0 0;white-space:pre-wrap;}
+.rv-order{display:flex;align-items:center;gap:10px;width:100%;text-align:left;border:1px solid var(--line);background:var(--surface);color:var(--ink);border-radius:12px;padding:10px 12px;margin-top:6px;cursor:pointer;font:inherit;}
+.rv-order span:first-child{flex:1;}
+.rv-go{color:var(--red-deep);font-weight:800;white-space:nowrap;}
+.rv-pick{display:flex;justify-content:center;gap:6px;margin:6px 0 4px;}
+.rv-pick button{border:0;background:none;font-size:42px;line-height:1;color:var(--line);cursor:pointer;padding:0 2px;}
+.rv-pick button.on{color:#f5b301;}
+</style>
 </head>
 <body>
 
@@ -71,8 +101,10 @@
 <div id="addBanner" class="add-banner" hidden></div>
 <button class="inq-btn" id="inqBtn">💬 <span id="inqLbl"></span><span class="dot-n" id="inqDot" hidden></span></button>
 <div id="activeOrders"></div>
+<div class="seg view-seg" id="viewSeg"><button type="button" data-view="menu" class="sel"></button><button type="button" data-view="reviews"></button></div>
 <div class="tabs" id="tabs"></div>
 <div id="menuRoot"></div>
+<div id="reviewRoot" hidden></div>
 
 <footer class="note" id="footNote"></footer>
 
@@ -219,7 +251,7 @@ function paintStatic(){
   db.textContent = "데모 모드: config.js 에 Supabase 정보를 넣기 전까지는 이 브라우저 안에서만 주문이 오갑니다. 같은 브라우저 다른 탭에서 admin.html 을 열어 테스트해보세요.";
 }
 document.querySelectorAll("#langSwitch button").forEach(b => b.onclick = () => {
-  PT.setLang(b.dataset.l); paintStatic(); renderMenu(); refreshCartBar(); renderActiveOrders();
+  PT.setLang(b.dataset.l); paintStatic(); renderMenu(); refreshCartBar(); renderActiveOrders(); paintViewSeg(); if(view === "reviews") renderReviews();
   if(window._rerenderOpen) window._rerenderOpen();
 });
 
@@ -1018,6 +1050,7 @@ async function renderActiveOrders(){
     if(seen.has(x.id)){ keep.push(x); continue; }
     let o = activeCache[x.id], failed = false;
     if(!o){ try{ o = await api.getOrder(x.id); }catch(e){ o = null; failed = true; } }
+    if(o && o.status === "done") rememberReviewable(x.id);
     if(o && !FINAL.includes(o.status)){ activeCache[x.id] = o; rows.push(o); keep.push(x); }
     else if(failed) keep.push(x);   // 인터넷이 잠깐 끊겨도 목록에서 지우지 않음 (다음에 다시 확인)
   }
@@ -1160,7 +1193,9 @@ function openTracker(id, opts = {}){
         ${o.tracking_url ? `<a class="primary-btn track-btn" href="${esc(o.tracking_url)}" target="_blank" rel="noopener">📍 ${L("배달 위치 확인","Track my rider")}</a>` : ""}`;
     }
     if(o.status === "done"){
+      rememberReviewable(o.id);
       body = `<div class="card wait-box"><div style="font-size:42px">🙏</div><b>${L("맛있게 드세요! 감사합니다","Enjoy your meal! Thank you")}</b>
+        <div data-rvslot style="width:100%"></div>
         ${o.user_id ? `<p class="hint">${L("이 주문은 내 정보 → 주문 내역에 저장되었어요","Saved in My account → Order history")}</p>
             ${shopSettings && shopSettings.review_enabled ? `<button class="ghost-btn" id="goReview">📸 ${L("리뷰 인증하고 스탬프 +1 받기","Post a review for +1 stamp")}</button>` : ""}`
           : `<p class="hint">${L("비회원 주문은 내역이 저장되지 않아요. 회원가입하면 주문 내역·주소가 저장되고 쿠폰도 받을 수 있어요!","Guest orders are not saved. Sign up to keep your history and addresses, and get coupons!")}</p>`}</div>`;
@@ -1226,6 +1261,7 @@ function openTracker(id, opts = {}){
       catch(e){ toast(T("업로드 실패. 다시 시도해주세요","Upload failed. Please try again"), 3500); exs.disabled = false; exs.innerHTML = L("추가 결제 영수증 제출","Submit receipt"); }
       busy = false;
     };
+    { const slot = $("[data-rvslot]"); if(slot) reviewButton(o.id, slot, () => s.close()); }
     const gr = $("#goReview"); if(gr) gr.onclick = () => { s.close(); openAccount().then(() => { const c = document.getElementById("rvCard"); if(c) c.scrollIntoView({ behavior:"smooth", block:"center" }); }); };
     s.el.querySelectorAll("[data-copy]").forEach(b => b.onclick = async () => {
       try{ await navigator.clipboard.writeText(b.dataset.copy); toast(T("복사했습니다","Copied")); }catch(e){ toast(b.dataset.copy); }
@@ -1372,6 +1408,122 @@ async function pollInquiry(){
 }
 setInterval(pollInquiry, 20000);
 
+/* ---------- ⭐ 메뉴 보기 / 리뷰 보기 (사장님 11/20) ----------
+   웹 주문이 완료되면 14일 안에 주문 1건당 리뷰 1개 (별점 · 글 · 사진 1장). 회원이면 스탬프 +1.
+   이름은 앞 2글자만 보임. 사장님은 관리자 화면에서 숨기기 · 답글 (sql/store_reviews.sql) */
+let view = location.hash === "#reviews" ? "reviews" : "menu", rvData = null, rvLoading = false;
+const RV_KEY = "paltong_rv_orders";
+function rememberReviewable(id){ const a = ls.get(RV_KEY, []).filter(x => x.id !== id && Date.now() - x.at < 14 * 864e5); a.unshift({ id, at: Date.now() }); ls.set(RV_KEY, a.slice(0, 10)); }
+const starStr = (n, size) => `<span class="rv-stars" style="${size ? `font-size:${size}px` : ""}">${[1,2,3,4,5].map(i => `<span class="${i <= Math.round(n) ? "on" : ""}">★</span>`).join("")}</span>`;
+function paintViewSeg(){
+  const seg = document.getElementById("viewSeg"); if(!seg) return;
+  const [bm, br] = seg.querySelectorAll("button");
+  bm.innerHTML = `🍽 ${L("메뉴 보기","Menu")}`;
+  br.innerHTML = `⭐ ${L("리뷰 보기","Reviews")}${rvData && rvData.count ? ` <small class="rv-mini">★${rvData.avg}</small>` : ""}`;
+  bm.classList.toggle("sel", view === "menu"); br.classList.toggle("sel", view === "reviews");
+}
+function setView(v){
+  view = v; try{ history.replaceState(null, "", location.pathname + location.search + (v === "reviews" ? "#reviews" : "")); }catch(e){}
+  tabsEl.hidden = v !== "menu"; rootEl.hidden = v !== "menu";
+  document.getElementById("reviewRoot").hidden = v !== "reviews";
+  paintViewSeg();
+  if(v === "reviews"){ renderReviews(); loadReviews(); }
+  window.scrollTo({ top: 0 });
+}
+document.querySelectorAll("#viewSeg [data-view]").forEach(b => b.onclick = () => setView(b.dataset.view));
+async function loadReviews(more){
+  if(rvLoading || !api.reviewList) return; rvLoading = true;
+  try{
+    const before = more && rvData && rvData.rows.length ? rvData.rows[rvData.rows.length - 1].id : null;
+    const r = await api.reviewList(before);
+    rvData = more && rvData ? { ...r, rows: [...rvData.rows, ...r.rows] } : r;
+    rvData.end = (r.rows || []).length < 20;
+  }catch(e){ if(!rvData) rvData = { count: 0, avg: null, rows: [], stars: {}, err: true }; }
+  rvLoading = false; paintViewSeg(); if(view === "reviews") renderReviews();
+}
+/* 리뷰 쓸 수 있는 내 주문 (이 기기에서 완료된 주문 + 회원 주문 내역, 14일 안) */
+async function reviewableOrders(){
+  const ids = new Map();
+  ls.get(RV_KEY, []).filter(x => Date.now() - x.at < 14 * 864e5).forEach(x => ids.set(x.id, x.at));
+  if(acct){ try{ (await api.myOrders()).filter(o => o.status === "done" && Date.now() - new Date(o.created_at) < 14 * 864e5).forEach(o => ids.set(o.id, +new Date(o.created_at))); }catch(e){} }
+  const out = [];
+  for(const [id] of [...ids].slice(0, 8)){
+    try{ const st = await api.reviewStatus(id); if(st && st.can){ const o = activeCache[id] || await api.getOrder(id); if(o) out.push(o); } }catch(e){}
+  }
+  return out;
+}
+function renderReviews(){
+  const box = document.getElementById("reviewRoot"); if(!box) return;
+  const d = rvData;
+  const dist = d && d.count ? [5,4,3,2,1].map(n => { const c = +(d.stars || {})[n] || 0; return `<div class="rv-bar"><span>${n}★</span><i><b style="width:${Math.round(c / d.count * 100)}%"></b></i><span>${c}</span></div>`; }).join("") : "";
+  box.innerHTML = `
+    <div class="card rv-sum">${d && d.count
+      ? `<div class="rv-avg"><b>${d.avg}</b>${starStr(d.avg, 22)}<small>${L(`리뷰 ${d.count}개`, `${d.count} reviews`)}</small></div><div class="rv-dist">${dist}</div>`
+      : d ? `<p style="margin:0;text-align:center"><b>${L("아직 리뷰가 없어요","No reviews yet")}</b><br><span class="hint">${L("첫 리뷰를 남겨주세요 ⭐","Be the first to leave one ⭐")}</span></p>`
+      : `<p class="hint" style="margin:0;text-align:center">${L("불러오는 중…","Loading…")}</p>`}</div>
+    <div id="rvMine"></div>
+    ${d && d.rows.length ? d.rows.map(r => `<div class="card rv-item">
+        <div class="rv-head"><b>${esc(r.name)}</b>${starStr(r.rating, 15)}<span class="hint">${esc(fmtDate(r.created_at))}</span></div>
+        ${(r.items || []).length ? `<div class="rv-items">${r.items.map(x => `<span>${esc(T(x.name, x.en || x.name))}</span>`).join("")}</div>` : ""}
+        ${r.body ? `<p class="rv-body">${esc(r.body)}</p>` : ""}
+        ${r.photo_path ? `<img class="rv-photo" loading="lazy" src="${esc(api.reviewPhotoUrl(r.photo_path))}" alt="review photo" data-rvimg>` : ""}
+        ${r.reply ? `<div class="rv-reply"><b>🐔 ${L("사장님 답글","Reply from the store")}</b><p>${esc(r.reply)}</p></div>` : ""}
+      </div>`).join("") : ""}
+    ${d && d.rows.length && !d.end ? `<button class="ghost-btn" id="rvMore">${L("리뷰 더 보기","More reviews")}</button>` : ""}`;
+  box.querySelectorAll("[data-rvimg]").forEach(img => img.onclick = () => window.open(img.src, "_blank"));
+  const mb = box.querySelector("#rvMore"); if(mb) mb.onclick = () => { mb.disabled = true; loadReviews(true); };
+  // 내 주문 리뷰 쓰기
+  reviewableOrders().then(list => {
+    const mine = document.getElementById("rvMine"); if(!mine || !list.length) return;
+    mine.innerHTML = `<div class="card rv-write-card"><h4 style="margin:0 0 8px">✍️ ${L("리뷰를 남겨주세요","Leave a review")}</h4>${list.map(o => `<button class="rv-order" data-rvorder="${esc(o.id)}"><span><b>${esc(fmtDT(o.created_at))}</b><br><small>${esc((o.items || []).filter(l => !PT.isSvc(l)).map(l => T(l.name, l.en || l.name)).join(", ").slice(0, 60))}</small></span><span class="rv-go">⭐ ${L("쓰기","Write")}</span></button>`).join("")}
+      ${acct ? `<p class="hint" style="margin:8px 0 0">${L("리뷰를 쓰면 스탬프 +1 🍗","+1 stamp for each review 🍗")}</p>` : ""}</div>`;
+    mine.querySelectorAll("[data-rvorder]").forEach(b => b.onclick = () => openWriteReview(list.find(o => o.id === b.dataset.rvorder)));
+  });
+}
+/* 주문 완료 화면의 '리뷰 쓰기' 버튼 */
+async function reviewButton(orderId, slot, before){
+  if(!api.reviewStatus) return;
+  try{
+    const st = await api.reviewStatus(orderId); if(!slot.isConnected) return;
+    if(st && st.done){ slot.innerHTML = `<p class="hint" style="margin:8px 0 0">⭐ ${L("리뷰 감사합니다!","Thanks for your review!")}</p>`; return; }
+    if(!st || !st.can) return;
+    slot.innerHTML = `<button class="primary-btn" style="margin-top:10px">⭐ ${L("리뷰 쓰기","Write a review")}${acct ? ` · ${L("스탬프 +1","+1 stamp")}` : ""}</button>`;
+    slot.querySelector("button").onclick = async () => { const o = activeCache[orderId] || await api.getOrder(orderId).catch(() => null); if(!o) return; before && before(); openWriteReview(o); };
+  }catch(e){}
+}
+function openWriteReview(o){
+  if(!o) return;
+  let rating = 0, body = "", blob = null, url = null, busy = false;
+  const s = sheet({ onClose(){ if(url) URL.revokeObjectURL(url); } });
+  s.setRender(function render(){
+    s.el.innerHTML = `
+      <div class="sheet-head"><h3>⭐ ${L("리뷰 쓰기","Write a review")}</h3><button class="close-x">✕</button></div>
+      <p class="hint" style="margin-top:-6px">${esc(fmtDT(o.created_at))} · ${esc((o.items || []).filter(l => !PT.isSvc(l)).map(l => T(l.name, l.en || l.name)).join(", ").slice(0, 80))}</p>
+      <div class="rv-pick">${[1,2,3,4,5].map(i => `<button type="button" data-star="${i}" class="${i <= rating ? "on" : ""}" aria-label="${i}">★</button>`).join("")}</div>
+      <p class="hint" style="text-align:center;margin:0 0 12px">${rating ? esc([, T("별로예요","Poor"), T("그저 그래요","Fair"), T("괜찮아요","Good"), T("맛있어요","Great"), T("최고예요!","Excellent!")][rating]) : L("별점을 눌러주세요","Tap the stars")}</p>
+      <div class="field"><label>${L("어떠셨어요? (선택)","How was it? (optional)")}</label>
+        <textarea id="rvBody" maxlength="500" rows="4" placeholder="${esc(T("맛, 양, 포장, 배달은 어땠나요?","Taste, portion, packaging, delivery…"))}">${esc(body)}</textarea></div>
+      <label class="upload-box"><input type="file" accept="image/*" id="rvPhoto"><span>📷 ${L("사진 올리기 (선택)","Add a photo (optional)")}</span>
+        ${url ? `<img class="upload-preview" src="${url}" alt="photo">` : ""}</label>
+      <p class="hint" style="margin:8px 0 0">${L("리뷰는 '리뷰 보기'에 모두에게 보여요. 이름은 앞 두 글자만 보여요.","Reviews are public on the Reviews tab. Only the first 2 letters of your name are shown.")}</p>
+      <button class="primary-btn" id="rvGo" style="margin-top:12px" ${rating ? "" : "disabled"}>${L("리뷰 올리기","Post review")}</button>`;
+    const $ = q => s.el.querySelector(q);
+    $(".close-x").onclick = s.close;
+    const ta = $("#rvBody"); ta.oninput = () => { body = ta.value; };
+    s.el.querySelectorAll("[data-star]").forEach(b => b.onclick = () => { body = ta.value; rating = +b.dataset.star; render(); });
+    $("#rvPhoto").onchange = async e => { const f = e.target.files[0]; if(!f) return; body = ta.value; blob = await PT.compressImage(f); if(url) URL.revokeObjectURL(url); url = URL.createObjectURL(blob); render(); };
+    $("#rvGo").onclick = async () => {
+      if(busy || !rating) return; busy = true; body = ta.value; const g = $("#rvGo"); g.disabled = true; g.textContent = T("올리는 중…","Posting…");
+      try{
+        const r = await api.reviewSubmit(o.id, rating, body.trim(), blob);
+        toast(r && r.stamp ? T("리뷰 감사합니다! 스탬프 +1 🍗","Thank you! +1 stamp 🍗") : T("리뷰 감사합니다! ⭐","Thank you for your review! ⭐"), 3500);
+        s.close(); if(acct) loadAccount();
+        rvData = null; setView("reviews");
+      }catch(e){ toast(PT.errMsg(e), 4000); busy = false; g.disabled = false; g.innerHTML = L("리뷰 올리기","Post review"); }
+    };
+  });
+}
+
 /* ---------- 시작 ---------- */
 /* 앱 안 브라우저에 그대로 남아 있으면(아이폰 인스타 등) → 외부 브라우저로 여는 방법 안내 */
 (function(){
@@ -1386,6 +1538,7 @@ setInterval(pollInquiry, 20000);
 })();
 paintStatic();
 renderMenu();
+paintViewSeg(); if(view === "reviews") setView("reviews"); else loadReviews();
 refreshCartBar();
 loadSoldOut();
 api.onMenuStatus(loadSoldOut);

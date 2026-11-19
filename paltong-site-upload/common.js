@@ -539,6 +539,9 @@ function errMsg(e){
     [/jtv_only/, ["JTV 메뉴는 지정된 JTV 매장 주소로만 주문할 수 있어요 (지도 위치 확인)", "JTV menu can only be ordered to the listed JTV venues (check the map pin)"]],
     [/store_closed/, ["지금은 영업 종료라 주문을 받을 수 없어요", "We are closed right now — orders are not available"]],
     [/sold_out/, ["품절된 메뉴가 있습니다", "Some items are sold out"]],
+    [/review_already/, ["이 주문은 이미 리뷰를 남기셨어요. 감사합니다!", "You already reviewed this order. Thank you!"]],
+    [/review_not_allowed/, ["완료된 주문만 14일 안에 리뷰를 쓸 수 있어요", "You can review completed orders within 14 days"]],
+    [/review_rating/, ["별점을 골라주세요", "Please choose a star rating"]],
     [/review_too_many/, ["확인 대기 중인 리뷰가 3개 있어요. 가게에서 확인한 뒤 다시 올려주세요", "You have 3 reviews waiting. Please wait until the store checks them"]],
     [/review_disabled/, ["지금은 리뷰 인증을 받지 않습니다", "Review rewards are currently off"]],
     [/already_decided/, ["이미 처리된 리뷰입니다", "Already processed"]],
@@ -748,6 +751,19 @@ function makeSupabaseApi(){
       catch(e){ if(/row-level security|unauthorized|403/i.test(String(e.message || e))) throw new Error("review_too_many"); throw e; }
       return unwrap(await sb.rpc("submit_review", { p_path: path }));
     },
+    /* ⭐ 앱 리뷰 (손님 웹 '리뷰 보기', sql/store_reviews.sql) */
+    async reviewList(before){ return unwrap(await sb.rpc("review_list", { p_limit: 20, p_before: before || null })); },
+    async reviewStatus(orderId){ return unwrap(await sb.rpc("review_status", { p_order: orderId })); },
+    reviewPhotoUrl(path){ return path ? sb.storage.from("review_photos").getPublicUrl(path).data.publicUrl : ""; },
+    async reviewSubmit(orderId, rating, body, blob){
+      let path = null;
+      if(blob){ path = `${orderId}/${Date.now()}.jpg`;
+        try{ unwrap(await sb.storage.from("review_photos").upload(path, blob, { contentType: blob.type || "image/jpeg", upsert: false })); }
+        catch(e){ if(/row-level security|unauthorized|403/i.test(String(e.message || e))) throw new Error("review_not_allowed"); throw e; } }
+      return unwrap(await sb.rpc("review_submit", { p_order: orderId, p_rating: rating, p_body: body || "", p_photo: path }));
+    },
+    async adminStoreReviews(){ return unwrap(await sb.rpc("admin_store_reviews")); },
+    async adminStoreReviewSet(id, hidden, reply){ unwrap(await sb.rpc("admin_store_review_set", { p_id: id, p_hidden: hidden, p_reply: reply })); },
     async myOrders(){
       const { data } = await sb.auth.getSession(); if(!data.session) return [];
       return unwrap(await sb.from("orders").select("id,order_no,created_at,status,subtotal,discount,total,items")
@@ -1239,6 +1255,15 @@ function makeDemoApi(){
       const r = { id: uuid(), user_id: id, image_path: await blobToDataURL(blob), status:"pending", admin_note:null, created_at: new Date().toISOString(), decided_at:null };
       setRV([r, ...RV()]); return r;
     },
+    async reviewList(){ return { count: 3, avg: 4.7, stars: { 5: 2, 4: 1 }, rows: [
+      { id: 3, name: "Ju***", rating: 5, body: "Chicken was super crispy! 맛있어요", items: [{ name: "순살 후라이드 치킨", en: "Fried Chicken (Boneless)" }], reply: "감사합니다! Thank you 🙏", created_at: new Date().toISOString() },
+      { id: 2, name: "Ma***", rating: 5, body: "", items: [{ name: "직화 닭발", en: "Dakbal" }], created_at: new Date().toISOString() },
+      { id: 1, name: "Ki***", rating: 4, body: "Spicy but good", items: [], created_at: new Date().toISOString() }] }; },   // 데모
+    async reviewStatus(){ return { can: false, done: false }; },
+    reviewPhotoUrl(){ return ""; },
+    async reviewSubmit(){ throw new Error("review_not_allowed"); },
+    async adminStoreReviews(){ return []; },
+    async adminStoreReviewSet(){},
     async myOrders(){ const id = me(); return id ? all().filter(o => o.user_id === id).sort((a,b) => b.created_at.localeCompare(a.created_at)).slice(0, 30) : []; },
     /* ---- 관리자: 회원/쿠폰 (데모) ---- */
     async getSettings(){ return ST(); },
