@@ -71,9 +71,9 @@ const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&":"&amp;","<":"&l
 const un = ({ data, error }) => { if(error) throw error; return data; };
 const toast = (m, ms = 2400) => { const t = $("toast"); t.textContent = m; t.style.display = "block"; clearTimeout(t._h); t._h = setTimeout(() => t.style.display = "none", ms); };
 const fmt = n => { n = Number(n); if(!isFinite(n)) return "–"; const r = Math.round(n * 10) / 10; return (Object.is(r, -0) ? 0 : r).toString(); };
-const CATS = { korea:"🇰🇷 한국주문 컨테이너 · Korea order containers", container:"🥡 컨테이너 · Containers", dry:"Dry stock · 건자재", frozen:"Frozen stock · 냉동", chicken:"🍗 치킨 냉동 · Chicken frozen", drink:"Drinks · 음료" };
+const CATS = { korea:"🇰🇷 한국 or 한국업체 주문 — 컨테이너 · Korea / Korean supplier — Containers", korea_drink:"🇰🇷 한국 or 한국업체 주문 — 음료 · Korea / Korean supplier — Drinks", container:"🥡 컨테이너 · Containers", dry:"Dry stock · 건자재", frozen:"Frozen stock · 냉동", chicken:"🍗 치킨 냉동 · Chicken frozen", drink:"🛒 음료 (현지) · Drinks (local)" };
 /* 보고(주문톡) 제목 */
-const REP_T = { korea:"From Korea", container:"Containers", dry:"Dry stock", frozen:"Frozen stock", chicken:"Chicken frozen", drink:"Drinks" };
+const REP_T = { korea:"Korean supplier — Containers", korea_drink:"Korean supplier — Drinks", container:"Containers", dry:"Dry stock", frozen:"Frozen stock", chicken:"Chicken frozen", drink:"Drinks (local)" };
 const BOXCATS = ["dry", "korea"];
 /* 세는 법 설명 (실사 화면) */
 const CAT_HINT = {
@@ -82,7 +82,8 @@ const CAT_HINT = {
   dry:"📦 box + plastic(pack) 으로 세기 · Count boxes + plastics/packs",
   frozen:"🧊 팩으로 세기 · Count in PACKS. <b>뜯은 팩은 0.5</b> · <b>Opened pack = 0.5</b><br>삼겹살 · 로컬 쭈꾸미 · 똥집 · 순살 닭고기 · <b>닭발(뼈·무뼈)</b>은 <b>kg</b> (저울, 예: 2.5, 해동한 것도 같이) · Pork belly, local pusit, gizzard, boneless chicken, <b>dakbal</b> in <b>kg</b> (weigh, e.g. 2.5, include thawed)<br>🥣 양념 버무린 것(날개 · 뼈 닭발)도 <b>kg</b> — 볼 여러 개면 무게 합쳐서 (예: 1.8 + 0.7 = 2.5) — <b>이것부터 먼저 나감</b> · Mixed-with-sauce also in <b>kg</b> (add up all bowls) — <b>used first</b><br>먹태는 개수 · Maktae in pcs",
   chicken:"☑️ 소스는 주문해야 하면 체크 (바로 저장) · Tick sauces that need ordering (saves right away) · 치킨 파우더는 plastic 개수 · Chicken powder: count plastics",
-  drink:"🥫 캔 개수 · Count cans"
+  korea_drink:"🥫 캔·병 개수 · Count cans / bottles",
+  drink:"🥫 캔·병 개수 · Count cans / bottles"
 };
 const rowHint = i => i.unit === "bowl" ? "🥣 볼 개수, 반 볼 0.5 · bowls, half = 0.5" : i.unit === "kg" ? "⚖️ kg (예 2.5 · e.g. 2.5)" : (i.cat === "frozen" && i.unit === "pack") ? "뜯은 팩 0.5 · opened = 0.5" : "";
 const KIND = { order:"🧾 주문 Order", count:"✍️ 실사 Count", in:"📥 입고 In", waste:"🗑 버림 Waste", adjust:"✏️ 조정 Adjust" };
