@@ -2707,16 +2707,42 @@ async function paintGooglePlace(force){
     const g = gPlaceCache; if(!document.body.contains(box)) return;
     box.innerHTML = `<b>G ${L("구글 리뷰 연결", "Google reviews")}</b> ${st.google_place_id ? `<span class="status-pill" style="background:var(--green)">${L("고정됨", "Pinned")}</span>` : `<span class="status-pill" style="background:#b45309">${L("자동으로 찾음", "Auto-found")}</span>`}
       <div style="margin:6px 0"><b data-raw>${esc(g.name)}</b> · ★${g.rating ?? "—"} (${g.count}) <span class="hint" data-raw>${esc(g.addr)}</span> ${g.url ? `<a href="${esc(g.url)}" target="_blank" rel="noopener">${L("구글 지도에서 확인", "Open in Google Maps")}</a>` : ""}</div>
-      <div class="btn-row">${st.google_place_id ? "" : `<button class="primary-btn sm green" data-gpin>✅ ${L("이 가게가 맞아요 (고정)", "This is us (pin)")}</button>`}<button class="ghost-btn sm" data-gset>✏️ ${L("Place ID 직접 넣기", "Set Place ID")}</button></div>`;
+      <div class="btn-row">${st.google_place_id ? "" : `<button class="primary-btn sm green" data-gpin>✅ ${L("이 가게가 맞아요 (고정)", "This is us (pin)")}</button>`}<button class="ghost-btn sm" data-gset>🔍 ${L("다른 가게 찾기", "Find another")}</button></div>`;
     const pin = box.querySelector("[data-gpin]"); if(pin) pin.onclick = async () => { try{ await api.saveSettings({ google_place_id: g.id }); toast(L("구글 가게를 고정했어요", "Pinned")); paintGooglePlace(true); }catch(e){ toast(PT.errMsg(e), 4000); } };
-    box.querySelector("[data-gset]").onclick = async () => { const v = prompt(L("구글 Place ID (ChIJ… 로 시작) · 비우면 자동 찾기", "Google Place ID (ChIJ…) · empty = auto"), st.google_place_id || g.id || ""); if(v == null) return;
-      try{ await api.saveSettings({ google_place_id: v.trim() || null }); gPlaceCache = null; paintGooglePlace(true); }catch(e){ toast(PT.errMsg(e), 4000); } };
+    box.querySelector("[data-gset]").onclick = () => googlePlaceFinder(st);
   }catch(e){
-    box.innerHTML = `<b>G ${L("구글 리뷰 연결", "Google reviews")}</b> <span style="color:var(--red-deep)">${/not_found/.test(String(e.message || e)) ? L("가게 근처에서 'Pal Tong'을 못 찾았어요 — Place ID를 직접 넣어주세요", "Couldn't find 'Pal Tong' nearby — set the Place ID") : L("불러오지 못했어요: ", "Failed: ") + esc(e.message || e)}</span>
-      <div class="btn-row"><button class="ghost-btn sm" data-gset2>✏️ ${L("Place ID 직접 넣기", "Set Place ID")}</button></div>`;
-    const b2 = box.querySelector("[data-gset2]"); if(b2) b2.onclick = async () => { const v = prompt(L("구글 Place ID (ChIJ… 로 시작)", "Google Place ID (ChIJ…)"), ""); if(v == null) return;
-      try{ await api.saveSettings({ google_place_id: v.trim() || null }); gPlaceCache = null; paintGooglePlace(true); }catch(e2){ toast(PT.errMsg(e2), 4000); } };
+    box.innerHTML = `<b>G ${L("구글 리뷰 연결", "Google reviews")}</b> <span style="color:var(--red-deep)">${/not_found/.test(String(e.message || e)) ? L("가게 근처에서 'Pal Tong'을 자동으로 못 찾았어요 — 아래 🔍 버튼으로 찾아주세요", "Couldn't auto-find 'Pal Tong' — use 🔍 below") : L("불러오지 못했어요: ", "Failed: ") + esc(e.message || e)}</span>
+      <div class="btn-row"><button class="ghost-btn sm" data-gset2>🔍 ${L("구글에서 가게 찾기", "Find on Google")}</button></div>`;
+    const b2 = box.querySelector("[data-gset2]"); if(b2) b2.onclick = async () => googlePlaceFinder(await api.getSettings().catch(() => ({})));
   }
+}
+/* 🔍 구글 가게 찾기: 이름으로 검색 → 목록에서 눌러서 고정 (Place ID 를 몰라도 됨) */
+function googlePlaceFinder(st){
+  st = st || {};
+  const ov = modal(`🔍 ${L("구글에서 우리 가게 찾기", "Find our shop on Google")}`, `
+    <p class="hint" style="margin-top:0">${L("구글 지도에 나오는 가게 이름을 넣고 찾기를 누르세요. 목록에서 우리 가게를 누르면 끝이에요 (Place ID 몰라도 돼요). 가까운 순서예요.", "Type the shop name as on Google Maps, then tap ours in the list. Nearest first.")}</p>
+    <div class="fee-row" style="gap:8px;margin:0 0 10px"><input id="gq" value="Pal Tong" style="flex:1;font-size:17px"><button class="primary-btn sm" id="gqGo" style="width:auto">${L("찾기", "Search")}</button></div>
+    <div id="gqList"></div>
+    <details style="margin-top:10px"><summary class="hint">${L("Place ID 를 알면 직접 넣기", "Paste a Place ID")}</summary>
+      <div class="fee-row" style="gap:8px;margin-top:6px"><input id="gqId" placeholder="ChIJ..." value="${esc(st.google_place_id || "")}" style="flex:1"><button class="ghost-btn sm" id="gqIdOk" style="width:auto">${L("저장", "Save")}</button></div></details>`,
+    () => true, L("닫기", "Close"));
+  const near = st.store_lat ? { lat: +st.store_lat, lng: +st.store_lng } : null;
+  const save = async id => { try{ await api.saveSettings({ google_place_id: id || null }); toast(id ? L("구글 가게를 고정했어요 ✅", "Pinned ✅") : L("자동 찾기로 바꿨어요", "Set to auto")); ov.remove(); gPlaceCache = null; paintGooglePlace(true); }catch(e){ toast(PT.errMsg(e), 4000); } };
+  const go = async () => {
+    const q = ov.querySelector("#gq").value.trim(), box = ov.querySelector("#gqList"); if(!q) return;
+    box.innerHTML = `<p class="hint">${L("찾는 중…", "Searching…")}</p>`;
+    try{
+      await loadAddressJs(); PTAddress.setGoogle(st.google_maps_key, st.google_map_id);
+      const list = await PTAddress.googlePlaceSearch(q, near);
+      box.innerHTML = list.length ? list.map(p => `<button class="ghost-btn" data-gpick="${esc(p.id)}" style="text-align:left;margin:0 0 6px;display:block;width:100%">
+          <b data-raw>${esc(p.name)}</b> ${p.rating ? `★${p.rating} (${p.count})` : ""}${p.meters != null ? ` · <b style="color:${p.meters < 300 ? "var(--green)" : "#b45309"}">${p.meters < 1000 ? p.meters + " m" : (p.meters / 1000).toFixed(1) + " km"}</b>` : ""}<br><small class="hint" data-raw>${esc(p.addr)}</small></button>`).join("")
+        : `<p class="hint">${L("결과가 없어요. 다른 이름으로 찾아보세요 (예: 빨통, Paltong, Korean chicken Remedios)", "No results — try another name")}</p>`;
+      box.querySelectorAll("[data-gpick]").forEach(b => b.onclick = () => save(b.dataset.gpick));
+    }catch(e){ box.innerHTML = `<p style="color:var(--red-deep)">${L("구글 검색 실패: ", "Google search failed: ")}${esc(e.message || e)}</p>`; }
+  };
+  ov.querySelector("#gqGo").onclick = go; ov.querySelector("#gq").onkeydown = e => { if(e.key === "Enter") go(); };
+  ov.querySelector("#gqIdOk").onclick = () => save(ov.querySelector("#gqId").value.trim());
+  go();
 }
 /* ⭐ 앱 리뷰 (손님 웹 '리뷰 보기'에 보이는 리뷰): 숨기기 · 답글 */
 function renderAppReviews(V, F){

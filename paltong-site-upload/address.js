@@ -348,5 +348,15 @@ async function googleStoreReviews(placeId, near){
     reviews: (p.reviews || []).map(r => ({ author: (r.authorAttribution && r.authorAttribution.displayName) || "Google user", uri: (r.authorAttribution && r.authorAttribution.uri) || "",
       photo: (r.authorAttribution && r.authorAttribution.photoURI) || "", rating: r.rating || 0, text: r.text || "", time: r.relativePublishTimeDescription || "" })) };
 }
-window.PTAddress = { createAddressWidget, loadLeaflet, setGoogle, googleStoreReviews, get google(){ return useGoogle(); }, get enabled(){ return ENABLED && !failed; } };
+/* 관리자: 구글에서 가게 이름으로 찾기 → [{ id, name, addr, rating, count, meters }] (가까운 순) */
+async function googlePlaceSearch(q, near){
+  const { Place } = await loadGoogle();
+  const c = near && near.lat ? near : CENTER;
+  const { places } = await Place.searchByText({ textQuery: q, fields: ["id", "displayName", "formattedAddress", "location", "rating", "userRatingCount"], locationBias: c, maxResultCount: 10 });
+  const m = p => { const l = p.location; if(!l) return null; const R = 6371000, r = x => x * Math.PI / 180, la = l.lat(), ln = l.lng();
+    const a = Math.sin(r(la - c.lat) / 2) ** 2 + Math.cos(r(c.lat)) * Math.cos(r(la)) * Math.sin(r(ln - c.lng) / 2) ** 2; return Math.round(2 * R * Math.asin(Math.sqrt(a))); };
+  return (places || []).map(p => ({ id: p.id, name: p.displayName || "", addr: p.formattedAddress || "", rating: p.rating || null, count: p.userRatingCount || 0, meters: m(p) }))
+    .sort((x, y) => (x.meters ?? 1e9) - (y.meters ?? 1e9));
+}
+window.PTAddress = { createAddressWidget, loadLeaflet, setGoogle, googleStoreReviews, googlePlaceSearch, get google(){ return useGoogle(); }, get enabled(){ return ENABLED && !failed; } };
 })();
