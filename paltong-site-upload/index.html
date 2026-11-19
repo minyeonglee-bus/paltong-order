@@ -1434,6 +1434,7 @@ function googleCardHTML(){
   if(!gRv || !gRv.rating) return "";
   return `<div class="card g-card">
     <div class="g-head"><span class="g-logo">G</span><b>${L("구글 리뷰","Google reviews")}</b>${starStr(gRv.rating, 16)}<b>${gRv.rating.toFixed(1)}</b><span class="hint">(${gRv.count.toLocaleString()})</span></div>
+    ${gRv.reviews.length ? "" : `<p class="hint" style="margin:6px 0 0">${L("최근 구글 리뷰는 구글 지도에서 볼 수 있어요","See recent reviews on Google Maps")}</p>`}
     ${gRv.reviews.map(r => `<div class="g-rv">
         <div class="rv-head">${r.photo ? `<img class="g-av" src="${esc(r.photo)}" alt="" referrerpolicy="no-referrer">` : ""}${r.uri ? `<a href="${esc(r.uri)}" target="_blank" rel="noopener"><b>${esc(r.author)}</b></a>` : `<b>${esc(r.author)}</b>`}${starStr(r.rating, 13)}<span class="hint">${esc(r.time)}</span></div>
         ${r.text ? `<p class="rv-body g-text">${esc(r.text)}</p>` : ""}</div>`).join("")}

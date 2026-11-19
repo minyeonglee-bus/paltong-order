@@ -345,7 +345,9 @@ async function googleStoreReviews(placeId, near){
   await p.fetchFields({ fields: ["displayName", "formattedAddress", "rating", "userRatingCount", "reviews", "googleMapsURI"] });
   return { id, auto: !placeId, name: p.displayName || "", addr: p.formattedAddress || "", rating: p.rating || null, count: p.userRatingCount || 0, url: p.googleMapsURI || "",
     writeUrl: "https://search.google.com/local/writereview?placeid=" + encodeURIComponent(id),
-    reviews: (p.reviews || []).map(r => ({ author: (r.authorAttribution && r.authorAttribution.displayName) || "Google user", uri: (r.authorAttribution && r.authorAttribution.uri) || "",
+    /* 최근 리뷰만 (사장님 11/20: 9월 1일 이후) — CFG.GOOGLE_REVIEW_SINCE 로 바꿀 수 있음 */
+    reviews: (p.reviews || []).filter(r => !r.publishTime || new Date(r.publishTime) >= new Date(CFG.GOOGLE_REVIEW_SINCE || "2026-09-01T00:00:00+08:00"))
+      .sort((x, y) => new Date(y.publishTime || 0) - new Date(x.publishTime || 0)).map(r => ({ author: (r.authorAttribution && r.authorAttribution.displayName) || "Google user", uri: (r.authorAttribution && r.authorAttribution.uri) || "",
       photo: (r.authorAttribution && r.authorAttribution.photoURI) || "", rating: r.rating || 0, text: r.text || "", time: r.relativePublishTimeDescription || "" })) };
 }
 /* 관리자: 구글에서 가게 이름으로 찾기 → [{ id, name, addr, rating, count, meters }] (가까운 순) */
