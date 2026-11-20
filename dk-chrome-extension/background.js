@@ -30,6 +30,17 @@ chrome.runtime.onMessage.addListener((msg, sender, reply) => {
       await log({ lastSent: Date.now(), lastNo: msg.no, count: (stat.count || 0) + (j && j.dup ? 0 : 1), lastError: "" });
       return { ok: true, dup: !!(j && j.dup) };
     }
+    if(msg.type === "status"){
+      const j = await rpc("dk_status_report", { p_key: key, p_list: msg.list });
+      await log({ lastStatus: Date.now(), lastError: "" });
+      return { ok: true, todo: (j && j.todo) || [] };
+    }
+    if(msg.type === "pushResult"){
+      await rpc("dk_push_result", { p_key: key, p_dk: msg.dk, p_ok: !!msg.ok, p_level: msg.level == null ? null : msg.level, p_error: msg.error || null });
+      const { stat = {} } = await chrome.storage.local.get("stat");
+      await log({ lastPush: Date.now(), lastPushNo: msg.dk, lastPushOk: !!msg.ok, lastPushErr: msg.error || "", pushCount: (stat.pushCount || 0) + (msg.ok ? 1 : 0) });
+      return { ok: true };
+    }
     if(msg.type === "ping"){
       await rpc("dk_inbox_ping", { p_key: key, p_info: msg.info || "" });
       await log({ lastPing: Date.now(), lastError: "" });
