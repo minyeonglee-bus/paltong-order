@@ -155,8 +155,10 @@
   const cardNo = a => T(a.querySelector(".classic-order-number")).replace(/\D/g, "") || (T(a).match(/#(\d{6,})/) || [])[1] || "";
   const findCard = no => [...document.querySelectorAll("article.merchant, article.redesign-card")].find(a => cardNo(a) === no);
   const cardLabel = a => T(a.querySelector(".status-label-text")) || T(a.querySelector("button.current-status"));
-  const orderViewOn = () => { const seg = [...document.querySelectorAll("ion-segment.order-top-segment ion-segment-button")].find(b => /^order$/i.test(T(b)));
-    return !!(seg && seg.classList.contains("segment-button-checked")); };
+  // 배달K 맨 위 ORDER / INQUIRY / CHATS 탭 중 ORDER가 선택돼 있는지 (ORDER 옆에 주문 개수 숫자가 붙음 — "ORDER 2")
+  const orderViewOn = () => { const segs = [...document.querySelectorAll("ion-segment.order-top-segment ion-segment-button")];
+    const seg = segs.find(b => /order|주문/i.test(T(b)) && !/inquiry|문의|chat|채팅/i.test(T(b))) || segs[0];
+    return !seg || seg.classList.contains("segment-button-checked") || seg.getAttribute("aria-selected") === "true"; };
   const filtered = () => [...document.querySelectorAll("button")].some(b => (b.classList.contains("active") || b.getAttribute("aria-pressed") === "true")
     && /^(my orders|pending|processing|reservation)\b/i.test(T(b)) && b.offsetParent);
   const wait = ms => new Promise(r => setTimeout(r, ms));
