@@ -126,7 +126,7 @@
 <script>window.PT_AUTH_KEY = "paltong_member_auth";</script>
 <script src="config.js"></script>
 <script src="menu.js"></script>
-<script src="common.js?v=20261118a"></script>
+<script src="common.js?v=20261120d"></script>
 <script src="address.js"></script>
 <script>
 const { CFG, MENU, ITEM_BY_ID, esc, peso, ls, L, T, STATUS, payInfo, isOnlinePay, api, toast } = PT;
@@ -649,7 +649,7 @@ function openCheckout(){
         </div>
         <div class="promo-box">
           ${welcome ? `🎁 ${L(`회원가입하면 ${peso(welcome)} 할인 쿠폰을 바로 드려요!`, `Sign up and get a ${peso(welcome)} coupon now!`)}` : `🎁 ${L("회원이 되면 쿠폰과 스탬프 혜택을 받을 수 있어요","Members get coupons and stamp rewards")}`}
-          <br><small>${L("회원은 주소와 주문 내역이 자동 저장되고, 스탬프·쿠폰함을 쓸 수 있어요. 비회원 주문은 내역이 남지 않아요.","Members get saved addresses, order history, stamps and a coupon box. Guest orders are not kept.")}</small>
+          <br><small>${L("회원은 주소와 주문 내역이 어디서든 보이고, 스탬프·쿠폰함을 쓸 수 있어요. 비회원 주문 내역은 이 기기(연동한 기기)에서만 보여요.","Members get saved addresses, order history, stamps and a coupon box. Guest orders show only on this device.")}</small>
           <button class="sm-link" id="goAuth">${L("로그인 / 회원가입","Log in / Sign up")} ›</button>
         </div>`}
       <div class="seg" id="typeSeg">
@@ -838,8 +838,8 @@ function openCheckout(){
           items: cart.map(l => ({ id:l.id, name:l.name, en:l.en, opts:l.opts, unitPrice:l.unitPrice, qty:l.qty })),
           subtotal: sub, name:cust.name.trim(), phone:cust.phone.trim(), addr: isPickup() ? "Store pickup" : cust.addr.trim(), lat: av.lat, lng: av.lng,
           order_type: isPickup() ? "pickup" : "delivery", scheduled_at: schedISO(),
-          memo:cust.memo.trim(), payment:cust.payment, lang:PT.LANG, coupon_id: acct && chosen.length ? chosen[0].id : null, coupon_ids: acct ? chosen.map(c => c.id) : [], ...(!acct && chosen.length ? { coupon_code: guestCode.code } : {}), quote_id: qok ? quote.quote_id : null });
-        rememberOrder(res.id);
+          memo:cust.memo.trim(), payment:cust.payment, lang:PT.LANG, coupon_id: acct && chosen.length ? chosen[0].id : null, coupon_ids: acct ? chosen.map(c => c.id) : [], ...(!acct && chosen.length ? { coupon_code: guestCode.code } : {}), quote_id: qok ? quote.quote_id : null, device: PT.deviceKey() });
+        rememberOrder(res.id); devCache = null;
         cart = []; saveCart(); cust.memo = ""; cust.sched = false; cust.sTime = ""; saveCust();
         s.close(); openTracker(res.id); loadAccount();
       }catch(e){
@@ -876,7 +876,7 @@ async function loadAccount(){
 }
 document.getElementById("acctBtn").onclick = () => acct ? openAccount() : openAuth(() => openAccount());
 
-function openAuth(onDone){
+function openAuth(onDone, prefillPhone){
   let mode = "login", busy = false;
   const s = sheet();
   s.setRender(function render(){
@@ -894,9 +894,10 @@ function openAuth(onDone){
       ${mode === "signup" ? `<div class="field"><label for="aPw2">${L("비밀번호 확인","Confirm password")} *</label><input id="aPw2" type="password" autocomplete="new-password"></div>` : ""}
       <button class="primary-btn" id="aGo">${mode === "login" ? L("로그인","Log in") : L("가입하고 쿠폰 받기","Sign up")}</button>
       ${mode === "login" ? `<p class="hint" style="text-align:center">${L("비밀번호를 잊으셨나요? 카카오톡으로 문의하시면 초기화해드립니다","Forgot password? Message us on KakaoTalk to reset it")} (${esc(CFG.KAKAO_ID)})</p>` : ""}
-      <button class="ghost-btn" id="aGuest">${L("비회원으로 계속하기","Continue as guest")}</button>`;
+      <button class="ghost-btn" id="aGuest">${L("비회원으로 계속하기","Continue as guest")}</button>
+      <button class="ghost-btn" id="aHist" style="margin-top:0">📋 ${L("비회원 주문 내역 · 기기 연동","Guest order history · Link device")}</button>`;
     const $ = q => s.el.querySelector(q);
-    { const d = String(cust.phone || "").replace(/\D/g, ""); if(d && !$("#aPhone").value) $("#aPhone").value = PT.phoneFmt(PT.phoneDigits(d)); }
+    { const d = String(prefillPhone || cust.phone || "").replace(/\D/g, ""); if(d && !$("#aPhone").value) $("#aPhone").value = PT.phoneFmt(PT.phoneDigits(d)); }
     // 09 고정 · 11자리, 형식이 맞으면 초록색 표시
     const ph = $("#aPhone"), phHint = $("#aPhoneHint");
     PT.phoneMask(ph);
@@ -908,6 +909,7 @@ function openAuth(onDone){
     s.el.querySelectorAll("[data-m]").forEach(b => b.onclick = () => { mode = b.dataset.m; render(); });
     $(".close-x").onclick = s.close;
     $("#aGuest").onclick = () => { s.close(); if(onDone && cart.length) openCheckout(); };
+    $("#aHist").onclick = () => { s.close(); openGuestHistory(); };
     s.el.querySelectorAll("input").forEach(i => i.addEventListener("keydown", e => { if(e.key === "Enter") $("#aGo").click(); }));
     $("#aGo").onclick = async () => {
       if(busy) return;
@@ -924,6 +926,7 @@ function openAuth(onDone){
         else await api.memberSignIn(phone, pw);
         await loadAccount();
         if(!acct) throw new Error("login_required");
+        refreshDeviceLink(true);
         toast(mode === "signup" ? T(`가입 완료! 쿠폰 ${(acct.coupons||[]).length}장이 지급되었어요`, `Welcome! You got ${(acct.coupons||[]).length} coupon(s)`) : T(`${acct.member.name || ""}님 환영합니다`, `Welcome back${acct.member.name ? ", " + acct.member.name : ""}`), 3000);
         s.close(); onDone && onDone();
       }catch(e){ toast(PT.errMsg(e), 4000); }
@@ -938,7 +941,11 @@ async function openAccount(){
   if(!acct) return openAuth(() => openAccount());
   let orders = [], rvBlob = null, rvURL = null, rvBusy = false;
   const s = sheet({ onClose(){ if(rvURL) URL.revokeObjectURL(rvURL); } });
-  api.myOrders().then(r => { orders = r || []; s.el._rr && s.el._rr(); }).catch(() => {});
+  Promise.all([api.myOrders().catch(() => []), loadDeviceOrders()]).then(([r, d]) => {
+    const seen = new Set((r || []).map(o => o.id));
+    orders = (r || []).concat((d || []).filter(o => !o.member && !seen.has(o.id)).map(o => ({ ...o, guest: true })))
+      .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+    s.el._rr && s.el._rr(); });
   s.setRender(function render(){
     const m = acct.member, st = acct.settings || shopSettings || {}, cps = acct.coupons || [];
     const goal = st.stamp_goal || 10;
@@ -990,10 +997,11 @@ async function openAccount(){
       <div class="card">
         <h4>${L("주문 내역","Order history")} <span class="en">${orders.length}</span></h4>
         ${orders.length ? orders.map(o => { const st2 = STATUS[o.status] || {}; return `<div class="order-row">
-            <button class="order-main" data-oid="${esc(o.id)}"><b>${esc(fmtDT(o.created_at))}</b> · ${L(st2.ko, st2.en)}<br><small>${esc((o.items||[]).map(l => l.name + "×" + l.qty).join(", ").slice(0, 70))}</small><br>
+            <button class="order-main" data-oid="${esc(o.id)}"><b>${esc(fmtDT(o.created_at))}</b> · ${L(st2.ko, st2.en)}${o.guest ? ` <small class="hint">(${esc(T("비회원 주문","guest order"))})</small>` : ""}<br><small>${esc((o.items||[]).map(l => l.name + "×" + l.qty).join(", ").slice(0, 70))}</small><br>
               <b>${peso(o.total ?? (o.subtotal - (o.discount||0)))}</b>${o.discount ? ` <small style="color:var(--green)">(${esc(T("쿠폰","coupon"))} -${peso(o.discount)})</small>` : ""}</button>
             <button class="sm-btn" data-re="${esc(o.id)}">${esc(T("다시 담기","Reorder"))}</button></div>`; }).join("") : `<p class="hint" style="margin:0">${L("주문 내역이 없습니다","No orders yet")}</p>`}
       </div>
+      ${linkCardHTML()}
       ${cart.length ? `<button class="primary-btn" id="toCheckout">${L("장바구니 주문하기","Checkout my cart")}</button>` : ""}
       <button class="ghost-btn" id="logout">${L("로그아웃","Log out")}</button>`;
     const $ = q => s.el.querySelector(q);
@@ -1019,6 +1027,7 @@ async function openAccount(){
     };
     s.el.querySelectorAll("[data-oid]").forEach(b => b.onclick = () => { s.close(); openTracker(b.dataset.oid); });
     s.el.querySelectorAll("[data-re]").forEach(b => b.onclick = () => { const o = orders.find(x => x.id === b.dataset.re); if(o){ reorder(o); render(); } });
+    bindLinkCard(s.el, render);
     s.el.querySelectorAll("[data-forget]").forEach(b => b.onclick = async () => {
       const a = (m.addresses || [])[+b.dataset.forget]; if(!a || !confirm(T("이 주소를 삭제할까요?","Delete this address?"))) return;
       try{ await api.forgetAddress(a); await loadAccount(); render(); }catch(e){ toast(PT.errMsg(e)); }
@@ -1043,6 +1052,94 @@ async function openAccount(){
   });
 }
 
+/* ---------- 📱 기기 연동 (2026-11-20) ----------
+   아이폰은 Safari 와 '홈 화면에 추가'한 앱의 저장소가 따로라서, 앱을 처음 열면 로그인·주문 내역이 비어 보임.
+   - 주문할 때 이 기기 키(PT.deviceKey)를 같이 보냄 → 서버가 기기별 주문 내역을 기억 (전화·주소는 안 보냄)
+   - 연동 코드: Safari 에서 미리 만들어 홈 화면 앱 시작 주소(/api/manifest?l=코드 → /?from=app&link=코드)에 넣음
+     → 앱을 처음 열면 자동으로 같은 기기로 묶임. 안 되면 '비회원 주문 내역 · 기기 연동'에서 코드를 직접 입력
+   - 회원은 로그인만 하면 주문 내역·쿠폰이 서버에서 그대로 (연동 코드로 들어오면 전화번호가 미리 채워짐)
+   - 쿠폰은 서버가 두 번 확인 (쿠폰 장부 coupon_redemptions) → 기기를 바꿔도 같은 쿠폰·코드 다시 못 씀 */
+let devCache = null;
+function loadDeviceOrders(){
+  if(!api.deviceOrders) return Promise.resolve([]);
+  if(!devCache) devCache = api.deviceOrders().catch(() => { devCache = null; return []; });
+  return devCache;
+}
+const IS_STANDALONE = (window.matchMedia && matchMedia("(display-mode: standalone)").matches) || navigator.standalone === true;
+const IS_IOS = /iPhone|iPad|iPod/i.test(navigator.userAgent || "") || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+const fmtLink = c => String(c || "").replace(/(.{5})(?=.)/g, "$1-");
+let devLink = null;   // { code, uid, exp }
+async function refreshDeviceLink(force){
+  if(!api.deviceLinkCreate) return null;
+  const uid = acct && acct.member ? acct.member.user_id || "m" : "";
+  const c = ls.get("paltong_link", null);
+  if(!force && c && c.uid === uid && c.exp > Date.now()){ devLink = c; applyManifest(); return c; }
+  try{ const r = await api.deviceLinkCreate();
+    devLink = { code: r.code, uid, exp: Date.now() + 20 * 864e5 }; ls.set("paltong_link", devLink); applyManifest(); return devLink; }
+  catch(e){ return null; }
+}
+/* 아이폰 Safari: 홈 화면 앱 시작 주소에 연동 코드를 넣음 (안드로이드 크롬은 저장소를 같이 써서 필요 없음) */
+function applyManifest(){
+  if(!IS_IOS || IS_STANDALONE || !devLink) return;
+  const el = document.querySelector('link[rel="manifest"]'); if(!el) return;
+  const href = "/api/manifest?l=" + encodeURIComponent(devLink.code);
+  if(el.getAttribute("href") !== href) el.setAttribute("href", href);
+}
+function linkCardHTML(){
+  return `<div class="card">
+    <h4>📱 ${L("기기 연동","Link devices")}</h4>
+    <p class="hint" style="margin-top:0">${L("홈 화면 앱·다른 폰에서 이 코드를 넣으면 이 기기의 주문 내역이 같이 보여요 (30일).","Enter this code in the Home Screen app or another phone to see this device's orders (30 days).")}</p>
+    <div class="code-row" style="align-items:center"><b id="lkCode" style="flex:1;font-size:18px;letter-spacing:1px">${devLink ? esc(fmtLink(devLink.code)) : "…"}</b>
+      <button class="sm-btn" id="lkCopy">${esc(T("복사","Copy"))}</button></div>
+    <div class="code-row"><input id="lkIn" placeholder="${esc(T("다른 기기의 연동 코드 입력","Enter a code from another device"))}" autocapitalize="characters" maxlength="14"><button class="sm-btn red" id="lkGo">${esc(T("연동","Link"))}</button></div>
+  </div>`;
+}
+function bindLinkCard(root, rerender){
+  const q = sel => root.querySelector(sel);
+  if(!devLink) refreshDeviceLink().then(() => { const b = q("#lkCode"); if(b && devLink) b.textContent = fmtLink(devLink.code); });
+  const cp = q("#lkCopy"); if(cp) cp.onclick = () => { if(!devLink) return; try{ navigator.clipboard.writeText(devLink.code); toast(T("복사했어요","Copied")); }catch(e){} };
+  const go = q("#lkGo"); if(go) go.onclick = async () => {
+    const v = q("#lkIn").value.trim(); if(!v) return;
+    go.disabled = true;
+    try{ const r = await redeemLink(v); toast(T("연동했어요! 주문 내역을 불러왔어요","Linked! Orders loaded"), 3000); rerender && rerender();
+      if(r && r.member_phone && !acct) openAuth(() => openAccount(), r.member_phone); }
+    catch(e){ toast(PT.errMsg(e), 3500); go.disabled = false; }
+  };
+}
+async function redeemLink(code){
+  const r = await api.deviceLinkRedeem(code);
+  ls.set("paltong_link_done", String(code).toUpperCase().replace(/[^A-Z0-9]/g, ""));
+  devCache = null; activeCache = {}; renderActiveOrders();
+  return r;
+}
+/* 비회원: 이 기기(연동 포함) 주문 내역 */
+function openGuestHistory(){
+  let orders = null;
+  const s = sheet();
+  loadDeviceOrders().then(d => { orders = d || []; s.el._rr && s.el._rr(); });
+  s.setRender(function render(){
+    s.el.innerHTML = `
+      <div class="sheet-head"><h3>📋 ${L("주문 내역","Order history")}</h3><button class="close-x">✕</button></div>
+      <p class="hint" style="margin-top:-6px">${L("이 기기와 연동한 기기에서 넣은 주문 (최근 180일). 회원 주문은 로그인하면 어디서든 보여요.","Orders from this and linked devices (180 days). Member orders show anywhere after login.")}</p>
+      <div class="card">
+        ${orders == null ? `<p class="hint" style="margin:0">${L("불러오는 중…","Loading…")}</p>`
+          : orders.length ? orders.map(o => { const st2 = STATUS[o.status] || {}; return `<div class="order-row">
+            <button class="order-main" data-oid="${esc(o.id)}"><b>${esc(fmtDT(o.created_at))}</b> · ${L(st2.ko || o.status, st2.en || o.status)}${o.member ? ` <small class="hint">(${esc(T("회원","member"))})</small>` : ""}<br><small>${esc((o.items||[]).map(l => l.name + "×" + l.qty).join(", ").slice(0, 70))}</small><br>
+              <b>${peso(o.total ?? (o.subtotal - (o.discount||0)))}</b>${o.discount ? ` <small style="color:var(--green)">(${esc(T("쿠폰","coupon"))} -${peso(o.discount)})</small>` : ""}</button>
+            <button class="sm-btn" data-re="${esc(o.id)}">${esc(T("다시 담기","Reorder"))}</button></div>`; }).join("")
+          : `<p class="hint" style="margin:0">${L("이 기기에서 넣은 주문이 없어요. 다른 기기(Safari 등)에서 주문했다면 그 기기의 연동 코드를 아래에 넣어주세요.","No orders on this device. If you ordered on another device (e.g. Safari), enter its link code below.")}</p>`}
+      </div>
+      ${linkCardHTML()}
+      <button class="primary-btn" id="ghLogin">👤 ${L("회원 로그인 (쿠폰·스탬프)","Member log in (coupons & stamps)")}</button>`;
+    const $ = q => s.el.querySelector(q);
+    $(".close-x").onclick = s.close;
+    $("#ghLogin").onclick = () => { s.close(); openAuth(() => openAccount()); };
+    s.el.querySelectorAll("[data-oid]").forEach(b => b.onclick = () => { s.close(); openTracker(b.dataset.oid); });
+    s.el.querySelectorAll("[data-re]").forEach(b => b.onclick = () => { const o = (orders || []).find(x => x.id === b.dataset.re); if(o){ reorder(o); render(); } });
+    bindLinkCard(s.el, () => { orders = null; render(); loadDeviceOrders().then(d => { orders = d || []; render(); }); });
+  });
+}
+
 /* ---------- 내 주문 기억 ---------- */
 function myOrders(){ return ss.get("paltong_my_orders", []); }
 function rememberOrder(id){ const a = myOrders().filter(x => x.id !== id); a.unshift({ id, at: Date.now() }); ss.set("paltong_my_orders", a.slice(0, 10)); }
@@ -1054,6 +1151,9 @@ async function renderActiveOrders(){
   // 회원: 서버의 내 주문 중 진행 중인 것 표시
   const rows = [], seen = new Set();
   if(acct){ try{ (await api.myOrders()).filter(o => !FINAL.includes(o.status)).forEach(o => { rows.push(o); seen.add(o.id); }); }catch(e){} }
+  // 📱 이 기기·연동된 기기(Safari ↔ 홈 화면 앱)에서 넣은 진행 중 주문
+  try{ (await loadDeviceOrders()).filter(o => !FINAL.includes(o.status) && !seen.has(o.id) && Date.now() - new Date(o.created_at) < 15 * 864e5)
+    .forEach(o => { rows.push(o); seen.add(o.id); }); }catch(e){}
   const keep = [];
   for(const x of myOrders().filter(x => Date.now() - x.at < 15 * 864e5)){   // 예약 주문도 있으니 최대 15일
     if(seen.has(x.id)){ keep.push(x); continue; }
@@ -1182,7 +1282,7 @@ function openTracker(id, opts = {}){
           <p class="hint" style="margin-top:0">${pick ? L(`찾으러 오실 때 매장에서 ${peso(o.total)}을 현금으로 결제해주세요.`, `Please pay ${peso(o.total)} in cash at the store.`) : L(`배달 기사님께 ${peso(o.total)}을 현금으로 결제해주세요. 잔돈이 필요하면 요청사항에 적어주세요.`, `Please pay ${peso(o.total)} in cash to the rider.`)}</p>
           <button class="primary-btn green" id="cashOk">${L("이 금액으로 주문 확정","Confirm order")}</button></div>`;
       }
-      if(!o.user_id) body += `<p class="hint" style="text-align:center">⚠ ${L("비회원 주문은 이 창을 닫으면 다시 볼 수 없어요. 결제가 끝날 때까지 창을 닫지 말아주세요.","Guest orders can't be reopened after you close this window. Please keep it open until payment is done.")}</p>`;
+      if(!o.user_id) body += `<p class="hint" style="text-align:center">⚠ ${L("비회원 주문은 👤 → '비회원 주문 내역'에서 다시 열 수 있어요 (이 기기에서만).","Guest orders can be reopened from 👤 → 'Guest order history' (this device only).")}</p>`;
     }
     if(o.status === "receipt_submitted"){
       body = `<div class="card wait-box"><div class="spinner"></div><b>${L("영수증을 확인하고 있어요","We're verifying your payment")}</b>
@@ -1207,7 +1307,7 @@ function openTracker(id, opts = {}){
         <div data-rvslot style="width:100%"></div>
         ${o.user_id ? `<p class="hint">${L("이 주문은 내 정보 → 주문 내역에 저장되었어요","Saved in My account → Order history")}</p>
             ${shopSettings && shopSettings.review_enabled ? `<button class="ghost-btn" id="goReview">📸 ${L("리뷰 인증하고 스탬프 +1 받기","Post a review for +1 stamp")}</button>` : ""}`
-          : `<p class="hint">${L("비회원 주문은 내역이 저장되지 않아요. 회원가입하면 주문 내역·주소가 저장되고 쿠폰도 받을 수 있어요!","Guest orders are not saved. Sign up to keep your history and addresses, and get coupons!")}</p>`}</div>`;
+          : `<p class="hint">${L("비회원 주문은 이 기기에서만 보여요 (👤 → 비회원 주문 내역). 회원가입하면 어느 폰에서든 주문 내역·주소가 보이고 쿠폰도 받을 수 있어요!","Guest orders show only on this device (👤 → Guest order history). Sign up to see your history on any phone and get coupons!")}</p>`}</div>`;
     }
     if(o.status === "cancelled"){
       body = `<div class="card wait-box"><b>${L("취소된 주문입니다","This order was cancelled")}</b>
@@ -1591,7 +1691,7 @@ refreshCartBar();
 loadSoldOut();
 api.onMenuStatus(loadSoldOut);
 renderActiveOrders();
-loadAccount().then(pollInquiry);
+const acctReady = loadAccount(); acctReady.then(pollInquiry);
 const jtvReady = api.jtvPlaces ? api.jtvPlaces().then(list => { PT.setJtvPlaces(list); jtvSync(cust.lat, cust.lng); }).catch(() => {}) : Promise.resolve();
 const settingsReady = api.getSettings().then(st => { if(st){ const was = isClosed(); shopSettings = st; PTAddress.setGoogle(st.google_maps_key, st.google_map_id); if(was !== isClosed()) renderMenu(); } }).catch(() => {});
 /* 처음 온 손님 (저장된 주소 없음) → 주소부터 */
@@ -1602,7 +1702,7 @@ Promise.all([jtvReady, settingsReady]).then(() => {
 try{ api.onSettings && api.onSettings(reloadStoreStatus); }catch(e){}
 setInterval(reloadStoreStatus, 60000);
 document.addEventListener("visibilitychange", () => { if(!document.hidden) reloadStoreStatus(); });
-setInterval(() => { activeCache = {}; renderActiveOrders(); }, 30000);
+setInterval(() => { activeCache = {}; devCache = null; renderActiveOrders(); }, 30000);
 /* 📄 영수증 QR (?review=주문id) → 리뷰 쓰기 */
 { const rid = new URLSearchParams(location.search).get("review");
   if(rid){ window._fromReview = true; setView("reviews"); history.replaceState(null, "", location.pathname + "#reviews");
@@ -1613,6 +1713,22 @@ setInterval(() => { activeCache = {}; renderActiveOrders(); }, 30000);
     }catch(e){ toast(PT.errMsg(e), 4000); } })(); } }
 const qid = new URLSearchParams(location.search).get("order");
 if(qid){ rememberOrder(qid); openTracker(qid); }
+/* 📱 홈 화면 앱 첫 실행: 시작 주소의 연동 코드로 Safari 쪽 주문 내역·회원 연결 */
+{ const lk = String(new URLSearchParams(location.search).get("link") || "").toUpperCase().replace(/[^A-Z0-9]/g, "");
+  if(lk && ls.get("paltong_link_done", "") !== lk){
+    redeemLink(lk).then(async r => {
+      await acctReady;
+      if(r && r.member_phone && !acct){
+        toast(T("📱 앱 연결 완료! 로그인하면 쿠폰·스탬프·주문 내역이 그대로 이어져요","📱 App linked! Log in to keep your coupons, stamps and orders"), 5000);
+        openAuth(() => openAccount(), r.member_phone);
+      } else toast(T("📱 앱 연결 완료! 이전 주문 내역을 불러왔어요","📱 App linked! Your previous orders are here"), 4000);
+    }).catch(() => {});
+  } else if(IS_STANDALONE && !lk && !ls.get("paltong_link_done", "") && !ls.get("paltong_app_hint", false)){
+    // 연동 코드 없이 열린 앱 (예전에 추가한 아이콘 등) → 한 번 안내
+    acctReady.then(() => { if(acct) return; loadDeviceOrders().then(d => { if((d || []).length) return; ls.set("paltong_app_hint", true);
+      toast(T("Safari에서 주문했었다면 👤 → '비회원 주문 내역 · 기기 연동'에서 코드를 넣으면 내역이 보여요","Ordered in Safari before? 👤 → 'Guest order history · Link device' to bring it here"), 6000); }); });
+  }
+  if(IS_IOS && !IS_STANDALONE) acctReady.then(() => refreshDeviceLink()); }   // 아이폰 Safari 만 미리 (홈 화면 추가 대비)
 </script>
 
 <!-- ============ 처음 들어오면 '홈 화면에 추가' 안내 ============ -->

@@ -204,6 +204,15 @@ const ls = {
   set(k, v){ try{ localStorage.setItem(k, JSON.stringify(v)); }catch(e){} },
   del(k){ try{ localStorage.removeItem(k); }catch(e){} },
 };
+/* 이 기기 키 (주문 내역 연동 · 비회원 쿠폰 기기 확인). 서버엔 sha256 해시만 저장 */
+function deviceKey(){
+  let k = ls.get("paltong_device", null);
+  if(typeof k !== "string" || k.length < 24){
+    const a = new Uint8Array(16); try{ crypto.getRandomValues(a); }catch(e){ for(let i = 0; i < 16; i++) a[i] = Math.random() * 256 | 0; }
+    k = "d" + Array.from(a, b => b.toString(16).padStart(2, "0")).join(""); ls.set("paltong_device", k);
+  }
+  return k;
+}
 
 /* ---------------- 언어 (한/영 병기 기본) ---------------- */
 let LANG = ls.get("paltong_lang", CFG.DEFAULT_LANG || "both");
@@ -528,7 +537,10 @@ function errMsg(e){
     [/code_invalid/, ["없는 쿠폰 코드입니다", "Invalid coupon code"]],
     [/code_expired/, ["등록 기간이 끝난 코드입니다", "This code has expired"]],
     [/code_sold_out/, ["선착순 수량이 모두 소진되었습니다", "This code has run out"]],
-    [/code_already_used/, ["이미 사용(등록)한 코드입니다", "You already used this code"]],
+    [/code_already_used/, ["이미 사용(등록)한 코드입니다 — 같은 코드는 전화번호·기기·회원 모두 합쳐 한 번만 쓸 수 있어요", "This code was already used (one use per phone, device and account)"]],
+    [/coupon_double_use/, ["이미 다른 주문에 사용된 쿠폰입니다", "This coupon was already used on another order"]],
+    [/link_invalid/, ["연동 코드가 맞지 않거나 기간이 지났어요", "Invalid or expired link code"]],
+    [/device_invalid/, ["기기 정보를 읽지 못했어요. 새로고침 후 다시 해주세요", "Couldn't read this device. Please reload"]],
     [/dk_inbox/, ["가게에서 50단계 SQL 설치가 필요해요 (DK 자동 접수)", "Run SQL step 50 first (DK auto inbox)"]],
     [/print_jobs|print_station/, ["가게에서 49단계 SQL 설치가 필요해요 (인쇄 스테이션)", "Run SQL step 49 first (print station)"]],
     [/coupon_code_member/, ["회원은 쿠폰 코드를 등록한 뒤 쿠폰함에서 골라 써주세요", "Members: add the code first, then pick it from your coupons"]],
@@ -740,7 +752,14 @@ function makeSupabaseApi(){
     },
     async updateProfile(name, addr){ unwrap(await sb.rpc("update_profile", { p_name: name, p_addr: addr })); },
     async claimCoupon(code){ return unwrap(await sb.rpc("claim_coupon", { p_code: code })); },
-    async checkCouponCode(code, phone){ return unwrap(await sb.rpc("check_coupon_code", { p_code: code, p_phone: phone || null })); },   // 비회원 쿠폰 코드 (48단계)
+    async checkCouponCode(code, phone){   // 비회원 쿠폰 코드 (48단계) — 전화번호 + 기기 둘 다 확인 (11/20)
+      const r = await sb.rpc("check_coupon_code", { p_code: code, p_phone: phone || null, p_device: deviceKey() });
+      if(r.error && /function .*check_coupon_code|p_device/i.test(r.error.message || "")) return unwrap(await sb.rpc("check_coupon_code", { p_code: code, p_phone: phone || null }));
+      return unwrap(r); },
+    /* 📱 기기 연동 — 홈 화면 앱(아이폰은 Safari와 저장소가 따로)에서도 이전 주문 내역이 보이게 */
+    async deviceOrders(){ return unwrap(await sb.rpc("device_orders", { p_device: deviceKey() })) || []; },
+    async deviceLinkCreate(){ return unwrap(await sb.rpc("device_link_create", { p_device: deviceKey() })); },
+    async deviceLinkRedeem(code){ return unwrap(await sb.rpc("device_link_redeem", { p_device: deviceKey(), p_code: code })); },
     async setBirthday(d){ unwrap(await sb.rpc("set_birthday", { p: d })); },
     async birthdayCheck(){ return unwrap(await sb.rpc("birthday_check")); },
     async forgetAddress(addr){ unwrap(await sb.rpc("forget_address", { p_addr: addr })); },
@@ -1209,6 +1228,7 @@ function makeDemoApi(){
       }
       return null;
     },
+    async deviceOrders(){ return []; }, async deviceLinkCreate(){ return { code: "DEMO123456" }; }, async deviceLinkRedeem(){ return { ok: true }; },
     async checkCouponCode(code){
       const k = CD().find(x => x.code === String(code).trim().toUpperCase());
       if(!k || !k.active) throw new Error("code_invalid");
@@ -1537,6 +1557,6 @@ function contactHTML(){
     CFG.STORE_PHONE ? `${T("전화·SMS", "Call·SMS")}: <a href="tel:${esc(CFG.STORE_PHONE.replace(/\s/g, ""))}"><b>${esc(CFG.STORE_PHONE)}</b></a>` : "",
     CFG.VIBER_PHONE ? `Viber·WhatsApp: <a href="https://wa.me/${num(CFG.VIBER_PHONE)}" target="_blank" rel="noopener"><b>${esc(CFG.VIBER_PHONE)}</b></a>` : ""].filter(Boolean).join("<br>");
 }
-window.PT = { contactLines, contactHTML, PRINT_SETS, PRINT_SETS_EN, KIND_LABEL, printKinds, manilaDay, bizDay, bizStart, DAY_START_HOUR, orderDay, get menuCfgActive(){ return menuCfgActive; }, loadMenuData, exportMenu, priceSig, politeKo, CATS, get menuOv(){ return menuOv; }, applyMenuOverrides, cleanForTranslate, setTranslateKey, googleTranslate, splitKoEn, msgText, schedLabel, menuToEnglish, matchZone, zoneFee, phoneMask, phoneValue, phoneOk, phoneDigits, phoneFmt, englishOnly, EN_NAME, EN_ADDR, hasHangul, stampRewards, stampText, isMemberPhone, normPhone, phoneEmail, prettyPhone, couponDiscount, couponValue, couponFace, couponsFace, couponCond, couponUsable, COUPON_KINDS, couponKind, stackKey, stackMax, couponStackOk, couponsDiscount, bestCoupons, stackRulesText, repriceLine, setNoSale, get noSale(){ return noSale; }, setJtvPlaces, isJtvAt, jtvPicks, errMsg, CFG, MENU, ITEM_BY_ID, esc, peso, ls, L, T, setLang, get LANG(){ return LANG; },
+window.PT = { deviceKey, contactLines, contactHTML, PRINT_SETS, PRINT_SETS_EN, KIND_LABEL, printKinds, manilaDay, bizDay, bizStart, DAY_START_HOUR, orderDay, get menuCfgActive(){ return menuCfgActive; }, loadMenuData, exportMenu, priceSig, politeKo, CATS, get menuOv(){ return menuOv; }, applyMenuOverrides, cleanForTranslate, setTranslateKey, googleTranslate, splitKoEn, msgText, schedLabel, menuToEnglish, matchZone, zoneFee, phoneMask, phoneValue, phoneOk, phoneDigits, phoneFmt, englishOnly, EN_NAME, EN_ADDR, hasHangul, stampRewards, stampText, isMemberPhone, normPhone, phoneEmail, prettyPhone, couponDiscount, couponValue, couponFace, couponsFace, couponCond, couponUsable, COUPON_KINDS, couponKind, stackKey, stackMax, couponStackOk, couponsDiscount, bestCoupons, stackRulesText, repriceLine, setNoSale, get noSale(){ return noSale; }, setJtvPlaces, isJtvAt, jtvPicks, errMsg, CFG, MENU, ITEM_BY_ID, esc, peso, ls, L, T, setLang, get LANG(){ return LANG; },
   orderPrefix, orderCode, isDine, inClosingWindow, isSvc, svcValue, riderPhone, riderEmail, STATUS, payInfo, isOnlinePay, lineName, lineOpt, optList, optLine, optChips, shortName, unitBreak, compressImage, api, DEMO, receiptDoc, printReceipt, toast };
 })();
