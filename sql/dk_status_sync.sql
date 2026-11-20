@@ -111,3 +111,8 @@ end $$;
 grant execute on function public.dk_status_report(text, jsonb) to anon, authenticated;
 grant execute on function public.dk_push_result(text, text, boolean, int, text) to anon, authenticated;
 revoke execute on function public.dk_find_order(text) from anon, authenticated, public;
+
+-- (11/21) 외부 주문을 '새 주문(처리 필요)'으로 만들 수 있게: admin_create_external_order 의 p->>'status' = 'new'
+--   → status 'new', confirmed_at null (그 외는 예전처럼 'confirmed'). 배달K 자동 등록이 씀.
+--   적용: 함수 정의에서 'confirmed', now(), 'delivery' 를
+--   case when p->>'status' = 'new' then 'new' else 'confirmed' end, case when p->>'status' = 'new' then null else now() end, 'delivery' 로 바꿈 (migration external_order_status_new)
