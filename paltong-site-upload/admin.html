@@ -568,10 +568,8 @@ function renderDaybar(){
     <button class="pill" id="cbBtn" style="margin-left:auto;background:#0E6B57;border-color:#0E6B57;color:#fff" title="${L("이 날 완료된 주문을 Paltong Cash Book 매출로 보내기", "Send this day's completed orders to the Paltong Cash Book")}">📒 ${L("캐시북으로", "To Cash Book")}</button>
     ${cReqs.some(r => r.status === "pending" || crNeedsFollow(r)) ? `<button class="pill" id="crBtn" style="background:#b45309;border-color:#b45309;color:#fff;font-weight:800">🧾 ${L("취소 요청", "Cancels")} <span class="n">${cReqs.filter(r => r.status === "pending" || crNeedsFollow(r)).length}</span></button>` : ""}
     <button class="pill" id="dkBtn" style="${dkInbox.length ? "background:#0f766e;border-color:#0f766e;color:#fff;font-weight:800" : ""}">📥 DK${dkInbox.length ? ` <span class="n">${dkInbox.length}</span>` : ""}</button>
-    <button class="pill" id="dkSnapBtn" style="background:#0f766e;border-color:#0f766e;color:#fff">📷 ${L("DK 캡처", "DK screenshot")}</button>
     <button class="pill" id="extBtn" style="background:var(--red);border-color:var(--red);color:#fff">➕ ${L("외부 주문", "Outside order")}</button>`;
   $("extBtn").onclick = () => extOrderModal();
-  $("dkSnapBtn").onclick = () => extOrderModal({ ch: "DK", ocr: true });
   $("dkBtn").onclick = () => dkInboxModal();
   if($("crBtn")) $("crBtn").onclick = () => cancelReqListModal();
   $("cbBtn").onclick = () => cashbookModal(viewDay || today());
