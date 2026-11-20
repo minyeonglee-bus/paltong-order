@@ -146,7 +146,7 @@
   const levelOf = s => { s = String(s || "").trim();
     if(/cancel|취소/i.test(s)) return -1;
     if(/complet|finish|완료/i.test(s)) return 6;
-    if(/arriv|soon|곧\s*도착/i.test(s)) return 5;
+    if(/arriv|soon|도착/i.test(s)) return 5;   // 곧도착 · 배달도착
     if(/deliver|배달\s*(시작|출발|중)|picked/i.test(s)) return 4;
     if(/prepar|cook|조리|준비/i.test(s)) return 3;
     if(/received|confirm|accept|주문\s*(접수|확인)/i.test(s)) return 2;
@@ -194,6 +194,9 @@
   }
   /* 배달K 상태 버튼을 눌러서 target 단계까지 (한 번에 한 단계, 확인 창은 '확인') */
   async function pushStatus(no, target){
+    // 배달K 탭이 여러 개 열려 있어도 한 탭만 버튼을 누르게 (같은 주문 60초 잠금)
+    const lk = await chrome.runtime.sendMessage({ type: "lock", dk: no }).catch(() => null);
+    if(!lk || !lk.ok) return;
     let level = null, err = null;
     for(let step = 0; step < 4; step++){
       const a = findCard(no);

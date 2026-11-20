@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "빨통 DK 연결 (Pal Tong DK link)",
-  "version": "1.3.1",
+  "version": "1.3.2",
   "description": "배달K 사장님 웹(www.deliveryk.com/order)의 새 주문을 빨통 주문 앱 📥 DK 목록으로 보냅니다.",
   "icons": { "16": "icon16.png", "48": "icon48.png", "128": "icon128.png" },
   "permissions": ["storage"],

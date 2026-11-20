@@ -20,7 +20,13 @@ async function log(patch){
   await chrome.storage.local.set({ stat: { ...stat, ...patch } });
 }
 
+const locks = {};   // 주문번호 → 잠근 시각 (여러 탭이 같은 주문 버튼을 동시에 누르지 않게)
 chrome.runtime.onMessage.addListener((msg, sender, reply) => {
+  if(msg.type === "lock"){
+    const now = Date.now();
+    if(locks[msg.dk] && now - locks[msg.dk] < 60000){ reply({ ok: false }); return; }
+    locks[msg.dk] = now; reply({ ok: true }); return;
+  }
   (async () => {
     const key = await getKey();
     if(!key) throw new Error("no_key");
