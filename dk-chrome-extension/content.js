@@ -83,7 +83,7 @@
   /* ---------------- 🔄 상태 맞추기 (양방향) ----------------
      배달K 단계: 1 접수대기 · 2 주문접수 · 3 조리중 · 4 배달시작 · 5 곧도착 · 6 완료 · -1 취소
      15초마다 보이는 카드 상태를 보내고, 서버가 돌려준 할 일(우리 앱에서 배달 중/완료된 주문)을
-     배달K 화면의 상태 버튼을 눌러서 맞춤. 배달K에서 아직 '조리중'이 안 된 주문(접수 전)은 안 건드림. */
+     배달K 화면의 상태 버튼을 눌러서 맞춤. 직원이 우리 앱에 등록(메뉴 확인)하면 배달K 접수대기 → 조리중까지. */
   const levelOf = s => { s = String(s || "").trim();
     if(/cancel|취소/i.test(s)) return -1;
     if(/complet|finish|완료/i.test(s)) return 6;
@@ -140,12 +140,18 @@
       level = levelOf(cardLabel(a));
       if(level == null){ err = "unknown_status:" + cardLabel(a); break; }
       if(level >= target || level === -1) break;
-      if(level < 3){ err = "not_accepted"; break; }   // 배달K에서 접수 전 → 사람이
       const btn = a.querySelector("button.current-status");
       if(!btn || btn.disabled){ err = "button_disabled"; break; }
       btn.click();
-      const al = await waitFor(() => document.querySelector("ion-alert:not(.overlay-hidden)"), 3000);
-      if(al){
+      const al = await waitFor(() => document.querySelector("ion-alert:not(.overlay-hidden)") || document.querySelector("ion-modal:not(.overlay-hidden)"), 4000);
+      if(al && al.tagName === "ION-MODAL"){   // 주문접수 → 조리중: 조리 시간 창 (기본값 그대로 확인)
+        await wait(600);
+        const btns = [...al.querySelectorAll("button, ion-button")].filter(b => b.offsetParent && T(b));
+        const no_ = b => /cancel|취소|close|닫기|back|뒤로/i.test(T(b));
+        const ok = btns.find(b => !no_(b) && /확인|confirm|^ok$|start|시작|저장|save|done|완료|변경|change/i.test(T(b))) || btns.filter(b => !no_(b)).pop();
+        if(!ok){ const c = btns.find(no_); if(c) c.click(); err = "modal_no_confirm"; break; }
+        ok.click();
+      } else if(al){
         const btns = [...al.querySelectorAll("button.alert-button")];
         const cancel = btns.find(b => b.classList.contains("alert-button-role-cancel") || /cancel|취소|닫기|close/i.test(T(b)));
         if(al.querySelector("input,textarea")){ if(cancel) cancel.click(); err = "needs_input"; break; }   // 입력이 필요한 창 → 사람이

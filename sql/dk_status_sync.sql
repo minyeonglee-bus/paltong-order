@@ -3,8 +3,9 @@
 --   배달K 단계: 1 접수대기 · 2 주문접수 · 3 조리중 · 4 배달시작 · 5 곧도착 · 6 완료 · -1 취소 (카드가 사라지면 gone)
 -- 배달K → 우리 앱: 배달시작/곧도착 → 'delivering' · 완료(또는 배달시작 뒤 사라짐) → 'done'
 --                  취소(또는 조리 단계에서 사라짐) → 자동으로 안 바꾸고 관리자 푸시만
--- 우리 앱 → 배달K: 'delivering' → 배달시작(4) · 'done' → 완료(6) — dk_status_report 가 할 일(todo)로 돌려주면
---                  확장이 배달K 화면의 상태 버튼을 눌러서 맞춤. 배달K에서 아직 접수(조리중) 안 한 주문은 안 건드림.
+-- 우리 앱 → 배달K: 등록(조리 중 'confirmed') → 조리중(3) · 'delivering' → 배달시작(4) · 'done' → 완료(6)
+--                  dk_status_report 가 할 일(todo)로 돌려주면 확장이 배달K 화면의 상태 버튼을 눌러서 맞춤.
+--                  우리 앱에 등록 안 한 주문(직원이 메뉴 확인 전)은 안 건드림.
 
 create table if not exists public.dk_order_sync (
   dk_id text primary key,
@@ -74,9 +75,11 @@ begin
     end if;
 
     -- 우리 앱 → 배달K (할 일)
-    if not v_gone and v_lv between 3 and 5 then
+    -- 직원이 우리 앱에 등록(메뉴 확인)하면 배달K도 조리중(3)까지 — 접수대기(1)·주문접수(2)에서 (사장님 11/21)
+    if not v_gone and v_lv between 1 and 5 then
       select * into o from public.orders where id = o.id;
-      v_target := case when o.status = 'done' then 6 when o.status = 'delivering' and not s.pickup then 4 else null end;
+      v_target := case when o.status = 'done' then 6 when o.status = 'delivering' and not s.pickup then 4
+                       when o.status in ('confirmed', 'accepted') then 3 else null end;
       if v_target is not null and v_target > v_lv
          and (s.push_error is null or s.push_tried_at < now() - interval '10 minutes') then
         todo := todo || jsonb_build_object('dk', v_dk, 'target', v_target, 'order_no', o.order_no);

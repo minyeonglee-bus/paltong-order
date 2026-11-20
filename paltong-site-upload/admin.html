@@ -4019,6 +4019,7 @@ async function dkInboxModal(){
   const ago = t => { const m = Math.round((Date.now() - new Date(t)) / 60000); return m < 1 ? L("방금", "just now") : m < 60 ? L(`${m}분 전`, `${m} min ago`) : m < 1440 ? L(`${Math.round(m / 60)}시간 전`, `${Math.round(m / 60)} h ago`) : L(`${Math.round(m / 1440)}일 전`, `${Math.round(m / 1440)} d ago`); };
   const ov = modal(`📥 ${L("배달K 자동 접수", "DK auto inbox")}`, `
     <div id="dkConn" class="hint" style="margin:0 0 10px"></div>
+    <p class="hint" style="margin:0 0 10px">${L("메뉴·금액을 확인하고 등록하면 배달K도 자동으로 <b>조리중</b>으로 넘어가요. 그 뒤 기사 출발·완료도 배달K에 자동으로 맞춰져요.", "After you check & add it, DeliveryK moves to <b>Preparing</b> automatically. Rider pickup / done also sync to DeliveryK.")}</p>
     <div id="dkList"></div>
     <details class="card" id="dkSetup" style="margin-top:10px"><summary><b>⚙ ${L("연결 방법 (PC 크롬 · 한 번만)", "Setup (PC Chrome · once)")}</b></summary><div id="dkSetupBody" class="hint" style="line-height:1.7;margin-top:6px"></div></details>`, async () => true, L("닫기", "Close"));
   const paint = () => {
