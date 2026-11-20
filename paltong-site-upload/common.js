@@ -712,6 +712,8 @@ function makeSupabaseApi(){
     async dkInboxSet(id, status, orderId){ unwrap(await sb.from("dk_inbox").update({ status, order_id: orderId || null, handled_at: new Date().toISOString() }).eq("id", id)); },
     async dkInboxClaim(id){ const r = await sb.from("dk_inbox").update({ status: "done", handled_at: new Date().toISOString() }).eq("id", id).eq("status", "new").select("id"); if(r.error) throw r.error; return (r.data || []).length > 0; },   // 여러 기기 중 한 곳만 자동 등록
     async dkInboxKey(rotate){ return unwrap(await sb.rpc("admin_dk_inbox_key", { p_rotate: !!rotate })); },
+    async dkInboxStatus(){ return unwrap(await sb.rpc("admin_dk_inbox_status")); },
+    async dkPriceHistory(){ return unwrap(await sb.from("orders").select("items").eq("source", "external").eq("channel", "DK").gte("created_at", new Date(Date.now() - 90 * 864e5).toISOString()).order("created_at", { ascending: false }).limit(300)) || []; },
     onDkInbox(cb){ sb.channel("dk_inbox").on("postgres_changes", { event:"INSERT", schema:"public", table:"dk_inbox" }, p => cb(p)).subscribe(); },
     /* 🧾 주문 취소 요청 (51단계) */
     async cancelReqList(days){ const since = new Date(Date.now() - (days || 2) * 864e5).toISOString();
@@ -1236,7 +1238,7 @@ function makeDemoApi(){
       if(k.total_limit != null && k.claimed_count >= k.total_limit) throw new Error("code_sold_out");
       return { ...k, source:"code", min_order:k.min_order || 0 };
     },
-    async dkInboxList(){ return []; }, async dkInboxSet(){}, async dkInboxClaim(){ return false; }, async dkInboxKey(){ return "demo-key"; }, onDkInbox(){},
+    async dkInboxList(){ return []; }, async dkInboxSet(){}, async dkInboxClaim(){ return false; }, async dkInboxKey(){ return "demo-key"; }, async dkInboxStatus(){ return {}; }, async dkPriceHistory(){ return []; }, onDkInbox(){},
     async cancelReqList(){ return ls.get("paltong_demo_cancel_req", []); },
     async cancelReqAdd(row){ const l = ls.get("paltong_demo_cancel_req", []); if(l.some(x => x.order_id === row.order_id && x.status === "pending")) throw new Error("duplicate key cancel_requests_one_pending");
       const r = { id: "cr" + Date.now(), status: "pending", created_at: new Date().toISOString(), ...row }; l.unshift(r); ls.set("paltong_demo_cancel_req", l); return r; },

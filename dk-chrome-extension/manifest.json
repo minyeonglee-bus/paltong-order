@@ -1,0 +1,14 @@
+{
+  "manifest_version": 3,
+  "name": "빨통 DK 연결 (Pal Tong DK link)",
+  "version": "1.0.0",
+  "description": "배달K 사장님 웹(www.deliveryk.com/order)의 새 주문을 빨통 주문 앱 📥 DK 목록으로 보냅니다.",
+  "icons": { "16": "icon16.png", "48": "icon48.png", "128": "icon128.png" },
+  "permissions": ["storage"],
+  "host_permissions": ["https://yzdhcumibflxtqkqvbul.supabase.co/*"],
+  "background": { "service_worker": "background.js" },
+  "content_scripts": [
+    { "matches": ["https://www.deliveryk.com/*", "https://deliveryk.com/*"], "js": ["content.js"], "run_at": "document_idle" }
+  ],
+  "action": { "default_popup": "popup.html", "default_title": "빨통 DK 연결" }
+}

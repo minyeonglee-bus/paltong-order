@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="ko"><head><meta charset="utf-8">
+<style>
+  body{font:14px/1.5 system-ui,-apple-system,"Malgun Gothic",sans-serif;width:300px;margin:12px;color:#1f2937}
+  h3{margin:0 0 8px;font-size:16px}
+  input{width:100%;box-sizing:border-box;padding:7px;font-size:13px;border:1px solid #cbd5e1;border-radius:8px}
+  button{margin-top:6px;padding:7px 12px;border:0;border-radius:8px;background:#c8102e;color:#fff;font-weight:700;cursor:pointer}
+  .hint{color:#64748b;font-size:12px}
+  .box{background:#f1f5f9;border-radius:8px;padding:8px;margin-top:10px;font-size:13px}
+  .err{color:#b91c1c}
+</style></head>
+<body>
+  <h3>🌶 빨통 DK 연결</h3>
+  <div class="hint">배달K 주문 화면(www.deliveryk.com/order)을 열어 두면 새 주문이 빨통 주문 앱 📥 DK 목록으로 가요.</div>
+  <label class="hint" style="display:block;margin-top:10px">연결 키 (관리자 화면 📥 DK → 연결 방법)</label>
+  <input id="key" autocomplete="off" spellcheck="false">
+  <button id="save">저장</button>
+  <div class="box" id="stat">…</div>
+  <script src="config.js"></script>
+  <script src="popup.js"></script>
+</body></html>

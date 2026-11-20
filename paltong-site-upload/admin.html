@@ -567,10 +567,12 @@ function renderDaybar(){
     <button class="pill" data-dstep="1" ${!d ? "disabled" : ""} title="${L("다음날", "Next day")}">▶</button>
     <button class="pill" id="cbBtn" style="margin-left:auto;background:#0E6B57;border-color:#0E6B57;color:#fff" title="${L("이 날 완료된 주문을 Paltong Cash Book 매출로 보내기", "Send this day's completed orders to the Paltong Cash Book")}">📒 ${L("캐시북으로", "To Cash Book")}</button>
     ${cReqs.some(r => r.status === "pending" || crNeedsFollow(r)) ? `<button class="pill" id="crBtn" style="background:#b45309;border-color:#b45309;color:#fff;font-weight:800">🧾 ${L("취소 요청", "Cancels")} <span class="n">${cReqs.filter(r => r.status === "pending" || crNeedsFollow(r)).length}</span></button>` : ""}
+    <button class="pill" id="dkBtn" style="${dkInbox.length ? "background:#0f766e;border-color:#0f766e;color:#fff;font-weight:800" : ""}">📥 DK${dkInbox.length ? ` <span class="n">${dkInbox.length}</span>` : ""}</button>
     <button class="pill" id="dkSnapBtn" style="background:#0f766e;border-color:#0f766e;color:#fff">📷 ${L("DK 캡처", "DK screenshot")}</button>
     <button class="pill" id="extBtn" style="background:var(--red);border-color:var(--red);color:#fff">➕ ${L("외부 주문", "Outside order")}</button>`;
   $("extBtn").onclick = () => extOrderModal();
   $("dkSnapBtn").onclick = () => extOrderModal({ ch: "DK", ocr: true });
+  $("dkBtn").onclick = () => dkInboxModal();
   if($("crBtn")) $("crBtn").onclick = () => cancelReqListModal();
   $("cbBtn").onclick = () => cashbookModal(viewDay || today());
   $("daybar").querySelectorAll("[data-day]").forEach(b => b.onclick = () => setViewDay(b.dataset.day));
@@ -3952,6 +3954,111 @@ function extNameBad(n, ch){
   if(ch === "DK") return /^\d{4,}$/.test(n) ? "" : L("DK 주문은 이름 칸에 DK 주문번호(숫자)만 적어요 — 예: 14596527", "DK orders: put the DK order number (digits only) in the name field");
   return /^[A-Za-z0-9 .,'&()#\/-]+$/.test(n) && /[A-Za-z0-9]/.test(n) ? "" : L("손님 이름은 영어 또는 숫자로만 적어요 (한글 X)", "Customer name: English letters or numbers only");
 }
+/* ---------------- 📥 배달K 자동 접수 (2026-11-21) ----------------
+   배달K 사장님 웹(www.deliveryk.com/order)을 켜 둔 PC의 크롬 확장 "빨통 DK 연결"이 새 주문을 보냄
+   → dk_inbox → 여기 📥 DK 목록 + 알림음 (+ 관리자 폰 푸시)
+   자동 등록은 하지 않음 (사장님 11/21 "웹에서 한번 더 확인"): [등록] → 외부 주문 창이 DK·내용 채워진 채 열림 → 확인 후 저장
+   직원이 이미 손으로 넣은 DK 주문(이름 칸 = DK 주문번호)은 목록에 안 뜸 */
+var dkInbox = [], dkSeen = null, dkReady = true;   // var: renderDaybar가 먼저 불려도 OK
+function dkParse(x){
+  const t = [x.title, x.body].filter(Boolean).join("\n");
+  const id = x.dk_id || (t.match(/주문\s*아이디\s*[:#]?\s*(\d{4,})/) || [])[1] || "";
+  const name = ((t.match(/주문\s*하신\s*분\s*[:：]?\s*([^/\n]+)/) || [])[1] || "").trim();
+  const total = (t.match(/합계\s*[:：]?\s*([\d,]+)/) || [])[1] || "";
+  const pickup = /(픽업|포장)\s*주문|pick\s*-?\s*up|take\s*-?\s*out/i.test(t);
+  return { id, name, total: total ? +total.replace(/,/g, "") : null, pickup, kind: pickup ? L("픽업", "Pickup") : L("배달", "Delivery") };
+}
+const dkExisting = id => id && orders.find(o => o.source === "external" && o.channel === "DK" && String(o.cust_name || "").trim() === String(id));
+async function loadDkInbox(first){
+  if(!dkReady) return;
+  try{
+    let list = await api.dkInboxList();
+    for(const x of list){   // 그 사이 손으로 넣은 같은 DK 주문 → 조용히 정리
+      const o = dkExisting(dkParse(x).id);
+      if(o){ await api.dkInboxSet(x.id, "done", o.id).catch(() => {}); x._gone = true; }
+    }
+    list = list.filter(x => !x._gone);
+    const fresh = dkSeen ? list.filter(x => !dkSeen.has(x.id)) : [];
+    dkSeen = new Set(list.map(x => x.id)); dkInbox = list;
+    for(const x of fresh){ const d = dkParse(x);
+      alarm("order", `📥 ${L("배달K 새 주문", "New DK order")}${d.id ? ` #${d.id}` : ""} — ${d.name || ""} · ${d.kind}${d.total ? ` · ${peso(d.total)}` : ""} — ${L("눌러서 확인 후 등록", "tap to check & add")}`, () => dkInboxModal()); }
+    if(first && list.length) toast(L(`📥 등록 안 한 배달K 주문 ${list.length}건 — 📥 DK 버튼`, `📥 ${list.length} DK order(s) waiting — 📥 DK button`), 5000);
+    renderDaybar();
+  }catch(e){ if(/dk_inbox|does not exist|schema cache|404/i.test(String(e.message || e))) dkReady = false; }
+}
+/* 배달K 웹 카드에는 메뉴별 가격이 없음 → 지난 DK 주문(같은 이름·옵션)의 가격을 붙여서 DK 메뉴 줄 형식("이름 770 ₱ ( half ) x 1")으로
+   못 찾은 줄은 그대로 (메뉴판에서 찾거나 가격 입력 필요) — 합계가 안 맞으면 외부 주문 창이 경고 */
+const dkKey = s => String(s || "").toLowerCase().replace(/[^a-z0-9가-힣]/g, "");
+async function dkPriceText(text){
+  let hist = [];
+  try{ hist = await api.dkPriceHistory(); }catch(e){ return text; }
+  const map = new Map();
+  for(const o of hist) for(const l of (o.items || [])){
+    if(!(+l.unitPrice > 0) || l.svc || l.service) continue;
+    const ok = (l.opts || []).filter(x => !x.svc).map(x => dkKey(x.en || x.ko)).filter(Boolean).sort().join(",");
+    for(const nm of new Set([l.name, l.en].filter(Boolean))){
+      const k = dkKey(nm); if(!k) continue;
+      if(!map.has(k + "|" + ok)) map.set(k + "|" + ok, +l.unitPrice);
+      if(!ok && !map.has(k + "|")) map.set(k + "|", +l.unitPrice);
+    }
+  }
+  return String(text || "").split("\n").map(line => {
+    const m = /^(.+?)(?:\s*\((.*)\))?\s*[x×]\s*(\d{1,2})$/.exec(line.trim()); if(!m || /₱|[:：]/.test(m[1])) return line;
+    const name = m[1].trim(), opts = (m[2] || "").split("/").map(x => x.trim()).filter(Boolean);
+    const optNames = opts.map(o => o.replace(/\s*\+\s*[\d,]+\s*₱?\s*$/, "").trim()).filter(Boolean);
+    const add = opts.reduce((a, o) => a + +(((o.match(/\+\s*([\d,]+)/) || [])[1] || "0").replace(/,/g, "")), 0);
+    const whole = line.trim().replace(/\s*[x×]\s*\d{1,2}$/, "").trim();   // "Red Pusit(500g)" 처럼 괄호까지 이름인 메뉴
+    if(m[2] && map.has(dkKey(whole) + "|")) return `${whole} ${map.get(dkKey(whole) + "|")} ₱ x ${m[3]}`;
+    let p = map.get(dkKey(name) + "|" + optNames.map(dkKey).sort().join(","));
+    if(p == null){ const b = map.get(dkKey(name) + "|"); if(b != null) p = b + add; }
+    if(p == null) return line;
+    return `${name} ${p} ₱${optNames.length ? ` ( ${optNames.join(" / ")} )` : ""} x ${m[3]}`;
+  }).join("\n");
+}
+async function dkInboxModal(){
+  const ago = t => { const m = Math.round((Date.now() - new Date(t)) / 60000); return m < 1 ? L("방금", "just now") : m < 60 ? L(`${m}분 전`, `${m} min ago`) : m < 1440 ? L(`${Math.round(m / 60)}시간 전`, `${Math.round(m / 60)} h ago`) : L(`${Math.round(m / 1440)}일 전`, `${Math.round(m / 1440)} d ago`); };
+  const ov = modal(`📥 ${L("배달K 자동 접수", "DK auto inbox")}`, `
+    <div id="dkConn" class="hint" style="margin:0 0 10px"></div>
+    <div id="dkList"></div>
+    <details class="card" id="dkSetup" style="margin-top:10px"><summary><b>⚙ ${L("연결 방법 (PC 크롬 · 한 번만)", "Setup (PC Chrome · once)")}</b></summary><div id="dkSetupBody" class="hint" style="line-height:1.7;margin-top:6px"></div></details>`, async () => true, L("닫기", "Close"));
+  const paint = () => {
+    const box = ov.querySelector("#dkList");
+    box.innerHTML = dkInbox.length ? dkInbox.map(x => { const d = dkParse(x); return `<div class="card" style="margin-bottom:8px">
+        <div style="display:flex;justify-content:space-between;gap:8px"><b>${d.pickup ? "🏃" : "🛵"} ${esc(d.name || "DK")} · ${d.kind}${d.id ? ` · DK #${esc(d.id)}` : ""}${d.total ? ` · ${peso(d.total)}` : ""}</b><span class="hint" style="white-space:nowrap">${ago(x.created_at)}</span></div>
+        <div data-raw style="white-space:pre-wrap;font-size:13px;margin:6px 0;max-height:220px;overflow:auto">${esc(x.body || "")}</div>
+        <div class="btn-row"><button class="primary-btn sm" data-dkgo="${x.id}">➕ ${L("확인하고 외부 주문으로 등록", "Check & create order")}</button><button class="ghost-btn sm" data-dkno="${x.id}">${L("무시", "Ignore")}</button></div></div>`; }).join("")
+      : `<p class="hint">${L("새로 들어온 배달K 주문이 없어요. 배달K 주문은 들어오는 즉시 여기에 뜨고 알림음이 울려요.", "No new DK orders. New DK orders appear here with a sound.")}</p>`;
+    box.querySelectorAll("[data-dkgo]").forEach(b => b.onclick = () => { const x = dkInbox.find(i => i.id === b.dataset.dkgo); if(!x) return;
+      const o = dkExisting(dkParse(x).id); if(o){ toast(L(`이미 등록된 주문이에요 — DK-${o.order_no}`, `Already added — DK-${o.order_no}`), 4000); api.dkInboxSet(x.id, "done", o.id).then(() => loadDkInbox()).catch(() => {}); ov.remove(); return; }
+      ov.remove(); dkPriceText(x.body || "").then(text => extOrderModal({ text, ch: "DK", inboxId: x.id })); });
+    box.querySelectorAll("[data-dkno]").forEach(b => b.onclick = async () => { if(!confirm(L("이 배달K 주문을 목록에서 지울까요? (주문은 등록되지 않아요)", "Remove this DK order from the list? (no order will be created)"))) return;
+      await api.dkInboxSet(b.dataset.dkno, "ignored").catch(e => toast(PT.errMsg(e))); await loadDkInbox(); paint(); });
+  };
+  const paintConn = async () => {
+    const el = ov.querySelector("#dkConn");
+    try{ const st = await api.dkInboxStatus(); const t = st && st.last_seen;
+      const m = t ? (Date.now() - new Date(t)) / 60000 : Infinity;
+      el.innerHTML = m <= 12 ? `🟢 ${L("배달K 연결됨", "DK connected")} · ${L("마지막 확인", "last check")} ${ago(t)}${st.info ? ` · ${esc(st.info)}` : ""}`
+        : `<span style="color:#b45309">🔴 ${t ? L(`배달K 연결이 ${ago(t)}부터 끊겼어요`, `DK not connected since ${ago(t)}`) : L("아직 연결된 적 없어요", "Never connected")} — ${L("PC가 켜져 있고 크롬에 배달K 주문 화면이 열려 있는지(로그인 포함) 확인하세요", "check the PC is on and the DK order page is open & logged in")}</span>`;
+    }catch(e){ el.textContent = ""; }
+  };
+  const paintSetup = key => {
+    ov.querySelector("#dkSetupBody").innerHTML = `<ol style="padding-left:18px;margin:6px 0">
+        <li>${L("PC에 <b>빨통 DK 연결</b> 크롬 확장 설치 (사장님이 받은 zip 파일 압축 풀기 → 크롬 주소창 <b>chrome://extensions</b> → 오른쪽 위 <b>개발자 모드</b> 켜기 → <b>압축해제된 확장 프로그램 로드</b> → 푼 폴더 선택)", "Install the <b>Pal Tong DK link</b> Chrome extension on the PC (unzip → chrome://extensions → Developer mode → Load unpacked → pick the folder)")}</li>
+        <li>${L("확장 아이콘 → 아래 <b>연결 키</b>가 들어 있는지 확인 (없으면 붙여넣고 저장)", "Extension icon → make sure the <b>link key</b> below is filled in")}
+          <input readonly value="${esc(key || "…")}" style="width:100%;font-size:12px;padding:6px;margin:4px 0" id="dkKey"> <button class="chip" id="dkCopy">📋 ${L("키 복사", "Copy key")}</button></li>
+        <li>${L("크롬에서 <b>www.deliveryk.com/order</b> 열고 사장님 계정으로 로그인 → 그 탭을 <b>계속 열어 두기</b> (PC 절전 끄기)", "Open <b>www.deliveryk.com/order</b>, log in, and <b>keep that tab open</b> (turn off PC sleep)")}</li>
+      </ol>
+      <p class="hint" style="margin:6px 0 0">${L("연결 키는 가게 전용 비밀 키예요. 다른 사람에게 보내지 마세요.", "The link key is secret — don't share it.")} <button class="chip" id="dkRotate">🔑 ${L("새 키 만들기", "New key")}</button></p>`;
+    ov.querySelector("#dkCopy").onclick = () => { const i = ov.querySelector("#dkKey"); i.select(); try{ navigator.clipboard.writeText(i.value); }catch(e){ document.execCommand("copy"); } toast(L("복사했어요", "Copied")); };
+    ov.querySelector("#dkRotate").onclick = async () => { if(!confirm(L("새 키를 만들면 PC 확장에도 새 키를 넣어야 해요. 계속할까요?", "You'll need to put the new key in the PC extension. Continue?"))) return;
+      try{ paintSetup(await api.dkInboxKey(true)); toast(L("새 키를 만들었어요 — PC 확장에 넣어 주세요", "New key — update the PC extension")); }catch(e){ toast(PT.errMsg(e)); } };
+  };
+  paint(); paintConn();
+  try{ await loadDkInbox(); paint(); paintSetup(await api.dkInboxKey(false)); }
+  catch(e){ ov.querySelector("#dkSetupBody").textContent = PT.errMsg(e); }
+}
+
 /* 붙여넣은 DK 글에서 DK 주문번호 찾기 ("주문아이디 14596527" · "14596527 유정옥 배달주문") */
 function extDkId(t){
   t = t || "";
@@ -4011,6 +4118,7 @@ async function extOrderModal(pre){   // pre = { text, ch, inboxId } — 📥 DK 
         await api.updateOrder(r.id, patch).catch(e => toast(L("포인트 공제 저장 실패: ", "Points not saved: ") + PT.errMsg(e), 5000));
       }
       if(stf.id) await api.setOrderStaff(r.id, stf.id, stf.pin).catch(e => toast(staffErr(e), 4000));
+      if(pre && pre.inboxId){ await api.dkInboxSet(pre.inboxId, "done", r.id).catch(() => {}); loadDkInbox(); }
       await loadOrders(); loadRiders();
       shareTrack({ id: r.id, order_no: r.order_no, tracking_url: r.tracking_url, cust_phone: f.phone, cust_name: f.name }, true);
     }, L("등록하고 링크 받기", "Create & get link"));
@@ -4191,6 +4299,9 @@ function startApp(){
   api.getSettings().then(st => { PT.setTranslateKey(st && st.google_maps_key); gGeoKey = (st && st.google_maps_key) || null; }).catch(() => {});   // Google 번역 키
   api.onOrdersChange(() => { clearTimeout(window._lt); window._lt = setTimeout(loadOrders, 300); });
   setInterval(loadOrders, 15000);          // 실시간 연결이 끊겨도 15초마다 새로고침
+  loadDkInbox(true);
+  try{ api.onDkInbox(() => loadDkInbox()); }catch(e){}
+  setInterval(() => loadDkInbox(), 20000);
   refreshReviewCount();
   loadThreads();
   try{ api.onChatChange(() => { clearTimeout(window._ct); window._ct = setTimeout(loadThreads, 300); }); }catch(e){}
