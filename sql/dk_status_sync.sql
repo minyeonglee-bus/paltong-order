@@ -68,6 +68,8 @@ begin
       if o.status in ('confirmed', 'delivering', 'accepted') then
         update public.orders set status = 'done', delivered_at = coalesce(delivered_at, now()), updated_at = now() where id = o.id;
       end if;
+    elsif not v_gone and v_lv = 3 and o.status = 'accepted' then   -- 배달K에서 조리중으로 바꾸면 우리 앱도 조리중
+      update public.orders set status = 'confirmed', confirmed_at = coalesce(confirmed_at, now()), updated_at = now() where id = o.id;
     elsif not v_gone and v_lv in (4, 5) and not s.pickup then
       if o.status in ('confirmed', 'accepted') then
         update public.orders set status = 'delivering', picked_up_at = coalesce(picked_up_at, now()), updated_at = now() where id = o.id;
@@ -79,7 +81,7 @@ begin
     if not v_gone and v_lv between 1 and 5 then
       select * into o from public.orders where id = o.id;
       v_target := case when o.status = 'done' then 6 when o.status = 'delivering' and not s.pickup then 4
-                       when o.status in ('confirmed', 'accepted') then 3 else null end;
+                       when o.status = 'confirmed' then 3 when o.status = 'accepted' then 2 else null end;   -- 주문확인 → 배달K 주문확인(2) (11/21)
       if v_target is not null and v_target > v_lv
          and (s.push_error is null or s.push_tried_at < now() - interval '10 minutes') then
         todo := todo || jsonb_build_object('dk', v_dk, 'target', v_target, 'order_no', o.order_no);

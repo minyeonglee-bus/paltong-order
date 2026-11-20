@@ -904,12 +904,16 @@ function cardHTML(o){
     + (svcOk ? `<div class="btn-row" style="margin:4px 0"><button class="ghost-btn sm" data-itemadd>➕ ${L("메뉴 추가", "Add item")}</button><button class="ghost-btn sm" data-svcadd>🎁 ${L("서비스 추가", "Add free item")}</button><button class="ghost-btn sm" data-adddc>🏷 ${L("추가/할인", "Add/DC")}</button></div>` : "");
   let action = "";
 
-  if(o.status === "new" && o.source === "external"){   // 📥 배달K 자동 등록 → 메뉴 확인 후 조리 시작
+  if((o.status === "new" || o.status === "accepted") && o.source === "external"){   // 📥 배달K 자동 등록: 주문대기 → [주문 확인] → 주문확인 → [조리 시작] → 조리중
+    const acc = o.status === "accepted";
     action = `${o.store_discount ? `<div class="sum-row"><span>${esc(discText(o.store_discount_label))}</span><span>-${peso(o.store_discount)}</span></div>` : ""}
       ${pick ? "" : `<div class="sum-row"><span>배달비</span><span>${peso(o.delivery_fee || 0)}</span></div>`}
       <div class="sum-row total"><span>${L("최종 금액", "Total")}</span><b>${o.total == null ? "—" : peso(o.total)}</b></div>
-      <p class="hint" style="margin:6px 0">📥 ${L("배달K에서 자동으로 들어온 주문이에요. 메뉴·옵션·금액이 배달K와 맞는지 확인하고 (틀리면 🔄 수정·➕ 메뉴 추가) 조리를 시작하세요. 조리 시작을 누르면 배달K도 <b>조리중</b>으로 바뀌어요.", "Auto-added from DeliveryK. Check items & total against DeliveryK (fix with 🔄 / ➕), then start cooking — DeliveryK moves to <b>Preparing</b> too.")}</p>
-      <div class="btn-row"><button class="primary-btn sm green" data-act="extok">✅ ${L("메뉴 확인 → 조리 시작", "Checked → start cooking")}</button></div>
+      ${acc
+        ? `<p class="hint" style="margin:6px 0">✅ ${L("주문 확인됨 — 배달K 손님에게도 '주문이 확인되었습니다'가 갔어요. 조리를 시작하면 배달K도 <b>조리중</b>으로 바뀌어요.", "Order confirmed — the DeliveryK customer was told too. Start cooking → DeliveryK moves to <b>Preparing</b>.")}</p>
+           <div class="btn-row"><button class="primary-btn sm green" data-act="extcook">👩‍🍳 ${L("조리 시작", "Start cooking")}</button></div>`
+        : `<p class="hint" style="margin:6px 0">📥 ${L("배달K에서 자동으로 들어온 주문이에요. 메뉴·옵션·금액이 배달K와 맞는지 확인하고 (틀리면 🔄 수정·➕ 메뉴 추가) <b>주문 확인</b>을 누르세요. 배달K 손님에게도 '주문이 확인되었습니다'가 가요.", "Auto-added from DeliveryK. Check items & total against DeliveryK (fix with 🔄 / ➕), then press <b>Confirm order</b> — the DeliveryK customer is told too.")}</p>
+           <div class="btn-row"><button class="primary-btn sm green" data-act="extok">✅ ${L("주문 확인", "Confirm order")}</button></div>`}
       <div class="btn-row">${pick ? "" : `<button class="ghost-btn sm" data-act="editfee">✏️ ${L("배달료 수정", "Edit fee")}</button>`}<button class="ghost-btn sm" data-act="reject">${L("주문 취소", "Cancel order")}</button></div>`;
   }
   else if(o.status === "new" || o.status === "accepted"){
@@ -1695,7 +1699,10 @@ async function act(o, a, btn){
     const ok = await run({ status: "confirmed", confirmed_at: new Date().toISOString(), admin_note: null }, L(`#${o.order_no} 주문 시작!`, `#${o.order_no} started!`));
     if(ok && CFG.AUTO_PRINT_ON_CONFIRM && !printed[o.id]) doPrint(o);
   }
-  if(a === "extok"){   // 📥 배달K 자동 등록 주문: 메뉴 확인 → 조리 시작 (배달K는 확장이 조리중으로)
+  if(a === "extok"){   // 📥 배달K 자동 등록 주문: 직원이 메뉴 확인 → 주문확인 (배달K는 확장이 '주문확인'으로)
+    await run({ status: "accepted" }, L(`${PT.orderCode(o)} 주문 확인! 배달K도 주문확인으로 바뀌어요`, `${PT.orderCode(o)} confirmed! DeliveryK will show it too`));
+  }
+  if(a === "extcook"){   // 주문확인 → 조리 시작 (배달K는 조리중)
     const ok = await run({ status: "confirmed", confirmed_at: new Date().toISOString() }, L(`${PT.orderCode(o)} 조리 시작! 배달K도 조리중으로 바뀌어요`, `${PT.orderCode(o)} cooking! DeliveryK will move to Preparing`));
     if(ok && CFG.AUTO_PRINT_ON_CONFIRM && !printed[o.id]) doPrint(o);
   }
