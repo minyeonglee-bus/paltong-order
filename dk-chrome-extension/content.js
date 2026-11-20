@@ -50,6 +50,54 @@
     return { no, name, items, want, title: `${pickup ? "픽업" : "배달"} · ${name || "DK"}${total ? ` · ₱${total}` : ""}`, text: lines.join("\n") };
   }
 
+
+  /* 배달K 주문 상세 화면(/shop-manage/orders/번호)을 안 보이는 창(iframe)으로 열어서 메뉴별 가격·할인·배달비·요청사항 읽기
+     (같은 사이트·같은 로그인 · 화면만 읽음) → DK 가격 그대로 */
+  const money = s => +String(s || "").replace(/[^\d.]/g, "") || 0;
+  async function readDetail(no){
+    const f = document.createElement("iframe");
+    f.style.cssText = "position:fixed;left:-5000px;top:0;width:420px;height:1000px;border:0;visibility:hidden";
+    f.src = `/shop-manage/orders/${no}`;
+    document.body.appendChild(f);
+    try{
+      const txt = await waitFor(() => { try{ const t = f.contentDocument && f.contentDocument.body && f.contentDocument.body.innerText || "";
+        return /주문내역|Order details/i.test(t) && /총\s*결제\s*금액|Total/i.test(t) ? t : null; }catch(e){ return null; } }, 20000);
+      if(!txt) return null;
+      await wait(500);
+      const t = f.contentDocument.body.innerText;
+      const L = t.split("\n").map(x => x.trim()).filter(Boolean);
+      const at = re => L.findIndex(x => re.test(x));
+      const after = (re, n = 1) => { const i = at(re); return i >= 0 ? L[i + n] || "" : ""; };
+      const i0 = at(/^주문내역$/), i1 = at(/^상품가격$/);
+      if(i0 < 0 || i1 < 0 || i1 <= i0) return null;
+      const items = []; let cur = null, optName = null;
+      for(const x of L.slice(i0 + 1, i1)){
+        const m = /^(.+?)\s+[xX×]\s*(\d{1,3})$/.exec(x);
+        if(m){ cur = { name: m[1].replace(/\p{Extended_Pictographic}|️/gu, "").trim(), qty: +m[2], price: null, opts: [] }; items.push(cur); optName = null; continue; }
+        if(!cur) continue;
+        const pm = /^([+-]?)\s*([\d,]+(?:\.\d+)?)\s*₱/.exec(x);
+        if(pm){ if(cur.price == null) cur.price = money(pm[2]); else if(optName != null){ cur.opts.push({ name: optName, price: money(pm[2]) }); optName = null; } continue; }
+        if(optName != null) cur.opts.push({ name: optName, price: 0 });
+        optName = x;
+      }
+      if(cur && optName != null) cur.opts.push({ name: optName, price: 0 });
+      if(!items.length || items.some(x => x.price == null)) return null;
+      const goods = money(after(/^상품가격$/)), disc = money(after(/^할인금액$/)), fee = money(after(/^배달비$/)), total = money(after(/^총\s*결제\s*금액$/));
+      // 배달K 상세 화면의 가격은 '줄 합계' (예: 참치 마요 500 ₱ (날치알 +100 ₱) X 2 = 개당 250 + 50) — 상품가격으로 확인
+      const optSum = x => x.opts.reduce((a, o) => a + o.price, 0);
+      const sumLine = items.reduce((a, x) => a + x.price + optSum(x), 0);            // 줄 합계 (옵션도 합계)
+      const sumUnit = items.reduce((a, x) => a + (x.price + optSum(x)) * x.qty, 0);  // 개당
+      const perUnit = goods && sumLine !== goods && sumUnit === goods;
+      const lines = items.map(x => {
+        const q = perUnit ? 1 : x.qty, r = n => Math.round(n / q);
+        return `${x.name} ${r(x.price)} ₱${x.opts.length ? ` ( ${x.opts.map(o => `${o.name} +${r(o.price)} ₱`).join(" / ")} )` : ""} x ${x.qty}`;
+      });
+      const req = []; const r0 = at(/^추가요청정보$/), r1 = at(/^상점정보$/);
+      if(r0 >= 0 && r1 > r0) req.push(...L.slice(r0 + 1, r1));
+      return { lines, goods, disc, fee, total, pay: after(/^결제방법$/), req, status: after(/^주문상태$/) };
+    }catch(e){ return null; }
+    finally{ f.remove(); }
+  }
   async function sentMap(){ const { sent = {} } = await chrome.storage.local.get("sent"); return sent; }
   let busy = false;
   async function scan(){
@@ -62,6 +110,17 @@
       for(const a of cards){
         const c = readCard(a); if(!c || sent[c.no]) continue;
         if(c.items.length < c.want && (waiting[c.no] = (waiting[c.no] || 0) + 1) < 4) continue;   // 메뉴가 다 보일 때까지 잠깐 기다림 (최대 ~20초)
+        const d = await readDetail(c.no);
+        if(d){   // DK 상세 화면 가격으로 메뉴 줄 바꾸기
+          const head = c.text.split("\n").filter(x => /^(요청: DK 주문아이디|픽업주문|주문하신 분|연락처|주소|상세 주소)/.test(x));
+          c.text = [...head, ...d.lines,
+            d.fee ? `배달비: ${d.fee} ₱` : "배달비: 0",
+            d.disc ? `포인트 공제: ${d.disc}` : "",
+            d.disc ? `요청: DK 할인 ₱${d.disc}` : "",
+            d.pay ? `결제: ${d.pay}` : "",
+            d.total ? `합계: ${d.total.toLocaleString("en-US")} ₱` : "",
+            ...d.req.map(r => `요청: ${r}`)].filter(Boolean).join("\n");
+        }
         const r = await chrome.runtime.sendMessage({ type: "order", no: c.no, title: c.title, text: c.text }).catch(e => ({ ok: false, error: String(e) }));
         if(r && r.ok){ sent[c.no] = Date.now(); await chrome.storage.local.set({ sent }); }
       }
