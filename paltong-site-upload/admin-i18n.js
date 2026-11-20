@@ -24,6 +24,7 @@ const DICT = [
   ["주문 불러오기 실패 — 인터넷 연결 확인", "Couldn't load orders — check the internet connection"],
 
   // ---- 필터 · 상태 ----
+  ["주문대기", "New"], ["주문확인", "Accepted"], ["입금확인", "Payment check"], ["조리중", "Cooking"], ["배송중", "Delivering"], ["완료", "Done"],
   ["처리 필요", "Needs action"], ["접수됨", "Accepted"], ["조리·입금 대기", "Cooking·awaiting payment"], ["조리·배달 중", "Cooking·delivering"],
   ["완료·취소", "Done·cancelled"], ["전체", "All"], ["해당하는 주문이 없습니다", "No orders here"],
   ["주문 확인 중", "Checking order"], ["주문 접수", "Order accepted"], ["조리 중·입금 대기", "Cooking · awaiting payment"], ["결제 확인 중", "Verifying payment"],

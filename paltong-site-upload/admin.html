@@ -248,13 +248,14 @@ const extraPending = o => extraDue(o) > 0 && !!o.extra_receipt_at && ["receipt_s
 const feeSrcLabel = o => o.fee_source === "zone" ? `${o.zone_name ? `<span data-raw>${esc(o.zone_name)}</span>` : L("지역", "zone")} ${L("자동", "auto")}${o.delivery_fee === 0 && o.zone_free_over ? L(` (₱${o.zone_free_over} 이상 무료)`, ` (free over ₱${o.zone_free_over})`) : ""}`
   : o.fee_source === "lalamove" ? L("라라무브 링크 · 자동 계산", "Lalamove link · auto") : o.fee_source === "manual" ? L("직원 수정", "edited by staff") : o.fee_source === "distance" ? `${L("라라무브식 자동", "Lalamove-style auto")}${o.distance_km != null ? " · " + o.distance_km + "km" : ""}` : "";
 const needsAction = o => NEED_ACTION.includes(o.status) || extraPending(o);
+/* 주문 단계 탭 (사장님 11/21 "간소화: 주문대기 > 주문확인 > 입금확인(캐시 제외) > 조리중 > 배송중 > 완료") */
 const FILTERS = [
-  { key:"action",  label:"처리 필요",   match:needsAction },
-  { key:"accepted", label:"접수됨",     match:o => o.status === "accepted" },
-  { key:"waiting", label:"조리·입금 대기", match:o => o.status === "awaiting_payment" },
-  { key:"cooking", label:"조리·배달 중", match:o => ["confirmed","delivering"].includes(o.status) },
-  { key:"closed",  label:"완료·취소",   match:o => ["done","cancelled"].includes(o.status) },
-  { key:"all",     label:"전체",       match:() => true },
+  { key:"action",   label:"주문대기", match:o => o.status === "new" },
+  { key:"accepted", label:"주문확인", match:o => o.status === "accepted" },
+  { key:"pay",      label:"입금확인", match:o => ["awaiting_payment", "receipt_submitted"].includes(o.status) || extraPending(o) },   // 현금 주문은 이 단계 없음
+  { key:"cooking",  label:"조리중",   match:o => o.status === "confirmed" },
+  { key:"delivering", label:"배송중", match:o => o.status === "delivering" },
+  { key:"done",     label:"완료",     match:o => ["done","cancelled"].includes(o.status) },
 ];
 
 async function loadOrders(){
@@ -384,7 +385,7 @@ function alertNew(list, prev){
   list.forEach(o => {
     const p = prev && prev.get(o.id);
     if(!p){ kinds.push("order"); alarm("order", `#${o.order_no} ${o.cust_name} · ${o.total == null ? L("배달비 미정", "fee TBD") : peso(o.total)}${o.order_type === "pickup" ? L(" 🏃 픽업", " 🏃 pickup") : ""}${o.scheduled_at ? " ⏰ " + schedText(o.scheduled_at) : ""} — ${L("수락해주세요", "please accept")}`, goOrders("action")); return; }
-    if(o.items_added_at && o.items_added_at !== p.items_added_at){ kinds.push("add"); alarm("add", L(`#${o.order_no} 메뉴 추가 — 최종 ${peso(o.total)} · 주방 확인!`, `#${o.order_no} items added — total ${peso(o.total)} · tell the kitchen!`), goOrders("all")); return; }
+    if(o.items_added_at && o.items_added_at !== p.items_added_at){ kinds.push("add"); alarm("add", L(`#${o.order_no} 메뉴 추가 — 최종 ${peso(o.total)} · 주방 확인!`, `#${o.order_no} items added — total ${peso(o.total)} · tell the kitchen!`), goOrders("action")); return; }
     if(o.extra_receipt_at && o.extra_receipt_at !== p.extra_receipt_at){ kinds.push("add"); alarm("add", L(`#${o.order_no} 추가 결제 영수증 도착`, `#${o.order_no} add-on receipt arrived`), goOrders("action")); return; }
     kinds.push("order"); alarm("order", o.status === "new" ? L(`#${o.order_no} — 새 주문을 확인하세요`, `#${o.order_no} — check the new order`) : L(`#${o.order_no} 영수증 도착 — 확인해주세요`, `#${o.order_no} receipt arrived — please check`), goOrders("action"));
   });
@@ -546,7 +547,7 @@ function dayLabel(d){
 }
 const inCache = d => d >= shiftDay(today(), -1);   // 오늘·어제는 이미 불러온 orders 안에 있어요
 function srcOrdersAll(fk = filter){
-  if(!viewDay) return fk === "action" || fk === "waiting" ? orders : orders.filter(o => PT.orderDay(o) === today());   // 처리 필요는 어제 못 끝낸 주문도 같이
+  if(!viewDay) return fk === "action" || fk === "pay" ? orders : orders.filter(o => PT.orderDay(o) === today());   // 처리 필요는 어제 못 끝낸 주문도 같이
   return inCache(viewDay) ? orders.filter(o => PT.orderDay(o) === viewDay) : dayOrders;
 }
 function srcOrders(fk){ return srcOrdersAll(fk).filter(o => !PT.isDine(o) || ["done", "cancelled"].includes(o.status)); }   // 진행 중인 다이닝(T)은 🍽 Dining 창에서, 결제 끝난 다이닝은 여기 목록에도 (R17)
@@ -555,7 +556,7 @@ async function setViewDay(d){
   viewDay = d || null;
   if(viewDay && viewDay >= today()) viewDay = null;
   if(viewDay && !inCache(viewDay)){ try{ dayOrders = await api.listOrdersByDay(viewDay); }catch(e){ dayOrders = []; toast(PT.errMsg(e), 3000); } }
-  if(viewDay && filter === "action") filter = "all";
+  if(viewDay && filter === "action") filter = "done";
   renderOrders();
 }
 function renderDaybar(){
@@ -867,16 +868,17 @@ function renderOrders(){
   const SRC = srcOrders(), SRC_ALL = srcOrdersAll();
   $("filters").innerHTML = FILTERS.map(f => {
     const n = srcOrders(f.key).filter(f.match).length;
-    return `<button class="pill ${filter===f.key?'sel':''}" data-f="${f.key}">${f.label}${n && f.key !== "all" && f.key !== "closed" ? `<span class="n">${n}</span>` : ` <span class="en">${n}</span>`}</button>`;
+    return `<button class="pill ${filter===f.key?'sel':''}" data-f="${f.key}">${f.label}${n && f.key !== "done" ? `<span class="n">${n}</span>` : ` <span class="en">${n}</span>`}</button>`;
   }).join("");
-  $("filters").insertAdjacentHTML("beforeend", filter === "action" || filter === "waiting" ? "" : `<button class="pill" id="sortBtn" title="${L("주문번호 정렬", "Sort by number")}">${sortDesc ? L("번호 ↓ 최신 위", "No. ↓ newest first") : L("번호 ↑ 1번부터", "No. ↑ from #1")}</button>`);
+  $("filters").insertAdjacentHTML("beforeend", filter === "action" || filter === "pay" ? "" : `<button class="pill" id="sortBtn" title="${L("주문번호 정렬", "Sort by number")}">${sortDesc ? L("번호 ↓ 최신 위", "No. ↓ newest first") : L("번호 ↑ 1번부터", "No. ↑ from #1")}</button>`);
   $("filters").querySelectorAll("[data-f]").forEach(b => b.onclick = () => { filter = b.dataset.f; renderOrders(); });
   { const sb = $("sortBtn"); if(sb) sb.onclick = () => { sortDesc = !sortDesc; ls.set("paltong_sort_desc", sortDesc); renderOrders(); }; }
 
+  if(!FILTERS.some(x => x.key === filter)) filter = "action";   // 예전 탭 이름(처리 필요 등)이 남아 있으면
   const f = FILTERS.find(x => x.key === filter);
   // 처리 필요·대기 = 먼저 들어온 것부터, 나머지 = 주문번호 순서 (W·P·DK·T 번호는 하나로 이어짐)
   const byNo = (a, b) => ((+a.order_no || 0) - (+b.order_no || 0)) || a.created_at.localeCompare(b.created_at);
-  const list = SRC.filter(f.match).sort((a,b) => filter === "action" || filter === "waiting" ? a.created_at.localeCompare(b.created_at) : (sortDesc ? byNo(b, a) : byNo(a, b)));
+  const list = SRC.filter(f.match).sort((a,b) => filter === "action" || filter === "pay" ? a.created_at.localeCompare(b.created_at) : (sortDesc ? byNo(b, a) : byNo(a, b)));
   // 입력 중인 칸 보존
   document.querySelectorAll("[data-draft]").forEach(el => { const [id,k] = el.dataset.draft.split("|"); (drafts[id] = drafts[id] || {})[k] = el.value; });
   const focused = document.activeElement && document.activeElement.dataset && document.activeElement.dataset.draft;
@@ -932,7 +934,7 @@ function cardHTML(o){
     action = `${o.store_discount ? `<div class="sum-row"><span>${esc(discText(o.store_discount_label))}</span><span>-${peso(o.store_discount)}</span></div>` : ""}
       <div class="sum-row"><span>배달비${o.fee_source ? ` <span class="en">${feeSrcLabel(o)}</span>` : ""}</span><span>${peso(o.delivery_fee)}</span></div>
       <div class="sum-row total"><span>최종 금액</span><b>${peso(o.total)}</b></div>
-      <p class="hint">${L("👩‍🍳 조리 중 · 손님 입금 대기 — 손님이 영수증을 올리면 '처리 필요'로 올라옵니다.", "👩‍🍳 Cooking · waiting for payment — it moves to 'Needs action' when the customer uploads a receipt.")}</p>
+      <p class="hint">${L("👩‍🍳 조리 중 · 손님 입금 대기 — 손님이 영수증을 올리면 '입금확인'에서 확인하세요.", "👩‍🍳 Cooking · waiting for payment — it moves to 'Needs action' when the customer uploads a receipt.")}</p>
       <div class="btn-row">
         ${pick ? "" : `<button class="ghost-btn sm" data-act="llmodal">🛵 라라무브 링크·금액</button><button class="ghost-btn sm" data-act="editfee">✏️ 배달료 수정</button>`}
         <button class="ghost-btn sm" data-act="print">🖨 인쇄</button>
@@ -3980,7 +3982,7 @@ function dkParse(x){
 }
 const dkExisting = id => id && orders.find(o => o.source === "external" && o.channel === "DK" && String(o.cust_name || "").trim() === String(id));
 /* 📥 → 메인 주문 목록으로 자동 등록 (사장님 11/21 "메인보드에 뜨면 좋겠는데")
-   '새 주문(처리 필요)'으로 들어감 → 직원이 메뉴·금액 확인 후 [✅ 메뉴 확인 → 조리 시작] → 조리 중 + 배달K도 조리중
+   '새 주문(주문대기)'으로 들어감 → 직원이 메뉴·금액 확인 후 [✅ 메뉴 확인 → 조리 시작] → 조리 중 + 배달K도 조리중
    여러 기기가 열려 있어도 한 곳만 등록 (dkInboxClaim). 실패하면 📥 DK 목록에 그대로 남음 */
 async function dkAutoCreate(x){
   const dkId = dkParse(x).id;
@@ -4069,7 +4071,7 @@ async function dkInboxModal(){
   const ago = t => { const m = Math.round((Date.now() - new Date(t)) / 60000); return m < 1 ? L("방금", "just now") : m < 60 ? L(`${m}분 전`, `${m} min ago`) : m < 1440 ? L(`${Math.round(m / 60)}시간 전`, `${Math.round(m / 60)} h ago`) : L(`${Math.round(m / 1440)}일 전`, `${Math.round(m / 1440)} d ago`); };
   const ov = modal(`📥 ${L("배달K 자동 접수", "DK auto inbox")}`, `
     <div id="dkConn" class="hint" style="margin:0 0 10px"></div>
-    <p class="hint" style="margin:0 0 10px">${L("배달K 주문은 관리자 화면이 열려 있으면 메인 주문 목록 <b>처리 필요</b>에 자동으로 들어가요. 여기 남은 건 자동 등록이 안 된 주문이에요 (6시간 넘음·오류). 메뉴 확인 후 조리를 시작하면 배달K도 <b>조리중</b>, 기사 출발·완료도 배달K에 자동으로 맞춰져요.", "DK orders go to <b>Needs action</b> on the main list automatically while an admin screen is open. Items left here weren't auto-added (older than 6 h or an error). Start cooking → DeliveryK moves to <b>Preparing</b>; rider pickup / done sync too.")}</p>
+    <p class="hint" style="margin:0 0 10px">${L("배달K 주문은 관리자 화면이 열려 있으면 메인 주문 목록 <b>주문대기</b>에 자동으로 들어가요. 여기 남은 건 자동 등록이 안 된 주문이에요 (6시간 넘음·오류). 메뉴 확인 후 조리를 시작하면 배달K도 <b>조리중</b>, 기사 출발·완료도 배달K에 자동으로 맞춰져요.", "DK orders go to <b>Needs action</b> on the main list automatically while an admin screen is open. Items left here weren't auto-added (older than 6 h or an error). Start cooking → DeliveryK moves to <b>Preparing</b>; rider pickup / done sync too.")}</p>
     <div id="dkList"></div>
     <details class="card" id="dkSetup" style="margin-top:10px"><summary><b>⚙ ${L("연결 방법 (PC 크롬 · 한 번만)", "Setup (PC Chrome · once)")}</b></summary><div id="dkSetupBody" class="hint" style="line-height:1.7;margin-top:6px"></div></details>`, async () => true, L("닫기", "Close"));
   const paint = () => {
