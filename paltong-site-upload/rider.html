@@ -360,13 +360,15 @@ function moneyHTML(o){
              : `<div class="money paid"><span>✅ ${T("결제 완료 — 돈 받지 마세요", "Paid — do not collect")}</span><big>${peso(o.total)}</big></div>`;
 }
 function orderHTML(o){
-  const s = ST[o.status] || [o.status, o.status, "#888"], live = o.status === "delivering";
+  const s = o.status === "delivering" && o.arrived_at ? ["배송 도착", "Arrived", "#e07b00"] : (ST[o.status] || [o.status, o.status, "#888"]), live = o.status === "delivering";
   const items = (o.items || []).map(i => `${i.svc ? "🎁" : ""}${esc(LANG === "en" ? (i.en || i.name) : i.name)} ×${i.qty}`).join(", ");
   let act;
   if(o.status === "confirmed") act = `<div class="row"><a class="btn ghost" href="${nav(storeLoc || {})}" target="_blank" rel="noopener" ${storeLoc ? "" : "hidden"}>🏪 ${T("가게", "Store")}</a><button class="btn red" data-pick="${o.id}" style="${storeLoc ? "" : "grid-column:1/-1"}">🛵 ${T("픽업·출발", "Picked up · Go")}</button></div>`;
   else if(live) act = `<div class="row"><a class="btn blue" href="${nav(o)}" target="_blank" rel="noopener">🧭 ${T("구글 길안내", "Google Maps")}</a><a class="btn ghost" href="${nav(o, "waze")}" target="_blank" rel="noopener">🚙 Waze</a>
-      <button class="btn green" data-done="${o.id}" style="grid-column:1/-1">✅ ${T("배달 완료", "Delivered")}</button></div>
-      <p class="hint" style="margin:6px 2px 0;font-size:12px">${T("길안내를 켜도 이 앱을 화면 분할로 같이 띄워두면 위치가 계속 전송돼요. 도착하면 '배달 완료'를 눌러주세요.", "Keep this app open in split screen while navigating so your location keeps updating. Tap 'Delivered' when you arrive.")}</p>`;
+      ${o.arrived_at   /* 배송 도착 → 배송 완료 (배달K와 같은 단계, 사장님 11/21) */
+        ? `<button class="btn green" data-done="${o.id}" style="grid-column:1/-1">✅ ${T("배송 완료", "Delivered")}</button>`
+        : `<button class="btn" data-arrive="${o.id}" style="grid-column:1/-1;background:#e07b00;color:#fff">📍 ${T("배송 도착", "Arrived")}</button>`}</div>
+      <p class="hint" style="margin:6px 2px 0;font-size:12px">${o.arrived_at ? T("손님에게 음식을 전달하고 (현금이면 돈을 받고) '배송 완료'를 눌러주세요.", "Hand over the food (collect cash if needed), then tap 'Delivered'.") + " " : T("손님 건물·문 앞에 도착하면 '배송 도착'을 눌러주세요. ", "Tap 'Arrived' when you reach the customer. ")}${o.arrived_at ? "" : T("길안내를 켜도 이 앱을 화면 분할로 같이 띄워두면 위치가 계속 전송돼요.", "Keep this app open in split screen while navigating so your location keeps updating.")}</p>`;
   else act = `<div class="wait">⏳ ${T("매장에서 조리·결제 확인 중이에요. 준비되면 '픽업·출발' 버튼이 켜져요.", "The store is still cooking / checking payment. The 'Picked up' button appears when it's ready.")}</div>`;
   return `<div class="ord ${live ? "live" : ""} ${o._new ? "new" : ""}">
     <div class="oh"><span class="no">#${esc(o.order_no)}</span><span class="pill" style="background:${s[2]}">${T(s[0], s[1])}</span>
@@ -402,6 +404,11 @@ function renderList(){
       await sb.rpc("rider_pickup", { p_order: b.dataset.pick }).then(unwrap);
       await maybeSend(true); toast(T("출발! 손님에게 위치가 보여요", "On the way! The customer can see you now"), 3500); await loadOrders();
     }catch(e){ toast(errText(e), 4500); b.disabled = false; }
+  });
+  $("list").querySelectorAll("[data-arrive]").forEach(b => b.onclick = async () => {
+    b.disabled = true;
+    try{ await sb.rpc("rider_arrive", { p_order: b.dataset.arrive }).then(unwrap); toast(T("📍 도착! 전달 후 '배송 완료'를 눌러주세요", "📍 Arrived! Tap 'Delivered' after handing over"), 3500); await loadOrders(); }
+    catch(e){ toast(errText(e), 4500); b.disabled = false; }
   });
   $("list").querySelectorAll("[data-done]").forEach(b => b.onclick = async () => {
     const o = orders.find(x => x.id === b.dataset.done);

@@ -118,3 +118,6 @@ revoke execute on function public.dk_find_order(text) from anon, authenticated, 
 --   → status 'new', confirmed_at null (그 외는 예전처럼 'confirmed'). 배달K 자동 등록이 씀.
 --   적용: 함수 정의에서 'confirmed', now(), 'delivery' 를
 --   case when p->>'status' = 'new' then 'new' else 'confirmed' end, case when p->>'status' = 'new' then null else now() end, 'delivery' 로 바꿈 (migration external_order_status_new)
+
+-- (11/21) 기사 앱 '배송 도착 → 배송 완료' (배달K와 같은 단계): orders.arrived_at, rider_arrive(p_order), rider_orders 에 arrived_at.
+--   dk_status_report: delivering + arrived_at → 배달K 배달도착(5) · 배달K 5 → arrived_at 기록 (migration rider_arrive_step)

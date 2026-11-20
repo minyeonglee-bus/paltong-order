@@ -961,7 +961,7 @@ function cardHTML(o){
       ${o.receipt_path ? `<div class="btn-row"><button class="ghost-btn sm" data-act="showrc">영수증 사진 보기</button></div>` : ""}`;
   }
   if(o.status === "delivering"){
-    action = `<div class="sum-row total"><span>${isOnlinePay(o.payment) ? "결제완료" : "현금 수령"}</span><b>${peso(o.total)}</b></div>
+    action = `${o.arrived_at && !pick ? `<p class="hint" style="margin:0 0 6px;color:#e07b00;font-weight:700">📍 ${L("기사 배송 도착", "Rider arrived")} · ${fmtTime(o.arrived_at)}</p>` : ""}<div class="sum-row total"><span>${isOnlinePay(o.payment) ? "결제완료" : "현금 수령"}</span><b>${peso(o.total)}</b></div>
       ${pick ? `<p class="hint" style="margin:6px 0">${L("🏃 손님에게 '픽업 준비 완료'가 표시되고 있습니다.", "🏃 The customer sees 'Ready for pickup'.")} ${isOnlinePay(o.payment) ? "" : L(`매장에서 현금 ${peso(o.total)} 받기`, `Collect ${peso(o.total)} cash at the store`)}</p>` : `<div class="hint" style="margin:6px 0">${o.tracking_url ? `📍 <a href="${esc(o.tracking_url)}" target="_blank" rel="noopener">배달 위치 링크</a> (손님 화면에 '위치 확인' 버튼 표시 중)` : "📍 위치 링크 없음"} <button class="chip" data-act="tracklink">${o.tracking_url ? "링크 수정" : "링크 입력"}</button></div>
       <div class="hint" style="margin-bottom:6px">배달비 ${peso(o.delivery_fee)} ${o.fee_source ? `<span class="en">${feeSrcLabel(o)}</span>` : ""} <button class="chip" data-act="editfee">✏️ 배달료 수정</button></div>`}
       <div class="btn-row"><button class="ghost-btn sm" data-act="print">🖨 인쇄</button><button class="primary-btn sm green" data-act="done">${pick ? "✅ 픽업 완료" : "배달 완료"}</button></div>`;
