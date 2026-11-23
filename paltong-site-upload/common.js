@@ -537,7 +537,9 @@ function errMsg(e){
     [/code_invalid/, ["없는 쿠폰 코드입니다", "Invalid coupon code"]],
     [/code_expired/, ["등록 기간이 끝난 코드입니다", "This code has expired"]],
     [/code_sold_out/, ["선착순 수량이 모두 소진되었습니다", "This code has run out"]],
-    [/code_already_used/, ["이미 사용(등록)한 코드입니다 — 같은 코드는 전화번호·기기·회원 모두 합쳐 한 번만 쓸 수 있어요", "This code was already used (one use per phone, device and account)"]],
+    [/code_already_used/, ["이미 사용(등록)한 코드입니다 — 같은 코드는 전화번호·기기·네트워크·회원 모두 합쳐 한 번만 쓸 수 있어요", "This code was already used (one use per phone, device, network and account)"]],
+    [/coupon_blocked/, ["이 기기·번호·네트워크에서는 쿠폰 코드를 쓸 수 없어요", "Coupon codes can't be used from this device, number or network"]],
+    [/phone_fake/, ["쿠폰을 쓰려면 실제 사용하는 휴대폰 번호(09XXXXXXXXX)를 넣어주세요", "Enter your real mobile number (09XXXXXXXXX) to use a coupon"]],
     [/coupon_double_use/, ["이미 다른 주문에 사용된 쿠폰입니다", "This coupon was already used on another order"]],
     [/link_invalid/, ["연동 코드가 맞지 않거나 기간이 지났어요", "Invalid or expired link code"]],
     [/device_invalid/, ["기기 정보를 읽지 못했어요. 새로고침 후 다시 해주세요", "Couldn't read this device. Please reload"]],
@@ -755,6 +757,9 @@ function makeSupabaseApi(){
     async updateProfile(name, addr){ unwrap(await sb.rpc("update_profile", { p_name: name, p_addr: addr })); },
     async claimCoupon(code){ return unwrap(await sb.rpc("claim_coupon", { p_code: code })); },
     async checkCouponCode(code, phone){   // 비회원 쿠폰 코드 (48단계) — 전화번호 + 기기 둘 다 확인 (11/20)
+      // 🛡 11/24: coupon_guard — phone · device · network(IP) once ever, fake numbers refused, a refused attempt is blocked for good
+      const g = await sb.rpc("coupon_guard", { p_code: code, p_phone: phone || null, p_device: deviceKey() });
+      if(!g.error){ if(g.data && g.data.ok === false) throw new Error(g.data.err || "code_invalid"); return g.data; }
       const r = await sb.rpc("check_coupon_code", { p_code: code, p_phone: phone || null, p_device: deviceKey() });
       if(r.error && /function .*check_coupon_code|p_device/i.test(r.error.message || "")) return unwrap(await sb.rpc("check_coupon_code", { p_code: code, p_phone: phone || null }));
       return unwrap(r); },
