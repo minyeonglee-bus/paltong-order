@@ -214,6 +214,46 @@ function deviceKey(){
   return k;
 }
 
+/* 🛡 11/24 쿠폰 부정 사용 방지: 기기 지문(시크릿 창·기록 삭제에도 같은 값) + 시크릿 모드 확인 */
+let _fpP = null, _pvP = null;
+function deviceFp(){
+  if(_fpP) return _fpP;
+  _fpP = (async () => {
+    const parts = [];
+    try{ const s = screen; parts.push(s.width + "x" + s.height + "x" + s.colorDepth, window.devicePixelRatio); }catch(e){}
+    try{ parts.push(Intl.DateTimeFormat().resolvedOptions().timeZone, (navigator.languages || [navigator.language]).join(","), navigator.platform, navigator.hardwareConcurrency, navigator.deviceMemory, navigator.maxTouchPoints); }catch(e){}
+    try{ const c = document.createElement("canvas"); c.width = 240; c.height = 60; const x = c.getContext("2d");
+      x.textBaseline = "top"; x.font = "16px Arial"; x.fillStyle = "#f60"; x.fillRect(100, 1, 62, 20); x.fillStyle = "#069"; x.fillText("Paltong 빨통 🍗 0912", 2, 15);
+      x.fillStyle = "rgba(102,204,0,0.7)"; x.font = "18px Georgia"; x.fillText("coupon-fp", 4, 34); parts.push(c.toDataURL()); }catch(e){}
+    try{ const g = document.createElement("canvas").getContext("webgl"); const d = g && g.getExtension("WEBGL_debug_renderer_info");
+      if(g) parts.push(d ? g.getParameter(d.UNMASKED_VENDOR_WEBGL) + "|" + g.getParameter(d.UNMASKED_RENDERER_WEBGL) : g.getParameter(g.RENDERER), g.getParameter(g.MAX_TEXTURE_SIZE)); }catch(e){}
+    const txt = parts.join("~");
+    try{ const h = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(txt)); return Array.from(new Uint8Array(h), b => b.toString(16).padStart(2, "0")).join("").slice(0, 40); }
+    catch(e){ let h = 0; for(let i = 0; i < txt.length; i++) h = (h * 31 + txt.charCodeAt(i)) | 0; return "h" + (h >>> 0).toString(16); }
+  })();
+  return _fpP;
+}
+function isPrivateMode(){   // 확실하지 않으면 false
+  if(_pvP) return _pvP;
+  _pvP = (async () => {
+    try{
+      const ua = navigator.userAgent || "";
+      if(/Firefox\//.test(ua)) return !("serviceWorker" in navigator);
+      const isSafari = /Safari\//.test(ua) && !/Chrome|CriOS|FxiOS|EdgiOS|SamsungBrowser|Android/.test(ua) || /iPhone|iPad/.test(ua);
+      if(isSafari && navigator.storage && navigator.storage.getDirectory){
+        try{ await navigator.storage.getDirectory(); return false; }catch(e){ return /unknown transient reason/i.test(String(e && e.message)); }
+      }
+      if(navigator.storage && navigator.storage.estimate){
+        const { quota } = await navigator.storage.estimate(); if(!quota) return false;
+        const lim = (performance.memory && performance.memory.jsHeapSizeLimit) || 1073741824;
+        return Math.round(quota / 1048576) < Math.round(lim / 1048576) * 2;
+      }
+    }catch(e){}
+    return false;
+  })();
+  return _pvP;
+}
+
 /* ---------------- 언어 (한/영 병기 기본) ---------------- */
 let LANG = ls.get("paltong_lang", CFG.DEFAULT_LANG || "both");
 function setLang(l){ LANG = l; ls.set("paltong_lang", l); }
@@ -538,6 +578,11 @@ function errMsg(e){
     [/code_expired/, ["등록 기간이 끝난 코드입니다", "This code has expired"]],
     [/code_sold_out/, ["선착순 수량이 모두 소진되었습니다", "This code has run out"]],
     [/code_already_used/, ["이미 사용(등록)한 코드입니다 — 같은 코드는 전화번호·기기·네트워크·회원 모두 합쳐 한 번만 쓸 수 있어요", "This code was already used (one use per phone, device, network and account)"]],
+    [/coupon_rate/, ["쿠폰 확인을 너무 많이 했어요. 1시간 뒤에 다시 해주세요", "Too many coupon checks. Please try again in an hour"]],
+    [/private_mode/, ["시크릿(개인정보 보호) 모드에서는 쿠폰을 쓸 수 없어요. 일반 창에서 열어주세요", "Coupons can't be used in private / incognito mode. Please open a normal window"]],
+    [/device_too_new/, ["처음 접속한 기기는 30분 뒤부터 쿠폰을 쓸 수 있어요", "Coupons can be used 30 minutes after first visiting on this device"]],
+    [/name_fake/, ["쿠폰을 쓰려면 실제 이름을 넣어주세요", "Enter your real name to use a coupon"]],
+    [/coupon_check_required/, ["쿠폰을 다시 확인해주세요 (쿠폰 코드 → 적용)", "Please apply the coupon code again"]],
     [/coupon_blocked/, ["이 기기·번호·네트워크에서는 쿠폰 코드를 쓸 수 없어요", "Coupon codes can't be used from this device, number or network"]],
     [/phone_fake/, ["쿠폰을 쓰려면 실제 사용하는 휴대폰 번호(09XXXXXXXXX)를 넣어주세요", "Enter your real mobile number (09XXXXXXXXX) to use a coupon"]],
     [/coupon_double_use/, ["이미 다른 주문에 사용된 쿠폰입니다", "This coupon was already used on another order"]],
@@ -661,6 +706,7 @@ function makeSupabaseApi(){
     },
     /* 가격 바꾸기 — 가격 비밀번호 필요 (25단계 SQL). patch: { base_price: 정가|null, sale_price: 할인가|0 } */
     async setMenuPrice(itemId, patch, pin){ unwrap(await sb.rpc("admin_set_menu_price", { p_item: itemId, p_patch: patch, p_pin: String(pin || "") })); },
+    async payfromMatches(last4, id){ return unwrap(await sb.rpc("admin_payfrom_matches", { p_last4: String(last4), p_order: id })) || []; },   // 🛡 같은 계좌 쿠폰 주문 (11/24)
     async checkPricePin(pin){ return !!unwrap(await sb.rpc("admin_check_price_pin", { p_pin: String(pin || "") })); },
     async changePricePin(oldPin, newPin){ unwrap(await sb.rpc("admin_change_price_pin", { p_old: String(oldPin || ""), p_new: String(newPin || "") })); },
     onMenuStatus(cb){
@@ -756,14 +802,20 @@ function makeSupabaseApi(){
     },
     async updateProfile(name, addr){ unwrap(await sb.rpc("update_profile", { p_name: name, p_addr: addr })); },
     async claimCoupon(code){ return unwrap(await sb.rpc("claim_coupon", { p_code: code })); },
-    async checkCouponCode(code, phone){   // 비회원 쿠폰 코드 (48단계) — 전화번호 + 기기 둘 다 확인 (11/20)
-      // 🛡 11/24: coupon_guard — phone · device · network(IP) once ever, fake numbers refused, a refused attempt is blocked for good
-      const g = await sb.rpc("coupon_guard", { p_code: code, p_phone: phone || null, p_device: deviceKey() });
+    async checkCouponCode(code, phone, name){   // 비회원 쿠폰 코드 (48단계) — 전화번호 + 기기 둘 다 확인 (11/20)
+      // 🛡 11/24: coupon_guard — phone · device · network(IP) · fingerprint once ever, fake numbers/names refused, new device 30 min wait,
+      //           private mode refused, 3 checks per hour, a refused attempt is blocked for good
+      const [fp, pv] = await Promise.all([deviceFp().catch(() => null), isPrivateMode().catch(() => false)]);
+      let g = await sb.rpc("coupon_guard", { p_code: code, p_phone: phone || null, p_device: deviceKey(), p_name: name || null, p_fp: fp, p_private: !!pv });
+      if(g.error && /coupon_guard|p_fp|function/i.test(g.error.message || "")) g = await sb.rpc("coupon_guard", { p_code: code, p_phone: phone || null, p_device: deviceKey() });
       if(!g.error){ if(g.data && g.data.ok === false) throw new Error(g.data.err || "code_invalid"); return g.data; }
       const r = await sb.rpc("check_coupon_code", { p_code: code, p_phone: phone || null, p_device: deviceKey() });
       if(r.error && /function .*check_coupon_code|p_device/i.test(r.error.message || "")) return unwrap(await sb.rpc("check_coupon_code", { p_code: code, p_phone: phone || null }));
       return unwrap(r); },
     /* 📱 기기 연동 — 홈 화면 앱(아이폰은 Safari와 저장소가 따로)에서도 이전 주문 내역이 보이게 */
+    async deviceHello(){   // 🛡 처음 본 기기는 30분 뒤부터 쿠폰 (11/24)
+      try{ const [fp, pv] = await Promise.all([deviceFp().catch(() => null), isPrivateMode().catch(() => false)]);
+        await sb.rpc("device_hello", { p_device: deviceKey(), p_fp: fp, p_private: !!pv }); }catch(e){} },
     async deviceOrders(){ return unwrap(await sb.rpc("device_orders", { p_device: deviceKey() })) || []; },
     async deviceLinkCreate(){ return unwrap(await sb.rpc("device_link_create", { p_device: deviceKey() })); },
     async deviceLinkRedeem(code){ return unwrap(await sb.rpc("device_link_redeem", { p_device: deviceKey(), p_code: code })); },
@@ -1564,6 +1616,6 @@ function contactHTML(){
     CFG.STORE_PHONE ? `${T("전화·SMS", "Call·SMS")}: <a href="tel:${esc(CFG.STORE_PHONE.replace(/\s/g, ""))}"><b>${esc(CFG.STORE_PHONE)}</b></a>` : "",
     CFG.VIBER_PHONE ? `Viber·WhatsApp: <a href="https://wa.me/${num(CFG.VIBER_PHONE)}" target="_blank" rel="noopener"><b>${esc(CFG.VIBER_PHONE)}</b></a>` : ""].filter(Boolean).join("<br>");
 }
-window.PT = { deviceKey, contactLines, contactHTML, PRINT_SETS, PRINT_SETS_EN, KIND_LABEL, printKinds, manilaDay, bizDay, bizStart, DAY_START_HOUR, orderDay, get menuCfgActive(){ return menuCfgActive; }, loadMenuData, exportMenu, priceSig, politeKo, CATS, get menuOv(){ return menuOv; }, applyMenuOverrides, cleanForTranslate, setTranslateKey, googleTranslate, splitKoEn, msgText, schedLabel, menuToEnglish, matchZone, zoneFee, phoneMask, phoneValue, phoneOk, phoneDigits, phoneFmt, englishOnly, EN_NAME, EN_ADDR, hasHangul, stampRewards, stampText, isMemberPhone, normPhone, phoneEmail, prettyPhone, couponDiscount, couponValue, couponFace, couponsFace, couponCond, couponUsable, COUPON_KINDS, couponKind, stackKey, stackMax, couponStackOk, couponsDiscount, bestCoupons, stackRulesText, repriceLine, setNoSale, get noSale(){ return noSale; }, setJtvPlaces, isJtvAt, jtvPicks, errMsg, CFG, MENU, ITEM_BY_ID, esc, peso, ls, L, T, setLang, get LANG(){ return LANG; },
+window.PT = { deviceKey, deviceFp, isPrivateMode, contactLines, contactHTML, PRINT_SETS, PRINT_SETS_EN, KIND_LABEL, printKinds, manilaDay, bizDay, bizStart, DAY_START_HOUR, orderDay, get menuCfgActive(){ return menuCfgActive; }, loadMenuData, exportMenu, priceSig, politeKo, CATS, get menuOv(){ return menuOv; }, applyMenuOverrides, cleanForTranslate, setTranslateKey, googleTranslate, splitKoEn, msgText, schedLabel, menuToEnglish, matchZone, zoneFee, phoneMask, phoneValue, phoneOk, phoneDigits, phoneFmt, englishOnly, EN_NAME, EN_ADDR, hasHangul, stampRewards, stampText, isMemberPhone, normPhone, phoneEmail, prettyPhone, couponDiscount, couponValue, couponFace, couponsFace, couponCond, couponUsable, COUPON_KINDS, couponKind, stackKey, stackMax, couponStackOk, couponsDiscount, bestCoupons, stackRulesText, repriceLine, setNoSale, get noSale(){ return noSale; }, setJtvPlaces, isJtvAt, jtvPicks, errMsg, CFG, MENU, ITEM_BY_ID, esc, peso, ls, L, T, setLang, get LANG(){ return LANG; },
   orderPrefix, orderCode, isDine, inClosingWindow, isSvc, svcValue, riderPhone, riderEmail, STATUS, payInfo, isOnlinePay, lineName, lineOpt, optList, optLine, optChips, shortName, unitBreak, compressImage, api, DEMO, receiptDoc, printReceipt, toast };
 })();

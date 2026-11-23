@@ -744,14 +744,43 @@ function bindRecv(ov, due, getMethod){
   };
 }
 /* 받은 금액 창 (배달·픽업 완료, 결제 확인, 추가 결제 확인) → 기록 정보 또는 null(닫음) */
+/* 🛡 쿠폰 부정 사용 방지 (11/24): 쿠폰 주문 여부 · 같이 받아 가는 쿠폰 주문 · 같은 계좌 입금 */
+const isCouponOrder = o => !!(o && (o.coupon_code || o.coupon_id || (o.coupon_ids || []).length));
+function couponTogether(o){   // 지금 처리하는 쿠폰 주문과 15분 안에 결제·완료됐거나, 같이 픽업 대기 중인 다른 쿠폰 주문
+  if(!isCouponOrder(o)) return [];
+  const now = Date.now(), near = t => t && Math.abs(now - new Date(t).getTime()) < 15 * 60000;
+  return (orders || []).concat(dayOrders || []).filter((x, i, a) => a.findIndex(y => y.id === x.id) === i)
+    .filter(x => x.id !== o.id && x.status !== "cancelled" && isCouponOrder(x) &&
+      (near(x.received_at) || (x.status === "done" && near(x.updated_at)) || (x.order_type === "pickup" && o.order_type === "pickup" && x.picked_up_at && x.status !== "done")));
+}
+async function couponFraudOk(o, from4){
+  const tg = couponTogether(o);
+  if(tg.length && !confirm(`⚠️ ${PT.orderCode(o)} — 쿠폰 주문이 같이 처리되고 있어요 / Other coupon orders are being handled together:\n` + tg.map(x => `· ${PT.orderCode(x)} ${x.cust_name || ""} (${x.coupon_code || x.coupon_title || "coupon"})`).join("\n")
+      + `\n\n같은 손님이 쿠폰 여러 개를 쓰는 것일 수 있어요. 손님에게 확인했나요?\nThe same customer may be using several coupons. Did you check?`)) return false;
+  if(from4 && api.payfromMatches){
+    let m = []; try{ m = await api.payfromMatches(from4, o.id); }catch(e){}
+    if(m.length && !confirm(`🚨 같은 계좌(끝 ${from4})로 쿠폰 주문이 또 있어요 / Same account already paid for coupon orders:\n` + m.slice(0, 8).map(x => `· ${x.code} ${x.day} ${x.name || ""} (${x.coupon || ""})`).join("\n")
+        + `\n\n같은 손님이 쿠폰을 여러 번 쓰는 거예요. 사장님께 알리고, 그래도 진행할까요?\nSame person using the coupon again — tell the owner. Continue anyway?`)) return false;
+  }
+  return true;
+}
 function payCheckModal(o, { due, method, title, okLabel, hint }){
   return new Promise(res => {
     let done = false; const fin = v => { if(!done){ done = true; res(v); } };
+    const online = method && method !== "cash" && method !== "split", needFrom = online && isCouponOrder(o);
     const ov = modal(title, `
       <div class="sum-row total" style="font-size:22px;margin:0 0 6px"><span>${L("받을 금액", "Amount due")}</span><b>${peso(due)}</b></div>
       <p class="hint" style="margin:0 0 10px">${L("결제", "Payment")}: <b>${esc(PAY_NAME(method))}</b>${hint ? " · " + hint : ""}</p>
-      ${recvBoxHTML(due)}`,
-      async () => { const r = rv.read(); if(!r) return false; fin(r); }, okLabel);
+      ${recvBoxHTML(due)}
+      ${online ? `<div class="field" id="pfBox" style="margin:0 0 12px${needFrom ? ";border:2px solid var(--red);border-radius:10px;padding:8px" : ""}"><label>🔢 ${L("보낸 계좌·번호 끝 4자리", "Sender account / number — last 4 digits")} ${needFrom ? `<b style="color:var(--red-deep)">${L("(쿠폰 주문 — 꼭 입력)", "(coupon order — required)")}</b>` : L("(선택)", "(optional)")}</label>
+        <input id="pfIn" type="text" inputmode="numeric" maxlength="4" placeholder="3596" style="font-size:20px;font-weight:800;letter-spacing:4px"></div>` : ""}`,
+      async () => { const r = rv.read(); if(!r) return false;
+        const pf = ((ov.querySelector("#pfIn") || {}).value || "").replace(/\D/g, "");
+        if(needFrom && r.method !== "cash" && pf.length !== 4){ toast(L("쿠폰 주문이에요 — 입금 내역에서 보낸 계좌·번호 끝 4자리를 넣어주세요", "Coupon order — enter the sender's last 4 digits from the transfer"), 4000); ov.querySelector("#pfIn").focus(); return false; }
+        if(pf && pf.length !== 4){ toast(L("끝 4자리를 넣어주세요", "Enter exactly 4 digits"), 3000); return false; }
+        if(!(await couponFraudOk(o, pf || null))) return false;
+        if(pf) r.from4 = pf;
+        fin(r); }, okLabel);
     const rv = bindRecv(ov, due, () => method);
     ov.querySelector(".close-x").addEventListener("click", () => fin(null));
     ov.addEventListener("click", e => { if(e.target === ov) fin(null); });
@@ -762,6 +791,7 @@ function payCheckModal(o, { due, method, title, okLabel, hint }){
 async function saveRecv(o, r, base){
   const patch = { received_amount: (base || 0) + r.kept, received_method: r.method, received_at: new Date().toISOString() };
   if(r.split) patch.split_pay = r.split;   // 나눠내기 → 캐시북에 결제수단마다 1줄
+  if(r.from4) patch.pay_from4 = r.from4;   // 🛡 보낸 계좌 끝 4자리 (11/24)
   if(r.diff){ patch.received_diff = (o.received_diff || 0) + r.diff; patch.received_reason = [o.received_reason, r.reason].filter(Boolean).join(" / "); patch.received_unreported = [o.received_unreported, r.unreported].filter(Boolean).join(" / "); }
   else if(o.received_diff == null) patch.received_diff = 0;
   try{ const n = await api.updateOrder(o.id, patch); Object.assign(o, n || patch); return true; }
@@ -1732,6 +1762,8 @@ async function act(o, a, btn){
       a === "deliver" ? L(`#${o.order_no} 배달 출발${url ? " · 위치 링크 전송" : ""}`, `#${o.order_no} out for delivery${url ? " · link sent" : ""}`) : L("위치 링크를 저장했습니다", "Tracking link saved"));
 
   }
+  // 🛡 이미 결제 확인된 쿠폰 주문도 완료할 때 같이 받아 가는 쿠폰 주문 확인 (11/24)
+  if(a === "done" && !PT.isDine(o) && isCouponOrder(o) && !((o.payment || "cash") === "cash" || o.received_amount == null) && !(await couponFraudOk(o, null))) return;
   if(a === "done" && o.total != null && !PT.isDine(o) && ((o.payment || "cash") === "cash" || o.received_amount == null)){
     // 💰 배달·픽업 완료: 현금 = 받은 돈(선택, 거스름돈 계산) · 온라인 결제인데 아직 받은 금액 기록이 없으면 꼭 입력
     const pick = o.order_type === "pickup", m = o.payment || "cash";

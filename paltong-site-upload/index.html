@@ -769,7 +769,7 @@ function openCheckout(){
     { const gb = $("#gcBtn"); if(gb) gb.onclick = async () => {   // 비회원 쿠폰 코드
         const v = $("#gcCode").value.trim(); if(!v || codeBusy) return; codeBusy = true; gb.disabled = true; sync();
         try{
-          guestCode = await api.checkCouponCode(v, PT.phoneOk(cust.phone) ? cust.phone : null);
+          guestCode = await api.checkCouponCode(v, PT.phoneOk(cust.phone) ? cust.phone : null, (cust.name || "").trim() || null);
           toast(PT.couponUsable(guestCode, cartTotal()) ? T(`쿠폰 적용: ${guestCode.title}`, `Coupon applied: ${guestCode.title}`) : T(`쿠폰 확인됨 (${PT.couponCond(guestCode)})`, `Coupon found (${PT.couponCond(guestCode)})`), 3000);
           render();
         }catch(e){ toast(PT.errMsg(e), 3500); gb.disabled = false; }
@@ -1059,6 +1059,8 @@ async function openAccount(){
      → 앱을 처음 열면 자동으로 같은 기기로 묶임. 안 되면 '비회원 주문 내역 · 기기 연동'에서 코드를 직접 입력
    - 회원은 로그인만 하면 주문 내역·쿠폰이 서버에서 그대로 (연동 코드로 들어오면 전화번호가 미리 채워짐)
    - 쿠폰은 서버가 두 번 확인 (쿠폰 장부 coupon_redemptions) → 기기를 바꿔도 같은 쿠폰·코드 다시 못 씀 */
+// 🛡 쿠폰: 이 기기를 처음 본 시각을 서버에 남김 (처음 본 기기는 30분 뒤부터 쿠폰 · 11/24)
+setTimeout(() => { try{ if(api && api.deviceHello) api.deviceHello(); }catch(e){} }, 800);
 let devCache = null;
 function loadDeviceOrders(){
   if(!api.deviceOrders) return Promise.resolve([]);
