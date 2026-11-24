@@ -500,7 +500,16 @@ function phoneMask(el){
   el.addEventListener("input", apply);
 }
 const phoneValue = el => { const d = String(el && el.value || "").replace(/\D/g, ""); return d === "09" ? "" : d; };
-const phoneOk = v => /^09\d{9}$/.test(String(v || "").replace(/\D/g, ""));
+/* 📱 실제 필리핀 휴대폰 번호만 (11/24): 통신사 번호 앞자리(Globe·TM·Smart·TNT·Sun·DITO) + 지어낸 번호 패턴 거절.
+   앞자리 목록 출처: filipiknow · 0xbitx PH prefixes · wikipedia +63 + 우리 주문에 실제로 있던 0960·0990. DB phone_fake 와 같은 규칙 */
+const PH_PREFIX = new Set("0811,0813,0817,0895,0896,0897,0898,0900,0904,0905,0906,0907,0908,0909,0910,0911,0912,0913,0914,0915,0916,0917,0918,0919,0920,0921,0922,0923,0924,0925,0926,0927,0928,0929,0930,0931,0932,0933,0934,0935,0936,0937,0938,0939,0940,0941,0942,0943,0944,0945,0946,0947,0948,0949,0950,0951,0952,0953,0954,0955,0956,0957,0958,0959,0960,0961,0962,0963,0964,0965,0966,0967,0968,0969,0970,0971,0973,0974,0975,0976,0977,0978,0979,0981,0985,0989,0990,0991,0992,0993,0994,0995,0996,0997,0998,0999".split(","));
+function phoneFake(v){
+  let d = String(v || "").replace(/\D/g, ""); if(/^639\d{9}$/.test(d)) d = "0" + d.slice(2);
+  if(!/^0[89]\d{9}$/.test(d) || !PH_PREFIX.has(d.slice(0, 4))) return true;
+  const t = d.slice(-7);
+  return /(\d)\1{4}/.test(d) || new Set(t).size <= 2 || ["0123456","1234567","2345678","3456789","9876543","8765432","7654321","6543210"].includes(t);
+}
+const phoneOk = v => !phoneFake(v);
 
 /* 영문만 입력 (이름·주소): 한글 등은 자동으로 지워지고 안내가 뜹니다 */
 const EN_NAME = /[^A-Za-z\u00C0-\u024F .,'\-]/g;
@@ -584,7 +593,7 @@ function errMsg(e){
     [/name_fake/, ["쿠폰을 쓰려면 실제 이름을 넣어주세요", "Enter your real name to use a coupon"]],
     [/coupon_check_required/, ["쿠폰을 다시 확인해주세요 (쿠폰 코드 → 적용)", "Please apply the coupon code again"]],
     [/coupon_blocked/, ["이 기기·번호·네트워크에서는 쿠폰 코드를 쓸 수 없어요", "Coupon codes can't be used from this device, number or network"]],
-    [/phone_fake/, ["쿠폰을 쓰려면 실제 사용하는 휴대폰 번호(09XXXXXXXXX)를 넣어주세요", "Enter your real mobile number (09XXXXXXXXX) to use a coupon"]],
+    [/phone_fake/, ["실제 사용하는 휴대폰 번호를 입력하세요", "Please enter your real mobile number"]],
     [/coupon_double_use/, ["이미 다른 주문에 사용된 쿠폰입니다", "This coupon was already used on another order"]],
     [/link_invalid/, ["연동 코드가 맞지 않거나 기간이 지났어요", "Invalid or expired link code"]],
     [/device_invalid/, ["기기 정보를 읽지 못했어요. 새로고침 후 다시 해주세요", "Couldn't read this device. Please reload"]],
@@ -1616,6 +1625,6 @@ function contactHTML(){
     CFG.STORE_PHONE ? `${T("전화·SMS", "Call·SMS")}: <a href="tel:${esc(CFG.STORE_PHONE.replace(/\s/g, ""))}"><b>${esc(CFG.STORE_PHONE)}</b></a>` : "",
     CFG.VIBER_PHONE ? `Viber·WhatsApp: <a href="https://wa.me/${num(CFG.VIBER_PHONE)}" target="_blank" rel="noopener"><b>${esc(CFG.VIBER_PHONE)}</b></a>` : ""].filter(Boolean).join("<br>");
 }
-window.PT = { deviceKey, deviceFp, isPrivateMode, contactLines, contactHTML, PRINT_SETS, PRINT_SETS_EN, KIND_LABEL, printKinds, manilaDay, bizDay, bizStart, DAY_START_HOUR, orderDay, get menuCfgActive(){ return menuCfgActive; }, loadMenuData, exportMenu, priceSig, politeKo, CATS, get menuOv(){ return menuOv; }, applyMenuOverrides, cleanForTranslate, setTranslateKey, googleTranslate, splitKoEn, msgText, schedLabel, menuToEnglish, matchZone, zoneFee, phoneMask, phoneValue, phoneOk, phoneDigits, phoneFmt, englishOnly, EN_NAME, EN_ADDR, hasHangul, stampRewards, stampText, isMemberPhone, normPhone, phoneEmail, prettyPhone, couponDiscount, couponValue, couponFace, couponsFace, couponCond, couponUsable, COUPON_KINDS, couponKind, stackKey, stackMax, couponStackOk, couponsDiscount, bestCoupons, stackRulesText, repriceLine, setNoSale, get noSale(){ return noSale; }, setJtvPlaces, isJtvAt, jtvPicks, errMsg, CFG, MENU, ITEM_BY_ID, esc, peso, ls, L, T, setLang, get LANG(){ return LANG; },
+window.PT = { deviceKey, deviceFp, isPrivateMode, phoneFake, contactLines, contactHTML, PRINT_SETS, PRINT_SETS_EN, KIND_LABEL, printKinds, manilaDay, bizDay, bizStart, DAY_START_HOUR, orderDay, get menuCfgActive(){ return menuCfgActive; }, loadMenuData, exportMenu, priceSig, politeKo, CATS, get menuOv(){ return menuOv; }, applyMenuOverrides, cleanForTranslate, setTranslateKey, googleTranslate, splitKoEn, msgText, schedLabel, menuToEnglish, matchZone, zoneFee, phoneMask, phoneValue, phoneOk, phoneDigits, phoneFmt, englishOnly, EN_NAME, EN_ADDR, hasHangul, stampRewards, stampText, isMemberPhone, normPhone, phoneEmail, prettyPhone, couponDiscount, couponValue, couponFace, couponsFace, couponCond, couponUsable, COUPON_KINDS, couponKind, stackKey, stackMax, couponStackOk, couponsDiscount, bestCoupons, stackRulesText, repriceLine, setNoSale, get noSale(){ return noSale; }, setJtvPlaces, isJtvAt, jtvPicks, errMsg, CFG, MENU, ITEM_BY_ID, esc, peso, ls, L, T, setLang, get LANG(){ return LANG; },
   orderPrefix, orderCode, isDine, inClosingWindow, isSvc, svcValue, riderPhone, riderEmail, STATUS, payInfo, isOnlinePay, lineName, lineOpt, optList, optLine, optChips, shortName, unitBreak, compressImage, api, DEMO, receiptDoc, printReceipt, toast };
 })();

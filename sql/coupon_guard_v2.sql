@@ -81,38 +81,38 @@ $$;
 
 create or replace function public.coupon_guard(p_code text, p_phone text, p_device text, p_name text, p_fp text, p_private boolean)
 returns jsonb language plpgsql security definer set search_path to 'public' as $$
-declare r jsonb; ip text := public.client_ip(); dev text := public.device_hash(p_device); ph text := public.phone10(p_phone);
+declare r jsonb; v_ip text := public.client_ip(); v_dev text := public.device_hash(p_device); ph text := public.phone10(p_phone);
   fpk text := public.fp_key(p_fp, public.client_ip()); why text; block boolean := false; seen timestamptz; c text := upper(trim(coalesce(p_code, '')));
 begin
   -- 9) rate limit: 3 checks per hour per IP / device
   if (select count(*) from public.coupon_attempts a where a.at > now() - interval '1 hour'
-        and ((ip is not null and a.ip = ip) or (dev is not null and a.device_hash = dev))) >= 3 then
+        and ((v_ip is not null and a.ip = v_ip) or (v_dev is not null and a.device_hash = v_dev))) >= 3 then
     why := 'coupon_rate';
   else
     begin r := public.check_coupon_code(p_code, p_phone);   -- invalid / expired / sold out (typos are NOT blocked)
     exception when others then why := sqlerrm; end;
     if why is null then
       c := r->>'code';
-      select first_seen into seen from public.device_seen where device_hash = dev;
-      if public.coupon_blocked2(ip, dev, ph, fpk) then why := 'coupon_blocked'; block := true;
+      select first_seen into seen from public.device_seen where device_hash = v_dev;
+      if public.coupon_blocked2(v_ip, v_dev, ph, fpk) then why := 'coupon_blocked'; block := true;
       elsif p_private then why := 'private_mode';
-      elsif dev is null or seen is null or seen > now() - interval '30 minutes' then why := 'device_too_new';
+      elsif v_dev is null or seen is null or seen > now() - interval '30 minutes' then why := 'device_too_new';
       elsif p_phone is not null and public.phone_fake(p_phone) then why := 'phone_fake'; block := true;
       elsif p_name is not null and public.name_fake(p_name) then why := 'name_fake'; block := true;
-      elsif public.coupon_code_used(c, ph, dev) or public.coupon_ip_used(c, ip) or public.coupon_fp_used(c, fpk) then why := 'code_already_used'; block := true;
+      elsif public.coupon_code_used(c, ph, v_dev) or public.coupon_ip_used(c, v_ip) or public.coupon_fp_used(c, fpk) then why := 'code_already_used'; block := true;
       end if;
     end if;
   end if;
-  insert into public.coupon_attempts(ip, device_hash, fp, phone, name, code, result) values (ip, dev, fpk, ph, left(p_name, 80), c, coalesce(why, 'ok'));
-  if dev is not null and seen is null and why is distinct from 'coupon_rate' then
-    insert into public.device_seen(device_hash, ip, fp, private) values (dev, ip, left(p_fp, 64), p_private) on conflict do nothing;
+  insert into public.coupon_attempts(ip, device_hash, fp, phone, name, code, result) values (v_ip, v_dev, fpk, ph, left(p_name, 80), c, coalesce(why, 'ok'));
+  if v_dev is not null and seen is null and why is distinct from 'coupon_rate' then
+    insert into public.device_seen(device_hash, ip, fp, private) values (v_dev, v_ip, left(p_fp, 64), p_private) on conflict do nothing;
   end if;
   if block then
-    perform public.coupon_block_add(ip, dev, ph, why, c);
+    perform public.coupon_block_add(v_ip, v_dev, ph, why, c);
     if fpk is not null then insert into public.coupon_blocks(kind, value, reason, code) values ('fp', fpk, why, c) on conflict do nothing; end if;
   end if;
   if why is not null then return jsonb_build_object('ok', false, 'err', why); end if;
-  insert into public.coupon_passes(device_hash, code, fp, ip) values (dev, c, fpk, ip);
+  insert into public.coupon_passes(device_hash, code, fp, ip) values (v_dev, c, fpk, v_ip);
   return r || jsonb_build_object('ok', true);
 end $$;
 grant execute on function public.coupon_guard(text, text, text, text, text, boolean) to anon, authenticated;
@@ -197,3 +197,25 @@ grant execute on function public.admin_payfrom_matches(text, uuid) to authentica
 
 -- 11/23 abuse: AllBank 3596
 update public.orders set pay_from4 = '3596' where order_date = '2026-11-23' and order_prefix = 'W' and order_no between 8 and 10 and pay_from4 is null;
+
+-- 📱 real PH mobile numbers only (owner 11/24 15:38): carrier prefixes + fake patterns. Same list as common.js PH_PREFIX.
+create or replace function public.phone_fake(p text) returns boolean language sql immutable as $$
+  with d as (select regexp_replace(regexp_replace(coalesce(p, ''), '\D', '', 'g'), '^63(9\d{9})$', '0\1') v)
+  select v !~ '^0[89]\d{9}$'
+      or left(v, 4) <> all (array['0811','0813','0817','0895','0896','0897','0898','0900','0904','0905','0906','0907','0908','0909','0910','0911','0912','0913','0914','0915','0916','0917','0918','0919','0920','0921','0922','0923','0924','0925','0926','0927','0928','0929','0930','0931','0932','0933','0934','0935','0936','0937','0938','0939','0940','0941','0942','0943','0944','0945','0946','0947','0948','0949','0950','0951','0952','0953','0954','0955','0956','0957','0958','0959','0960','0961','0962','0963','0964','0965','0966','0967','0968','0969','0970','0971','0973','0974','0975','0976','0977','0978','0979','0981','0985','0989','0990','0991','0992','0993','0994','0995','0996','0997','0998','0999'])
+      or v ~ '(\d)\1{4}'
+      or (select count(distinct c) from regexp_split_to_table(right(v, 7), '') c) <= 2
+      or right(v, 7) in ('0123456','1234567','2345678','3456789','9876543','8765432','7654321','6543210')
+  from d
+$$;
+
+-- web orders (customer site) with a fake number are refused outright
+create or replace function public.orders_phone_guard() returns trigger language plpgsql security definer set search_path to 'public' as $$
+begin
+  if new.source = 'web' and new.cust_phone is not null and new.cust_phone <> '' and public.phone_fake(new.cust_phone) then
+    raise exception 'phone_fake';
+  end if;
+  return new;
+end $$;
+drop trigger if exists orders_phone_guard on public.orders;
+create trigger orders_phone_guard before insert on public.orders for each row execute function public.orders_phone_guard();

@@ -814,7 +814,7 @@ function openCheckout(){
       if(busy) return; sync();
       { const bad = unmetRequirement(); if(bad){ toast(requireText(bad), 4500); return; } }
       if(!cust.name.trim()){ toast(T("이름을 입력해주세요","Please enter your name")); $("#fName").focus(); return; }
-      if(!PT.phoneOk(cust.phone)){ toast(T("연락처는 09로 시작하는 11자리 숫자로 입력해주세요","Enter an 11-digit number starting with 09"), 3000); $("#fPhone").focus(); return; }
+      if(!PT.phoneOk(cust.phone)){ toast(T("실제 사용하는 휴대폰 번호를 입력하세요 (09로 시작하는 11자리)","Please enter your real mobile number (11 digits, starts with 09)"), 3500); $("#fPhone").focus(); return; }
       const jpk = !isPickup() && jtvPick();
       const av = isPickup() ? { addr: "", lat: null, lng: null } : jpk ? { addr: jtvLabel(jpk), lat: jpk.lat, lng: jpk.lng } : addrW.value();
       if(av.error){ toast(av.error, 3000); addrW.focus(av.focus); return; }
@@ -1505,7 +1505,7 @@ async function openInquiry(forceNew){
   $("#iqGo").onclick = async () => {
     const name = $("#iqName").value.trim(), phone = PT.phoneValue($("#iqPhone"));
     if(!name){ toast(CT("이름을 입력해주세요","Please enter your name")); return; }
-    if(!PT.phoneOk(phone)){ toast(CT("연락처는 09로 시작하는 11자리 숫자로 입력해주세요","Enter an 11-digit number starting with 09"), 3000); return; }
+    if(!PT.phoneOk(phone)){ toast(CT("실제 사용하는 휴대폰 번호를 입력하세요 (09로 시작하는 11자리)","Please enter your real mobile number (11 digits, starts with 09)"), 3500); return; }
     $("#iqGo").disabled = true;
     try{ const t = await api.chatNewInquiry(name, phone); setInquiryId(t); cust.name = name; cust.phone = phone; s.close(); openChat(t, CT("가게에 문의하기","Contact the store"), start); }
     catch(e){ toast(PT.errMsg(e), 3500); $("#iqGo").disabled = false; }
