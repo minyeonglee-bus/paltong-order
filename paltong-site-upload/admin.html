@@ -1983,6 +1983,15 @@ $("printerBtn").onclick = () => {
 };
 
 /* ---------------- 품절 관리 ---------------- */
+/* 🚫 옵션 품절 (사장님 11/27): menu_status 에 "opt:메뉴id:선택지이름" 으로 저장 → 손님 웹에서 그 선택지 못 고름 (DB 트리거 orders_opt_soldout 도 막음) */
+const optKey = (id, label) => `opt:${id}:${String(label || "").replace(/ ×\d+$/, "")}`;
+function optSoHTML(it){
+  const gs = (it.options || []).filter(g => (g.choices || []).length);
+  if(!gs.length) return "";
+  return `<div class="mm-ctl" style="flex-wrap:wrap;gap:4px"><label class="hint">🚫 ${L("옵션 품절", "Option sold out")}</label>` +
+    gs.map(g => `<span class="hint" data-raw style="margin-left:6px">${esc(g.title)}:</span>` + g.choices.map(c => { const k = optKey(it.id, c.label), out = !!soldOut[k];
+      return `<button class="chip ${out ? "sel" : ""}" data-oso="${esc(k)}" data-raw style="${out ? "background:#b42318;color:#fff;text-decoration:line-through" : ""}" title="${out ? L("눌러서 판매 재개", "Tap to put back on sale") : L("눌러서 품절 처리", "Tap to mark sold out")}">${esc(c.label)}${out ? " · " + L("품절", "sold out") : ""}</button>`; }).join("")).join("") + `</div>`;
+}
 async function loadSoldOut(){ try{ soldOut = await api.getMenuStatus({ includeHidden: true }); }catch(e){} renderSoldOut(); }
 /* ---- 메뉴판 고치기: 지금 메뉴판을 복사 → 고침 → 저장 (가격이 바뀌면 가격 비밀번호) ---- */
 const menuFind = (cfg, id) => { for(const c of cfg){ const i = c.items.findIndex(x => x.id === id); if(i >= 0) return { cat: c, i, it: c.items[i] }; } return null; };
@@ -2036,8 +2045,14 @@ function renderSoldOut(){
         <label class="hint">${L("할인가 ₱", "Sale ₱")}</label><input type="number" min="0" inputmode="numeric" data-msale="${it.id}" value="${it.onSale ? it.price : ""}" placeholder="${L("없음", "none")}">
         <button class="chip" data-msave="${it.id}">🔒 ${L("가격 저장", "Save price")}</button>
         <label class="chip ${it.saleDine ? "sel" : ""}" style="cursor:pointer" title="${L("체크하면 다이닝(T) 주문에도 할인가, 안 하면 다이닝은 정가", "Checked = dine-in (T) also gets the sale price")}"><input type="checkbox" data-mdine="${it.id}" ${it.saleDine ? "checked" : ""} style="margin-right:4px">🍽 ${L("다이닝 포함", "Incl. dining")}</label>
-      </div></div>`).join("")).join("");
+      </div>${optSoHTML(it)}</div>`).join("")).join("");
   const G = $("soGrid");
+  G.querySelectorAll("[data-oso]").forEach(b => b.onclick = async () => {   // 🚫 옵션 품절 (11/27)
+    const k = b.dataset.oso, v = !soldOut[k]; b.disabled = true;
+    try{ await api.setSoldOut(k, v); if(v) soldOut[k] = true; else delete soldOut[k]; toast(v ? L("옵션 품절 처리했습니다", "Option marked sold out") : L("옵션 판매 재개했습니다", "Option back on sale")); }
+    catch(e){ toast(L("저장 실패: ", "Save failed: ") + (e.message||e)); }
+    renderSoldOut();
+  });
   G.querySelectorAll("[data-so]").forEach(b => b.onclick = async () => {
     const id = b.dataset.so, v = !soldOut[id]; b.disabled = true;
     try{ await api.setSoldOut(id, v); if(v) soldOut[id] = true; else delete soldOut[id]; toast(v ? "품절 처리했습니다" : "판매 재개했습니다"); }

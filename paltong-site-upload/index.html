@@ -362,12 +362,16 @@ function closedToast(){ toast(PT.inClosingWindow() && !(shopSettings && shopSett
 let lastClosing = PT.inClosingWindow();
 setInterval(() => { const c = PT.inClosingWindow(); if(c !== lastClosing){ lastClosing = c; try{ renderMenu(); }catch(e){} toast(c ? T("⏳ 오전 7:50~8:00은 마감 정산 시간이라 주문을 잠시 받지 않아요", "⏳ Orders pause 7:50–8:00 AM for daily closing") : T("8시! 지금부터 주문할 수 있어요", "It's 8:00 — you can order now"), 4500); } }, 20000);
 
+/* 🚫 옵션 품절 (사장님 11/27): menu_status 에 "opt:메뉴id:선택지이름" 으로 저장 */
+const optKey = (id, label) => `opt:${id}:${String(label || "").replace(/ ×\d+$/, "")}`;
+const choiceOut = (item, c) => !!soldOut[optKey(item.id, c.label)];
+const lineOptOut = l => (l.opts || []).some(o => !o.note && soldOut[optKey(l.id, o.ko)]);
 async function loadSoldOut(){
   try{ soldOut = await api.getMenuStatus(); }catch(e){ soldOut = {}; }
   renderMenu();
   // 장바구니에 품절 메뉴가 있으면 제거
   const before = cart.length;
-  cart = cart.filter(l => !soldOut[l.id]);
+  cart = cart.filter(l => !soldOut[l.id] && !lineOptOut(l));
   if(cart.length !== before){ saveCart(); toast(T("품절된 메뉴가 장바구니에서 빠졌습니다","Sold-out items were removed from your cart")); }
 }
 
@@ -456,7 +460,7 @@ function openItem(item){
   // 필수 옵션: required 값이 없으면 '하나만 고르기'는 필수, 여러 개/수량형은 선택(예전과 같은 동작)
   const isReq = g => g.required != null ? !!g.required : !isCount(g) && !isMulti(g);
   // 하나만 고르기: 필수면 첫 번째가 기본 선택, 선택(필수 아님)이면 아무것도 안 고른 상태(-1)로 시작
-  const sel = groups.map(g => isCount(g) ? g.choices.map(() => 0) : isMulti(g) ? [] : isReq(g) ? 0 : -1);
+  const sel = groups.map(g => isCount(g) ? g.choices.map(() => 0) : isMulti(g) ? [] : isReq(g) ? g.choices.findIndex(c => !choiceOut(item, c)) : -1);   // 필수: 품절 아닌 첫 선택지
   const picked = gi => { const g = groups[gi], v = sel[gi]; return isCount(g) ? v.reduce((a,b) => a+b, 0) : isMulti(g) ? v.length : (v >= 0 ? 1 : 0); };
   const tagHtml = g => isReq(g)
     ? ` <span class="opt-tag req">${esc(T("필수","Required"))}</span>`
@@ -477,13 +481,14 @@ function openItem(item){
         <div class="opt-group"><div class="opt-title">${L(g.title, g.titleEn)}${tagHtml(g)}${isMulti(g) ? ` <span class="en">(${esc(T(`최대 ${g.max}개`, `up to ${g.max}`))})</span>` : ''}</div>
           ${isCount(g) ? g.choices.map((c,ci) => `
             <div class="qty-row" style="margin:6px 0">
-              <div>${L(c.label, c.en)}${c.delta ? ` <b style="color:var(--red-deep)">+${peso(c.delta)}</b>` : ''}
+              <div${choiceOut(item, c) ? ' style="opacity:.45"' : ''}>${L(c.label, c.en)}${choiceOut(item, c) ? ` <span class="tag tag-out">${esc(T("품절","SOLD OUT"))}</span>` : ''}${c.delta ? ` <b style="color:var(--red-deep)">+${peso(c.delta)}</b>` : ''}
                 <div class="hint">${esc(T(`최대 ${c.maxQty||1}번`, `up to ${c.maxQty||1}×`))}</div></div>
               <div class="qty-ctrl"><button data-cg="${gi}" data-cc="${ci}" data-d="-1">−</button><span>${sel[gi][ci]}</span><button data-cg="${gi}" data-cc="${ci}" data-d="1">+</button></div>
             </div>`).join('') : `
           <div class="opt-choices">${g.choices.map((c,ci) => {
             const on = isMulti(g) ? sel[gi].includes(ci) : sel[gi] === ci;
-            return `<button class="opt-choice ${on?'sel':''}" data-g="${gi}" data-c="${ci}">${isMulti(g) ? (on ? '☑ ' : '☐ ') : ''}${L(c.label, c.en)}${c.delta ? ` (+${peso(c.delta)})` : ''}</button>`;
+            const out = choiceOut(item, c);
+            return `<button class="opt-choice ${on?'sel':''}" data-g="${gi}" data-c="${ci}"${out ? ' disabled style="opacity:.45;text-decoration:line-through"' : ''}>${isMulti(g) ? (on ? '☑ ' : '☐ ') : ''}${L(c.label, c.en)}${c.delta ? ` (+${peso(c.delta)})` : ''}${out ? ` · ${esc(T("품절","SOLD OUT"))}` : ''}</button>`;
           }).join('')}
           </div>`}</div>`).join('')}
       <div class="opt-group"><div class="opt-title">📝 ${L("이 메뉴 요청사항","Request for this item")} <span class="opt-tag">${esc(T("선택","Optional"))}</span></div>
@@ -500,6 +505,7 @@ function openItem(item){
     s.el.querySelector("#itReq").oninput = e => { req = e.target.value; };
     s.el.querySelectorAll(".opt-choice").forEach(b => b.onclick = () => {
       const gi = +b.dataset.g, ci = +b.dataset.c, g = groups[gi];
+      if(choiceOut(item, g.choices[ci])){ toast(T("품절된 옵션이에요","This option is sold out")); return; }
       if(isMulti(g)){
         const a = sel[gi], i = a.indexOf(ci);
         if(i >= 0) a.splice(i, 1);
@@ -510,6 +516,7 @@ function openItem(item){
     });
     s.el.querySelectorAll("[data-cg]").forEach(b => b.onclick = () => {
       const gi = +b.dataset.cg, ci = +b.dataset.cc, max = groups[gi].choices[ci].maxQty || 1;
+      if(+b.dataset.d > 0 && choiceOut(item, groups[gi].choices[ci])){ toast(T("품절된 옵션이에요","This option is sold out")); return; }
       const v = sel[gi][ci] + (+b.dataset.d);
       if(v > max){ toast(T(`최대 ${max}번까지 추가할 수 있어요`, `You can add up to ${max}×`)); return; }
       sel[gi][ci] = Math.max(0, v); render();
@@ -524,6 +531,9 @@ function openItem(item){
         s.close(); openAddrGate();
         return;
       }
+      if(chosen().some(x => choiceOut(item, x.c))){ toast(T("품절된 옵션이 있어요 — 다른 옵션을 골라주세요","A chosen option is sold out — please pick another"), 3500); return; }
+      const allOut = groups.findIndex(g => isReq(g) && g.choices.every(c => choiceOut(item, c)));
+      if(allOut >= 0){ toast(T("지금은 이 메뉴의 옵션이 모두 품절이에요","All options for this item are sold out right now"), 3500); return; }
       const miss = groups.findIndex((g,gi) => isReq(g) && picked(gi) === 0);
       if(miss >= 0){ const g = groups[miss]; toast(T(`'${g.title}' 옵션을 선택해주세요 (필수)`, `Please choose '${g.titleEn || g.title}' (required)`)); return; }
       const opts = chosen().map(x => ({ g:x.g, c:x.ci, n:x.n,
@@ -1192,7 +1202,7 @@ function reorder(o){
   (o.items || []).forEach(l => {
     if(l.svcAdded) return;                       // 가게가 서비스로 넣어준 메뉴는 다시 담지 않음
     const price = PT.repriceLine(l);
-    if(price == null || soldOut[l.id]){ skipped += l.qty; return; }
+    if(price == null || soldOut[l.id] || lineOptOut(l)){ skipped += l.qty; return; }
     const it = ITEM_BY_ID[l.id];
     const opts = (l.opts || []).map(x => ({ ...x }));
     const key = l.id + "|" + opts.map(x => (x.g ?? "") + ":" + (x.c ?? x.en) + ":" + (x.n || 1)).join(",");
