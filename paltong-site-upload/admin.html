@@ -1612,11 +1612,13 @@ function addItemModal(o, svc, editIdx, kitchen){
   const cur = () => sel.value ? all.find(x => x.id === sel.value) : null;
   function paintOpts(){
     const it = cur(); cus.hidden = !!it;
+    const oo = c => dineMode && !edit && it && !!soldOut[optKey(it.id, c.label)];   // 🚫 다이닝: 품절 옵션 못 고름 (11/27)
+    const OUT = ` — ${L("품절", "sold out")}`;
     box.innerHTML = it ? (it.options || []).map((g, gi) => `<div class="field" style="margin:0 0 8px" data-og="${gi}">
       <label>${esc(g.title)} <span class="en">${esc(g.titleEn || "")}</span> ${isReq(g) ? `<b style="color:var(--red-deep)">${L("필수", "required")}</b>` : `<span class="hint">${L("선택", "optional")}${isMulti(g) ? ` · ${L("최대", "max")} ${g.max}` : ""}</span>`}</label>
-      ${isCount(g) ? g.choices.map((c, ci) => `<div class="fee-row" style="margin:0 0 4px;gap:8px"><span style="flex:1">${esc(c.label)} ${c.delta ? `+${peso(c.delta)}` : ""}</span><input type="number" min="0" max="${c.maxQty || 1}" value="0" data-cnt="${ci}" style="width:70px"></div>`).join("")
-      : isMulti(g) ? `<div class="chips">${g.choices.map((c, ci) => `<label class="chip" style="cursor:pointer"><input type="checkbox" data-chk="${ci}" style="margin-right:4px">${esc(c.label)}${c.delta ? ` +${peso(c.delta)}` : ""}</label>`).join("")}</div>`
-      : `<select class="note-in" style="margin:0" data-one>${isReq(g) ? "" : `<option value="-1">${L("선택 안 함", "None")}</option>`}${g.choices.map((c, ci) => `<option value="${ci}">${esc(c.label)} · ${esc(c.en || "")}${c.delta ? ` (+${peso(c.delta)})` : ""}</option>`).join("")}</select>`}
+      ${isCount(g) ? g.choices.map((c, ci) => `<div class="fee-row" style="margin:0 0 4px;gap:8px${oo(c) ? ";opacity:.45" : ""}"><span style="flex:1">${esc(c.label)} ${c.delta ? `+${peso(c.delta)}` : ""}${oo(c) ? OUT : ""}</span><input type="number" min="0" max="${oo(c) ? 0 : c.maxQty || 1}" value="0" data-cnt="${ci}" style="width:70px" ${oo(c) ? "disabled" : ""}></div>`).join("")
+      : isMulti(g) ? `<div class="chips">${g.choices.map((c, ci) => `<label class="chip" style="cursor:pointer${oo(c) ? ";opacity:.45;text-decoration:line-through" : ""}"><input type="checkbox" data-chk="${ci}" style="margin-right:4px" ${oo(c) ? "disabled" : ""}>${esc(c.label)}${c.delta ? ` +${peso(c.delta)}` : ""}${oo(c) ? OUT : ""}</label>`).join("")}</div>`
+      : `<select class="note-in" style="margin:0" data-one>${isReq(g) ? "" : `<option value="-1">${L("선택 안 함", "None")}</option>`}${g.choices.map((c, ci) => `<option value="${ci}" ${oo(c) ? "disabled" : ""}>${esc(c.label)} · ${esc(c.en || "")}${c.delta ? ` (+${peso(c.delta)})` : ""}${oo(c) ? OUT : ""}</option>`).join("")}</select>`}
     </div>`).join("") : "";
     box.querySelectorAll("input,select").forEach(x => x.oninput = x.onchange = () => build(false));
     build(false);
@@ -1635,6 +1637,8 @@ function addItemModal(o, svc, editIdx, kitchen){
         else if(isMulti(g)){ g.choices.forEach((c, ci) => { if(gEl.querySelector(`[data-chk="${ci}"]`).checked) picks.push([ci, 1]); });
           if(picks.length > g.max) return fail(L(`'${g.title}'는 최대 ${g.max}개`, `'${g.titleEn || g.title}': up to ${g.max}`)); }
         else { const v = +gEl.querySelector("[data-one]").value; if(v >= 0) picks.push([v, 1]); }
+        if(dineMode && !edit){ const bad = picks.find(([ci]) => soldOut[optKey(it.id, g.choices[ci].label)]);
+          if(bad) return fail(L(`'${g.choices[bad[0]].label}' 옵션은 품절이에요`, `'${g.choices[bad[0]].en || g.choices[bad[0]].label}' is sold out`)); }
         if(isReq(g) && !picks.length) return fail(L(`'${g.title}' 옵션을 선택해주세요 (필수)`, `Choose '${g.titleEn || g.title}' (required)`));
         picks.forEach(([ci, n]) => { const c = g.choices[ci]; unit += (c.delta || 0) * n;
           opts.push({ g: gi, c: ci, n, ko: c.label + (n > 1 ? ` ×${n}` : ""), en: (c.en || c.label) + (n > 1 ? ` ×${n}` : "") }); });

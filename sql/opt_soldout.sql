@@ -1,7 +1,7 @@
 -- 🚫 옵션 품절 (사장님 2026-11-27)
 -- 관리자 메뉴 화면에서 선택지별 품절 → menu_status(item_id = 'opt:메뉴id:선택지이름', sold_out = true).
 -- 손님 웹 주문(source = 'web')과 손님 추가 주문(add_items 로 들어온 줄)에 품절 선택지가 있으면 'sold_out:...' 오류.
--- 직원이 넣는 주문(다이닝 · 외부 · 관리자 추가)은 막지 않음. 수량형 옵션의 " ×2" 같은 꼬리는 떼고 비교.
+-- 11/27 23:20 사장님 "다이닝에도 포함" → 다이닝(T) 주문 생성 · 다이닝 메뉴 추가도 막음. 외부 주문(DK · 전화 등)은 안 막음. 수량형 옵션의 " ×2" 같은 꼬리는 떼고 비교.
 
 create or replace function public.opt_soldout_names(p_items jsonb) returns text
 language sql stable as $$
@@ -18,8 +18,13 @@ language plpgsql as $$
 declare v_out text;
 begin
   if tg_op = 'INSERT' then
-    if coalesce(new.source, 'web') <> 'web' then return new; end if;
+    if coalesce(new.source, 'web') not in ('web', 'dine') then return new; end if;
     v_out := public.opt_soldout_names(new.items);
+  elsif new.source = 'dine' then
+    -- 다이닝: 이번에 새로 들어온 추가 줄 (added = true, 예전 items 에 없던 것). 🔄 수정 줄은 added 가 없어서 제외
+    select public.opt_soldout_names(coalesce(jsonb_agg(e), '[]'::jsonb)) into v_out
+      from jsonb_array_elements(new.items) e
+     where coalesce((e->>'added')::boolean, false) and not coalesce(old.items, '[]'::jsonb) @> jsonb_build_array(e);
   else
     -- add_items: 새 줄은 added = true, added_at = now() (같은 트랜잭션), 관리자 추가(byAdmin)는 제외
     select public.opt_soldout_names(coalesce(jsonb_agg(e), '[]'::jsonb)) into v_out
