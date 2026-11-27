@@ -1655,7 +1655,10 @@ function addItemModal(o, svc, editIdx, kitchen){
     line.qty = qty; line.added = true; line.added_at = new Date().toISOString(); line.byAdmin = true;
     if(edit){ delete line.added; delete line.added_at; delete line.byAdmin; }
     if(svc){ line.origUnit = line.unitPrice; line.unitPrice = 0; line.svc = true; line.svcAdded = true; delete line.added; delete line.added_at; }
-    ov.querySelector("#svSum").textContent = edit ? `${peso(el0.unitPrice * el0.qty)} → ${peso(line.unitPrice * qty)}` : svc ? (line.origUnit ? `${peso(line.origUnit * qty)} → ₱0` : "₱0") : "+" + peso(line.unitPrice * qty);
+    // 🍶 소주 이벤트 미리보기 (다이닝 · 전화 등, DB 트리거가 최종 계산): 이 주문에 쭈꾸미가 있거나 같이 넣으면 ₱200
+    const pv = !edit && !svc ? PT.sojuPromo([line], { channel: o.channel, extra: o.items || [], used: (o.items || []).filter(x => x.promo).reduce((t, x) => t + (+x.qty || 0), 0) }) : [line];
+    const pSum = pv.reduce((t, x) => t + x.unitPrice * x.qty, 0), pOn = pv.some(x => x.promo);
+    ov.querySelector("#svSum").textContent = edit ? `${peso(el0.unitPrice * el0.qty)} → ${peso(line.unitPrice * qty)}` : svc ? (line.origUnit ? `${peso(line.origUnit * qty)} → ₱0` : "₱0") : "+" + peso(pSum) + (pOn ? ` 🍶 ${L("소주 이벤트", "soju promo")} (${peso(line.unitPrice * qty)} → ${peso(pSum)})` : "");
     return { line, qty };
   }
   sel.onchange = paintOpts;
