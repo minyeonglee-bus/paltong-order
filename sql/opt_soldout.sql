@@ -6,8 +6,8 @@
 create or replace function public.opt_soldout_names(p_items jsonb) returns text
 language sql stable as $$
   select string_agg(distinct coalesce(e->>'name', e->>'id') || ' (' || (o->>'ko') || ')', ', ')
-    from jsonb_array_elements(case when jsonb_typeof(p_items) = 'array' then p_items else '[]'::jsonb end) e,
-         jsonb_array_elements(case when jsonb_typeof(e->'opts') = 'array' then e->'opts' else '[]'::jsonb end) o
+    from jsonb_array_elements(case when jsonb_typeof(p_items) = 'array' then p_items else '[]'::jsonb end) e
+    cross join lateral jsonb_array_elements(case when jsonb_typeof(e->'opts') = 'array' then e->'opts' else '[]'::jsonb end) o
     join public.menu_status ms
       on ms.sold_out and ms.item_id = 'opt:' || (e->>'id') || ':' || regexp_replace(coalesce(o->>'ko', ''), ' ×\d+$', '')
    where not coalesce((o->>'note')::boolean, false)
