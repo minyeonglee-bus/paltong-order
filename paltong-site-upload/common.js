@@ -418,6 +418,33 @@ function repriceLine(l){
   }
   return p;
 }
+/* 🍶 소주 이벤트 (사장님 11/27): 영업일 11/27·11/28, 쭈꾸미·쭈꾸미 삼겹 주문 시 참이슬/처음처럼 ₱200, 주문(테이블)당 5병까지.
+   진로·새로 제외, 배달K(DK) 주문 제외. DB 트리거 orders_promo_soju 가 같은 규칙으로 최종 계산 (sql/promo_soju.sql).
+   줄을 나눠서 이벤트 병은 promo:"soju200" · promoOrig(원래 단가) 표시. */
+const PROMO_SOJU = { days:["2026-11-27", "2026-11-28"], price:200, max:5, qual:["jjukkumi", "jjukkumi_samgyeop", "m_mvg4m5sf"] };
+const promoSojuOn = when => PROMO_SOJU.days.includes(bizDay(when || Date.now()));
+const isSojuLine = l => !!l && !isSvc(l) && (!l.priceByAdmin || !!l.promo) && (l.id === "chamisul" ||
+  (!!l.custom && /참이슬|처음처럼|chamisul|chum ?churum/i.test(`${l.name || ""} ${l.en || ""}`) && !/진로|jinro|새로|saero/i.test(`${l.name || ""} ${l.en || ""}`)));
+const isPromoQual = l => !!l && !isSvc(l) && (PROMO_SOJU.qual.includes(l.id) || (!!l.custom && /쭈꾸미|쭈삼|jjuk|pusit/i.test(`${l.name || ""} ${l.en || ""}`)));
+function sojuPromo(lines, opt = {}){
+  lines = lines || [];
+  if(opt.channel === "DK" || !promoSojuOn(opt.when)) return lines;
+  if(!lines.some(isSojuLine)) return lines;
+  const on = lines.concat(opt.extra || []).some(isPromoQual);
+  let left = PROMO_SOJU.max - (opt.used || 0);
+  const out = [];
+  for(const l0 of lines){
+    if(!isSojuLine(l0)){ out.push(l0); continue; }
+    const l = { ...l0 }; const q = +l.qty || 0;
+    if(l.promo){ l.unitPrice = +l.promoOrig || l.unitPrice; delete l.promo; delete l.promoOrig; }
+    if(on && left > 0 && l.unitPrice > PROMO_SOJU.price && q > 0){
+      const n = Math.min(q, left); left -= n;
+      out.push({ ...l, qty:n, unitPrice:PROMO_SOJU.price, promo:"soju200", promoOrig:l.unitPrice });
+      if(q > n) out.push({ ...l, qty:q - n });
+    } else out.push(l);
+  }
+  return out;
+}
 /* 스탬프 보상 안내 문구 (설정값 기준) */
 function stampRewards(st){
   st = st || {}; const out = [];
@@ -1625,6 +1652,6 @@ function contactHTML(){
     CFG.STORE_PHONE ? `${T("전화·SMS", "Call·SMS")}: <a href="tel:${esc(CFG.STORE_PHONE.replace(/\s/g, ""))}"><b>${esc(CFG.STORE_PHONE)}</b></a>` : "",
     CFG.VIBER_PHONE ? `Viber·WhatsApp: <a href="https://wa.me/${num(CFG.VIBER_PHONE)}" target="_blank" rel="noopener"><b>${esc(CFG.VIBER_PHONE)}</b></a>` : ""].filter(Boolean).join("<br>");
 }
-window.PT = { deviceKey, deviceFp, isPrivateMode, phoneFake, contactLines, contactHTML, PRINT_SETS, PRINT_SETS_EN, KIND_LABEL, printKinds, manilaDay, bizDay, bizStart, DAY_START_HOUR, orderDay, get menuCfgActive(){ return menuCfgActive; }, loadMenuData, exportMenu, priceSig, politeKo, CATS, get menuOv(){ return menuOv; }, applyMenuOverrides, cleanForTranslate, setTranslateKey, googleTranslate, splitKoEn, msgText, schedLabel, menuToEnglish, matchZone, zoneFee, phoneMask, phoneValue, phoneOk, phoneDigits, phoneFmt, englishOnly, EN_NAME, EN_ADDR, hasHangul, stampRewards, stampText, isMemberPhone, normPhone, phoneEmail, prettyPhone, couponDiscount, couponValue, couponFace, couponsFace, couponCond, couponUsable, COUPON_KINDS, couponKind, stackKey, stackMax, couponStackOk, couponsDiscount, bestCoupons, stackRulesText, repriceLine, setNoSale, get noSale(){ return noSale; }, setJtvPlaces, isJtvAt, jtvPicks, errMsg, CFG, MENU, ITEM_BY_ID, esc, peso, ls, L, T, setLang, get LANG(){ return LANG; },
+window.PT = { PROMO_SOJU, promoSojuOn, sojuPromo, deviceKey, deviceFp, isPrivateMode, phoneFake, contactLines, contactHTML, PRINT_SETS, PRINT_SETS_EN, KIND_LABEL, printKinds, manilaDay, bizDay, bizStart, DAY_START_HOUR, orderDay, get menuCfgActive(){ return menuCfgActive; }, loadMenuData, exportMenu, priceSig, politeKo, CATS, get menuOv(){ return menuOv; }, applyMenuOverrides, cleanForTranslate, setTranslateKey, googleTranslate, splitKoEn, msgText, schedLabel, menuToEnglish, matchZone, zoneFee, phoneMask, phoneValue, phoneOk, phoneDigits, phoneFmt, englishOnly, EN_NAME, EN_ADDR, hasHangul, stampRewards, stampText, isMemberPhone, normPhone, phoneEmail, prettyPhone, couponDiscount, couponValue, couponFace, couponsFace, couponCond, couponUsable, COUPON_KINDS, couponKind, stackKey, stackMax, couponStackOk, couponsDiscount, bestCoupons, stackRulesText, repriceLine, setNoSale, get noSale(){ return noSale; }, setJtvPlaces, isJtvAt, jtvPicks, errMsg, CFG, MENU, ITEM_BY_ID, esc, peso, ls, L, T, setLang, get LANG(){ return LANG; },
   orderPrefix, orderCode, isDine, inClosingWindow, isSvc, svcValue, riderPhone, riderEmail, STATUS, payInfo, isOnlinePay, lineName, lineOpt, optList, optLine, optChips, shortName, unitBreak, compressImage, api, DEMO, receiptDoc, printReceipt, toast };
 })();

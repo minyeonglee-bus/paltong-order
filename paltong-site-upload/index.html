@@ -372,7 +372,16 @@ async function loadSoldOut(){
 }
 
 /* ---------- 장바구니 ---------- */
-const cartTotal = () => cart.reduce((s,l) => s + l.unitPrice * l.qty, 0);
+const orderLines = () => PT.sojuPromo(cart);   // 🍶 소주 이벤트 가격 반영 (11/27·28)
+const cartRawTotal = () => cart.reduce((s,l) => s + l.unitPrice * l.qty, 0);
+const cartTotal = () => orderLines().reduce((s,l) => s + l.unitPrice * l.qty, 0);
+const lineOut = l => ({ id:l.id, name:l.name, en:l.en, opts:l.opts, unitPrice:l.unitPrice, qty:l.qty, ...(l.promo ? { promo:l.promo, promoOrig:l.promoOrig } : {}) });
+function promoNote(){
+  if(!PT.promoSojuOn() || !cart.some(l => l.id === "chamisul")) return "";
+  const save = cartRawTotal() - cartTotal();
+  return save > 0 ? `<div class="sum-row" style="color:var(--red-deep)"><span>🍶 ${L("소주 이벤트 (쭈꾸미 주문 시 1병 ₱200, 최대 5병)","Soju promo (₱200/bottle with Jjukumi, max 5)")}</span><b>−${peso(save)}</b></div>`
+    : `<p class="hint" style="color:var(--red-deep)">🍶 ${L("오늘의 이벤트: 쭈꾸미 · 쭈꾸미 삼겹을 같이 주문하면 참이슬/처음처럼 1병 ₱200 (최대 5병)","Today's promo: add Jjukumi or Jjusam and get Chamisul / Chum Churum for ₱200 a bottle (max 5)")}</p>`;
+}
 const cartCount = () => cart.reduce((s,l) => s + l.qty, 0);
 function saveCart(){ if(!addMode) ss.set("paltong_cart", cart); refreshCartBar(); armBack(); }
 function refreshCartBar(){
@@ -546,6 +555,7 @@ function openCart(){
             </div>
             <div class="cart-line-qty"><button data-dec="${i}">−</button><span>${l.qty}</span><button data-inc="${i}">+</button></div>
           </div>`).join('')}
+        ${promoNote()}
         <div class="sum-row total"><span>${L("메뉴 합계","Subtotal")}</span><b>${peso(cartTotal())}</b></div>
         ${addMode ? `<p class="hint">${L(`진행 중인 주문에 추가되고, 최종 금액이 자동으로 바뀌어요. 배달비는 그대로예요.`, `These items are added to your current order and the total updates automatically. Same delivery fee.`)}</p>
           <button class="primary-btn" id="goAdd">${L("추가 결제하기","Pay for added items")}</button>
@@ -565,7 +575,7 @@ function openCart(){
       ga.disabled = true;
       try{
         const id = addMode.id;
-        await api.addItems(id, cart.map(l => ({ id:l.id, name:l.name, en:l.en, opts:l.opts, unitPrice:l.unitPrice, qty:l.qty })), cartTotal());
+        await api.addItems(id, cart.map(l => ({ id:l.id, name:l.name, en:l.en, opts:l.opts, unitPrice:l.unitPrice, qty:l.qty })), cartRawTotal());   // 🍶 소주 이벤트는 DB가 주문 전체 기준으로 다시 계산
         toast(T("메뉴를 추가했어요! 최종 금액이 바뀌었어요","Items added — your total was updated"), 3500);
         endAdd(); s.close(); openTracker(id, { focusPay: true });
       }catch(e){ toast(PT.errMsg(e), 4000); ga.disabled = false; if(String(e.message || e).includes("sold_out")) loadSoldOut(); }
@@ -681,7 +691,7 @@ function openCheckout(){
           <input id="fTime" type="time" step="900" value="${esc(cust.sTime)}"></div>
         <p class="hint" id="schedHint" style="margin:6px 0 0" ${cust.sched ? "" : "hidden"}>${isPickup() ? L("찾으러 오실 시간을 골라주세요 (지금부터 15분 뒤 ~ 7일 안).","Choose when you'll pick it up (15 min to 7 days from now).") : L("받고 싶은 시간을 골라주세요 (지금부터 15분 뒤 ~ 7일 안). 가게에서 시간에 맞춰 준비해요.","Choose when you want it delivered (15 min to 7 days from now).")}</p></div>
       <div class="card">
-        ${cart.map(l => `<div class="sum-row"><span>${PT.lineName(l,"html")}${l.opts && l.opts.length ? ` <span class="en">(${esc(optLine(l))})</span>` : ''} ×${l.qty}</span><span>${peso(l.unitPrice*l.qty)}</span></div>`).join('')}
+        ${orderLines().map(l => `<div class="sum-row"><span>${l.promo ? "🍶 " : ""}${PT.lineName(l,"html")}${l.opts && l.opts.length ? ` <span class="en">(${esc(optLine(l))})</span>` : ''} ×${l.qty}</span><span>${l.promo ? `<s class="hint">${peso(l.promoOrig*l.qty)}</s> ` : ""}${peso(l.unitPrice*l.qty)}</span></div>`).join('')}
         <div id="sumBox"></div>
       </div>
       <button class="primary-btn" id="placeBtn">${L("주문 요청하기","Place order")}</button>
@@ -835,7 +845,7 @@ function openCheckout(){
       busy = true; $("#placeBtn").disabled = true; $("#placeBtn").textContent = T("주문 전송 중…","Sending…");
       try{
         const res = await api.placeOrder({
-          items: cart.map(l => ({ id:l.id, name:l.name, en:l.en, opts:l.opts, unitPrice:l.unitPrice, qty:l.qty })),
+          items: orderLines().map(lineOut),
           subtotal: sub, name:cust.name.trim(), phone:cust.phone.trim(), addr: isPickup() ? "Store pickup" : cust.addr.trim(), lat: av.lat, lng: av.lng,
           order_type: isPickup() ? "pickup" : "delivery", scheduled_at: schedISO(),
           memo:cust.memo.trim(), payment:cust.payment, lang:PT.LANG, coupon_id: acct && chosen.length ? chosen[0].id : null, coupon_ids: acct ? chosen.map(c => c.id) : [], ...(!acct && chosen.length ? { coupon_code: guestCode.code } : {}), quote_id: qok ? quote.quote_id : null, device: PT.deviceKey() });
